@@ -1,8 +1,8 @@
-PlotFarm
+#PlotFarm
 
 Nền tảng cho thuê ô đất canh tác trực tuyến, giúp kết nối người dùng có nhu cầu trồng trọt với không gian nông nghiệp số hóa.
 
-Giới thiệu dự án
+##Giới thiệu dự án
 
 PlotFarm là giải pháp công nghệ mang lại trải nghiệm làm nông nghiệp từ xa thông qua các tính năng cốt lõi:
 
@@ -14,7 +14,7 @@ PlotFarm là giải pháp công nghệ mang lại trải nghiệm làm nông ngh
 
 -Thu hoạch sản phẩm: Nhận thành phẩm trực tiếp sau khi cây trồng đến kỳ thu hoạch.
 
-Tính năng chính
+##Tính năng chính
 
 -Thuê đất trực tuyến: Xem danh sách, diện tích, vị trí và tiến hành thuê ô đất mong muốn.
 
@@ -23,3 +23,8 @@ Tính năng chính
 -Camera trực tuyến (Live Stream): Theo dõi hình ảnh thực tế của ô đất 24/7.
 
 -Yêu cầu dịch vụ: Gửi yêu cầu hỗ trợ tưới nước, bón phân, phòng trừ sâu bệnh hoặc chăm sóc định kỳ cho nhà vườn.
+
+## Công nghệ
+
+- Frontend: React + Vite
+- Backend: Node.js + PostgreSQL
