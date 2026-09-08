@@ -228,6 +228,13 @@ h1 em, h2 em { font-family: inherit; font-style: normal; font-weight: 700; }
 .header-cta, .primary-button, .outline-button, .listing-select, .auth-tabs button, .social-button { font-family: var(--sans); font-weight: 700; }
 .hero-description, .section-note, .start-grid p, .journal-copy > p:not(.eyebrow), .listing-body, .contact-subtitle, footer { line-height: 1.55; }
 
+/* Keep contact form text readable on the light form panel. */
+.contact-form { color: #173525; }
+.contact-form label { display: grid; gap: 7px; color: #526658; font-size: 11px; font-weight: 700; }
+.contact-form input { width: 100%; box-sizing: border-box; border: 1px solid #c7d0c8; border-radius: 4px; background: #fff; color: #173525; caret-color: #c98b3c; padding: 12px 13px; outline: 0; }
+.contact-form input::placeholder { color: #8a958d; opacity: 1; }
+.contact-form input:focus { border-color: #c98b3c; box-shadow: 0 0 0 3px rgba(201, 139, 60, .16); }
+
 /* Full-screen garden map */
 .garden-map-overlay { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; background: #f8f9f7; color: #173525; animation: fade-in .2s ease-out; }
 .garden-map-toolbar { display: grid; grid-template-columns: minmax(240px, 1fr) 215px 215px 215px 42px; gap: 6px; align-items: center; padding: 8px 18px; background: #fff; border-bottom: 1px solid #d8ddd8; }
