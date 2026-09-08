@@ -1,30 +1,25 @@
 import { useState } from 'react'
 import './App.css'
-import AuthModal from './AuthModal.jsx'
+import Header from './components/Header.jsx'
+import LandingSections from './components/LandingSections.jsx'
+import PlotSelector from './components/PlotSelector.jsx'
+import ContactSection from './components/ContactSection.jsx'
+import AuthModal from './components/AuthModal.jsx'
+import Footer from './components/Footer.jsx'
 
 function App() {
   const [selectedPlot, setSelectedPlot] = useState('B-07')
-  const [submitted, setSubmitted] = useState(false)
   const [authMode, setAuthMode] = useState(null)
-  const plots = ['A-01', 'A-02', 'A-03', 'B-05', 'B-06', 'B-07', 'C-09', 'C-10', 'C-11']
-  const occupiedPlots = ['A-03', 'C-09']
   const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
-  const handleSubmit = (event) => { event.preventDefault(); setSubmitted(true) }
-  const openAuth = (mode = 'login') => setAuthMode(mode)
 
-  return (
-    <main>
-      <header className="site-header"><a className="brand" href="#top"><span className="brand-mark">PF</span><span>plot<span>farm</span></span></a><nav><button onClick={() => scrollTo('plots')}>Ô đất đang trống</button><button onClick={() => scrollTo('how-it-works')}>Cách hoạt động</button><button onClick={() => scrollTo('journal')}>Nhật ký mùa vụ</button></nav><div className="header-actions"><button className="login-link" onClick={() => openAuth('login')}>Đăng nhập</button><button className="header-cta" onClick={() => openAuth('register')}>Bắt đầu trồng <span>↗</span></button></div></header>
-      <section className="hero" id="top"><div className="hero-copy"><p className="eyebrow"><span className="eyebrow-dot" /> Nông nghiệp gần hơn bạn nghĩ</p><h1>Một mảnh đất.<br /><em>Một mùa xanh.</em></h1><p className="hero-description">Thuê ô đất riêng, tự tay chọn giống và theo dõi khu vườn của bạn mỗi ngày. PlotFarm chăm cây, bạn tận hưởng thành quả.</p><div className="hero-actions"><button className="primary-button" onClick={() => scrollTo('plots')}>Khám phá ô đất <span>→</span></button><button className="text-button" onClick={() => scrollTo('how-it-works')}>Xem cách hoạt động <span>↓</span></button></div><div className="hero-proof"><div className="avatar-stack"><span>MH</span><span>LT</span><span>AN</span></div><p><strong>250+</strong> người đang tự trồng<br />bữa ăn của mình</p></div></div><div className="hero-visual"><img src="https://images.unsplash.com/photo-1592982537447-7440770cbfc9?auto=format&fit=crop&w=1100&q=85" alt="Người làm vườn chăm sóc luống rau xanh" /><div className="visual-tag tag-location"><span className="pin">⌖</span><div><strong>Vườn Phúc Lộc</strong><small>Đà Nẵng · 2.4 ha</small></div></div><div className="visual-tag tag-weather"><span>☀</span><div><strong>28°C</strong><small>Điều kiện lý tưởng</small></div></div><div className="season-badge"><span className="badge-number">01</span><span>Mùa vụ<br />của bạn</span></div></div></section>
-      <section className="marquee"><span>TRỒNG THẬT</span><i>✦</i><span>SỐNG XANH</span><i>✦</i><span>ĂN LÀNH</span><i>✦</i><span>TRỒNG THẬT</span></section>
-      <section className="plots-section section-shell" id="plots"><div className="section-intro"><div><p className="eyebrow">01 / Chọn không gian của bạn</p><h2>Chạm vào đất,<br /><em>chạm vào bình yên.</em></h2></div><p className="section-note">Mỗi ô đất là một khởi đầu mới. Chọn diện tích phù hợp, chúng mình sẽ chuẩn bị mọi thứ để bạn bắt đầu.</p></div><div className="plot-layout"><div className="map-card"><div className="map-header"><span className="live-dot" /> Sơ đồ khu vườn <span className="map-meta">Cập nhật 2 phút trước</span></div><div className="plot-grid">{plots.map((plot) => <button key={plot} disabled={occupiedPlots.includes(plot)} className={`plot ${occupiedPlots.includes(plot) ? 'plot-occupied' : ''} ${selectedPlot === plot ? 'plot-selected' : ''}`} onClick={() => setSelectedPlot(plot)}><span>{plot}</span><small>24m²</small></button>)}</div><div className="map-legend"><span><i className="legend-dot available" /> Đang trống</span><span><i className="legend-dot selected" /> Đang chọn</span><span><i className="legend-dot occupied" /> Đã thuê</span></div></div><div className="plot-detail"><p className="eyebrow">Ô đất đang chọn</p><div className="plot-title"><h3>{selectedPlot}</h3><span className="available-label"><i /> Đang trống</span></div><div className="detail-row"><span>Diện tích</span><strong>24m²</strong></div><div className="detail-row"><span>Thời hạn tối thiểu</span><strong>3 tháng</strong></div><div className="detail-row"><span>Chi phí chăm sóc</span><strong>Đã bao gồm</strong></div><div className="price"><small>Từ</small><strong>490.000đ</strong><span>/ tháng</span></div><button className="primary-button full-width" onClick={() => scrollTo('contact')}>Giữ ô đất này <span>→</span></button><p className="detail-footnote">Không cần thanh toán ngay · Tư vấn miễn phí</p></div></div></section>
-      <section className="how-section section-shell" id="how-it-works"><div className="section-heading-centered"><p className="eyebrow">02 / Mọi thứ thật đơn giản</p><h2>Từ hạt giống<br /><em>đến bàn ăn.</em></h2></div><div className="steps"><article><span className="step-number">01</span><div className="step-icon">⌖</div><h3>Chọn ô đất</h3><p>Chọn vị trí, diện tích và loại cây bạn muốn trồng ngay trên bản đồ.</p></article><article className="step-featured"><span className="step-number">02</span><div className="step-icon">♧</div><h3>Gieo & chăm sóc</h3><p>Đội ngũ nhà vườn chăm sóc mỗi ngày, bạn theo dõi hành trình qua nhật ký.</p></article><article><span className="step-number">03</span><div className="step-icon">✦</div><h3>Thu hoạch tại nhà</h3><p>Đến thăm vườn hoặc nhận rau tươi tận cửa khi mùa vụ chín.</p></article></div></section>
-      <section className="journal-section section-shell" id="journal"><div className="journal-image"><img src="https://images.unsplash.com/photo-1589923188900-85dae523342b?auto=format&fit=crop&w=900&q=85" alt="Rau xanh trong khu vườn PlotFarm" /><div className="image-caption">Một ngày ở PlotFarm <span>↗</span></div></div><div className="journal-copy"><p className="eyebrow">03 / Nhật ký mùa vụ</p><h2>Nhìn thấy điều<br /><em>mình nuôi lớn.</em></h2><p>Mỗi mầm cây đều có câu chuyện riêng. Xem ảnh, cập nhật thời tiết, tình trạng đất và những việc nhà vườn đã làm cho khu vườn của bạn.</p><button className="outline-button" onClick={() => scrollTo('contact')}>Xem thử nhật ký <span>↗</span></button><div className="journal-stats"><div><strong>12</strong><span>lần cập nhật<br />mỗi tháng</span></div><div><strong>24/7</strong><span>camera trực tiếp<br />tại khu vườn</span></div></div></div></section>
-      <section className="contact-section" id="contact"><div className="contact-inner"><div><p className="eyebrow light">Sẵn sàng bắt đầu?</p><h2>Để PlotFarm<br /><em>giữ chỗ cho bạn.</em></h2><p className="contact-subtitle">Để lại thông tin, đội ngũ của chúng mình sẽ gọi lại trong vòng 24 giờ.</p></div>{submitted ? <div className="success-message"><span>✓</span><h3>Cảm ơn bạn đã đăng ký!</h3><p>PlotFarm sẽ liên hệ với bạn sớm nhất.</p></div> : <form className="contact-form" onSubmit={handleSubmit}><label>Họ và tên<input required placeholder="Nguyễn Minh An" /></label><label>Số điện thoại<input required type="tel" placeholder="09xx xxx xxx" /></label><button className="primary-button light-button" type="submit">Nhận tư vấn miễn phí <span>→</span></button></form>}</div></section>
-      {authMode && <AuthModal mode={authMode} onClose={() => setAuthMode(null)} onSwitchMode={openAuth} />}
-      <footer><a className="brand" href="#top"><span className="brand-mark">PF</span><span>plot<span>farm</span></span></a><p>Trồng một khu vườn, nuôi một lối sống.</p><span className="copyright">© 2024 PlotFarm</span></footer>
-    </main>
-  )
+  return <main>
+    <Header onOpenAuth={setAuthMode} onNavigate={scrollTo} />
+    <LandingSections onNavigate={scrollTo} />
+    <PlotSelector selectedPlot={selectedPlot} onSelectPlot={setSelectedPlot} onReserve={() => scrollTo('contact')} />
+    <ContactSection />
+    {authMode && <AuthModal mode={authMode} onClose={() => setAuthMode(null)} onSwitchMode={setAuthMode} />}
+    <Footer />
+  </main>
 }
 
 export default App
