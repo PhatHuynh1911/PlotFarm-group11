@@ -398,6 +398,34 @@ h1 em, h2 em { font-family: inherit; font-style: normal; font-weight: 700; }
 .journal-history article { display: flex; justify-content: space-between; gap: 15px; padding: 14px 0; border-top: 1px solid #eef0eb; }
 .journal-history article strong, .journal-history article small { display: block; }.journal-history article strong { color: #173525; }.journal-history article small, .journal-history article p { color: #718176; font-size: 11px; }.journal-history article p { margin: 7px 0 0; line-height: 1.5; }.journal-history img { width: 76px; height: 56px; object-fit: cover; border-radius: 4px; }
 .empty-state { color: #87938b; font-size: 12px; }
+
+/* Admin operations workspace */
+.admin-heading { display: flex; justify-content: space-between; align-items: end; gap: 28px; }
+.admin-heading h1 { margin-bottom: 16px; }
+.admin-system { margin-bottom: 14px; color: #4e7d59; }
+.admin-tabs { display: flex; gap: 27px; margin: 48px 0 28px; overflow-x: auto; border-bottom: 1px solid #dfe1da; white-space: nowrap; }
+.admin-tabs button { padding: 0 0 14px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: #718176; font-size: 12px; font-weight: 700; }
+.admin-tabs button.active { border-color: #c98b3c; color: #173525; }
+.admin-message, .admin-success { margin: 0 0 20px; padding: 12px 15px; background: #fff1ec; }
+.admin-success { border-left: 3px solid #67ad48; background: #edf5e9; color: #416249; font-size: 12px; }
+.admin-card { min-width: 0; padding: 28px; background: #fff; border: 1px solid #dfe1da; border-radius: 8px; }
+.admin-card h2 { margin: 0; color: #173525; font-size: 27px; }
+.admin-overview-grid, .admin-two-column { display: grid; grid-template-columns: 1.55fr 1fr; gap: 16px; }
+.admin-health { background: #173525; color: #fff; }
+.admin-health h2 { color: #fff; margin-bottom: 25px; }
+.admin-health .eyebrow { color: #e5b04b; }
+.admin-health div { display: flex; align-items: baseline; gap: 12px; padding: 16px 0; border-top: 1px solid rgba(255,255,255,.16); }
+.admin-health b { min-width: 45px; color: #e5b04b; font-size: 27px; }.admin-health span { color: rgba(255,255,255,.72); font-size: 12px; }
+.revenue-chart { display: flex; align-items: end; justify-content: space-around; gap: 12px; min-height: 220px; padding-top: 25px; border-top: 1px solid #eef0eb; }
+.revenue-column { display: flex; flex: 1; height: 190px; align-items: center; justify-content: end; flex-direction: column; gap: 7px; color: #87938b; font-size: 9px; text-align: center; }
+.revenue-column i { display: block; width: min(42px, 70%); min-height: 8px; background: #c98b3c; border-radius: 4px 4px 0 0; }.revenue-column span { color: #526658; font-size: 9px; }.revenue-column small { font-size: 10px; }
+.panel-heading { margin-bottom: 25px; }.panel-heading .eyebrow { margin-bottom: 11px; }.admin-table-wrap { overflow-x: auto; }
+.admin-table { width: 100%; min-width: 700px; border-collapse: collapse; color: #526658; font-size: 12px; }.admin-table th { padding: 0 14px 12px; color: #87938b; font-size: 10px; font-weight: 700; text-align: left; text-transform: uppercase; }.admin-table td { padding: 14px; border-top: 1px solid #eef0eb; white-space: nowrap; }.admin-table td:first-child, .admin-table th:first-child { padding-left: 0; }.admin-table td:last-child, .admin-table th:last-child { padding-right: 0; }.admin-table strong, .admin-table small { display: block; }.admin-table strong { color: #173525; }.admin-table small { margin-top: 4px; color: #87938b; font-size: 10px; }.admin-table select, .admin-request-list select { padding: 7px 9px; border: 1px solid #d3dbd1; border-radius: 4px; background: #fff; color: #526658; font: 11px var(--sans); }
+.status-pill { display: inline-block; padding: 5px 8px; border-radius: 12px; background: #edf1eb; color: #526658; font-size: 10px; font-weight: 700; }.status-pill.is-good { background: #edf5e9; color: #4e7d59; }.status-pill.is-blocked { background: #fff0eb; color: #b54b35; }.status-pill.is-pending { background: #fff7e9; color: #a96c29; }
+.table-action { border: 0; background: transparent; color: #b9782c; font-size: 11px; font-weight: 700; }.admin-plot-list { display: grid; gap: 9px; }.admin-plot-row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 16px; padding: 15px 0; border-top: 1px solid #eef0eb; }.admin-plot-row div > * { display: block; }.admin-plot-row strong { color: #173525; font-size: 16px; }.admin-plot-row span { margin-top: 3px; color: #526658; font-size: 12px; }.admin-plot-row small { margin-top: 6px; color: #87938b; font-size: 10px; }
+.admin-form { display: grid; gap: 13px; }.admin-form label { display: grid; gap: 6px; color: #526658; font-size: 11px; font-weight: 700; }.admin-form input, .admin-form select, .admin-form textarea { box-sizing: border-box; width: 100%; padding: 11px; border: 1px solid #d3dbd1; border-radius: 4px; background: #fff; color: #304b39; font: 12px var(--sans); outline: 0; }.admin-form textarea { min-height: 78px; resize: vertical; }.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }.form-actions { display: flex; align-items: center; gap: 15px; margin-top: 5px; }.form-actions .primary-button { padding: 11px 14px; }
+.admin-request-list { display: grid; }.admin-request-list article { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 17px 0; border-top: 1px solid #eef0eb; }.admin-request-list article > div { min-width: 0; }.admin-request-list strong, .admin-request-list span { display: block; }.admin-request-list strong { color: #173525; font-size: 13px; }.admin-request-list span, .admin-request-list p { margin: 5px 0 0; color: #87938b; font-size: 11px; }.admin-request-list p { color: #526658; line-height: 1.5; }
+@media (max-width: 800px) { .admin-heading, .admin-overview-grid, .admin-two-column { display: block; }.admin-system { display: block; margin-top: 22px; }.admin-tabs { margin-top: 34px; }.admin-card { margin-bottom: 16px; padding: 22px; }.admin-heading h1 { font-size: 50px; }.admin-request-list article { align-items: start; flex-direction: column; gap: 12px; }.admin-request-list select { width: 100%; }.admin-plot-row { grid-template-columns: 1fr auto; }.admin-plot-row .table-action { grid-column: 2; grid-row: 1; }.form-row { grid-template-columns: 1fr; } }
 .request-list, .camera-settings, .harvest-list { display: grid; gap: 10px; }
 .care-request, .camera-setting, .harvest-item { padding: 18px; border: 1px solid #e0e3df; border-radius: 6px; background: #fbfbf8; }
 .care-request.resolved { opacity: .7; }

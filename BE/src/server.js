@@ -9,7 +9,7 @@ const { connectDB } = require('./config/db');
 const plotRoutes = require('./routes/plotRoutes');
 const rentalRoutes = require('./routes/rentalRoutes');
 const authRoutes = require('./routes/authRoutes');
-const { getAdminDashboard } = require('./controllers/authController');
+const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -26,7 +26,7 @@ connectDB();
 app.use('/api/plots', plotRoutes);
 app.use('/api/rentals', rentalRoutes);
 app.use('/api/auth', authRoutes);
-app.get('/api/admin/dashboard', getAdminDashboard);
+app.use('/api/admin', adminRoutes);
 
 // Route kiểm tra server
 app.get('/', (req, res) => {
