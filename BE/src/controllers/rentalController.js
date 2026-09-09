@@ -86,4 +86,24 @@ const getAllRentals = async (req, res) => {
     }
 };
 
-module.exports = { createRental, getAllRentals };
+const getRentalsByUser = async (req, res) => {
+    try {
+        const pool = await sql.connect();
+        const result = await pool.request()
+            .input('ma_nguoi_dung', sql.Int, Number(req.params.userId))
+            .query(`
+                SELECT h.ma_hop_dong, h.so_hop_dong, h.ngay_bat_dau, h.ngay_ket_thuc,
+                       h.tong_tien, h.trang_thai_hop_dong, o.so_hieu_o, o.ten_o_dat
+                FROM HopDongThue h
+                INNER JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+                WHERE h.ma_nguoi_dung = @ma_nguoi_dung
+                ORDER BY h.ngay_tao DESC
+            `);
+        return res.json({ success: true, data: result.recordset });
+    } catch (error) {
+        console.error('Lỗi khi lấy hợp đồng của người dùng:', error);
+        return res.status(500).json({ success: false, message: 'Không thể tải hợp đồng' });
+    }
+};
+
+module.exports = { createRental, getAllRentals, getRentalsByUser };
