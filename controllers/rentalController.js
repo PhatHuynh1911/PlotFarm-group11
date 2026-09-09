@@ -73,10 +73,7 @@ const getAllRentals = async (req, res) => {
     try {
         const pool = await sql.connect();
         const result = await pool.request().query(`
-            SELECT h.*, u.ho_ten as ten_nguoi_dung, o.ten_o_dat 
-            FROM HopDongThue h
-            LEFT JOIN NguoiDung u ON h.ma_nguoi_dung = u.ma_nguoi_dung
-            LEFT JOIN ODat o ON h.ma_o_dat = o.ma_o_dat
+            SELECT * FROM HopDongThue
         `);
 
         res.status(200).json({
