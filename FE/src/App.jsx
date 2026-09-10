@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import './App.css'
 import Header from './components/Header.jsx'
@@ -10,6 +10,7 @@ import Footer from './components/Footer.jsx'
 import AdminPage from './components/AdminPage.jsx'
 import UserPage from './components/UserPage.jsx'
 import FarmerPage from './components/FarmerPage.jsx'
+import { getDashboardStats, getPlots } from './api.js'
 
 const dashboardPath = (role) => ({ quan_tri: '/admin', nong_dan: '/farmer', khach_hang: '/dashboard' }[role] || '/')
 
@@ -33,13 +34,35 @@ function ProtectedRoute({ auth, allowedRoles, children }) {
 }
 
 function HomePage({ authMode, setAuthMode, onAuthenticated }) {
-  const [selectedPlot, setSelectedPlot] = useState('B-07')
+  const [selectedPlot, setSelectedPlot] = useState('')
+  const [plots, setPlots] = useState([])
+  const [stats, setStats] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+
+  useEffect(() => {
+    Promise.all([getPlots(), getDashboardStats()])
+      .then(([nextPlots, nextStats]) => {
+        setPlots(nextPlots)
+        setStats(nextStats)
+        setSelectedPlot(nextPlots.find((plot) => plot.status === 'trong')?.code || '')
+      })
+      .catch((requestError) => setError(requestError.message))
+      .finally(() => setLoading(false))
+  }, [])
 
   return <main>
     <Header onOpenAuth={setAuthMode} onNavigate={scrollTo} />
-    <LandingSections onNavigate={scrollTo} />
-    <PlotSelector selectedPlot={selectedPlot} onSelectPlot={setSelectedPlot} onReserve={() => scrollTo('contact')} />
+    <LandingSections stats={stats} statsLoading={loading} statsError={error} onNavigate={scrollTo} />
+    <PlotSelector
+      plots={plots}
+      loading={loading}
+      error={error}
+      selectedPlot={selectedPlot}
+      onSelectPlot={setSelectedPlot}
+      onReserve={() => scrollTo('contact')}
+    />
     <ContactSection />
     {authMode && <AuthModal mode={authMode} onClose={() => setAuthMode(null)} onSwitchMode={setAuthMode} onAuthenticated={onAuthenticated} />}
     <Footer />

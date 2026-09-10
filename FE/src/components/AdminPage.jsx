@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 const tabs = [['overview', 'Tổng quan'], ['users', 'Người dùng'], ['plots', 'Ô đất'], ['rentals', 'Đơn thuê & giao dịch'], ['requests', 'Yêu cầu & khiếu nại']]
@@ -15,10 +15,11 @@ function AdminPage({ user, token, onLogout }) {
   const [activeTab, setActiveTab] = useState('overview')
   const [data, setData] = useState({ stats: null, users: [], plots: [], rentals: [], requests: [] })
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
   const [notice, setNotice] = useState('')
   const [editingPlot, setEditingPlot] = useState(null)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const endpoints = ['dashboard', 'users', 'plots', 'rentals', 'requests']
       const responses = await Promise.all(endpoints.map((endpoint) => fetch(`${API_URL}/admin/${endpoint}`, { headers: { Authorization: `Bearer ${token}` } })))
@@ -29,9 +30,9 @@ function AdminPage({ user, token, onLogout }) {
       }))
       setData({ stats: results[0], users: results[1], plots: results[2], rentals: results[3], requests: results[4] })
       setError('')
-    } catch (requestError) { setError(requestError.message) }
-  }
-  useEffect(() => { load() }, [])
+    } catch (requestError) { setError(requestError.message) } finally { setLoading(false) }
+  }, [token])
+  useEffect(() => { load() }, [load])
 
   const update = async (path, method, body) => {
     const response = await fetch(`${API_URL}/admin/${path}`, { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body) })
@@ -55,11 +56,11 @@ function AdminPage({ user, token, onLogout }) {
 
   const stats = data.stats || {}
   return <main className="dashboard-page admin-workspace">
-    <header className="dashboard-header"><a className="brand" href="/"><span className="brand-mark">PF</span><span>plot<span>farm</span></span></a><div className="dashboard-account"><span>{user.name}<small>Quản trị viên</small></span><button className="dashboard-logout" onClick={onLogout}>Đăng xuất</button></div></header>
+    <header className="dashboard-header"><a className="brand" href="/"><span className="brand-mark">PF</span><span>plot<span>farm</span></span></a><nav className="workspace-nav" aria-label="Điều hướng quản trị">{tabs.map(([id, label]) => <button className={activeTab === id ? 'active' : ''} key={id} onClick={() => setActiveTab(id)}>{label}</button>)}</nav><div className="dashboard-account"><span>{user.name}<small>Quản trị viên</small></span><button className="dashboard-logout" onClick={onLogout}>Đăng xuất</button></div></header>
     <section className="dashboard-shell">
       <div className="admin-heading"><div><p className="eyebrow">TRUNG TÂM VẬN HÀNH</p><h1>Quản trị <em>PlotFarm.</em></h1><p className="dashboard-lead">Theo dõi tài khoản, mùa vụ và chất lượng phục vụ từ một nơi.</p></div><span className="system-status admin-system"><i /> Hệ thống đang hoạt động</span></div>
       <nav className="admin-tabs" aria-label="Các chức năng quản trị">{tabs.map(([id, label]) => <button className={activeTab === id ? 'active' : ''} key={id} onClick={() => setActiveTab(id)}>{label}</button>)}</nav>
-      {error && <p className="dashboard-error admin-message">{error}</p>}{notice && <p className="admin-success">{notice}</p>}
+      {loading && <p className="loading-state" role="status">Đang tải dữ liệu quản trị...</p>}{error && <p className="dashboard-error admin-message" role="alert">{error}</p>}{notice && <p className="admin-success">{notice}</p>}
       {activeTab === 'overview' && <Overview stats={stats} />}
       {activeTab === 'users' && <Users items={data.users} onUpdate={updateUser} />}
       {activeTab === 'plots' && <Plots items={data.plots} editingPlot={editingPlot} setEditingPlot={setEditingPlot} onSubmit={savePlot} onCancel={() => setEditingPlot(null)} />}

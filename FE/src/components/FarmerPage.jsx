@@ -1,22 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import ProfilePanel from './ProfilePanel.jsx'
 import AccountMenu from './AccountMenu.jsx'
-
-const initialPlots = [
-  { id: 'A-12', crop: 'Cà chua bi', customer: 'Nguyễn Minh Anh', area: '120 m²', stage: 'Ra hoa', progress: 68, next: 'Tưới và kiểm tra sâu bệnh', camera: true },
-  { id: 'B-07', crop: 'Rau cải hữu cơ', customer: 'Trần Hoàng Nam', area: '80 m²', stage: 'Sinh trưởng', progress: 42, next: 'Bón phân hữu cơ', camera: true },
-  { id: 'C-03', crop: 'Dâu tây', customer: 'Lê Thu Hà', area: '60 m²', stage: 'Sắp thu hoạch', progress: 91, next: 'Kiểm tra độ chín', camera: false },
-]
-
-const initialRequests = [
-  { id: 1, plot: 'B-07', customer: 'Trần Hoàng Nam', text: 'Bón thêm phân hữu cơ trước đợt mưa tới.', status: 'Mới', time: 'Hôm nay, 08:30' },
-  { id: 2, plot: 'A-12', customer: 'Nguyễn Minh Anh', text: 'Nhờ kiểm tra lá cây và cập nhật hình ảnh.', status: 'Đã xử lý', time: 'Hôm qua, 16:10' },
-]
+import { getActiveRentals, getServiceRequests, updateServiceRequest } from '../api.js'
 
 function FarmerPage({ user, onLogout }) {
+  const token = JSON.parse(sessionStorage.getItem('plotfarm_auth') || '{}').token
   const [activeTab, setActiveTab] = useState('plots')
-  const [plots] = useState(initialPlots)
-  const [requests, setRequests] = useState(initialRequests)
+  const [plots, setPlots] = useState([])
+  const [requests, setRequests] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [journal, setJournal] = useState([])
   const [journalForm, setJournalForm] = useState({ plot: 'A-12', note: '', water: '10 lít', fertilizer: 'Chưa bón', photo: '' })
   const [journalMessage, setJournalMessage] = useState('')
@@ -24,7 +17,22 @@ function FarmerPage({ user, onLogout }) {
   const [cameraMessage, setCameraMessage] = useState('')
   const [harvested, setHarvested] = useState([])
 
-  const updateRequest = (id) => setRequests((items) => items.map((item) => item.id === id ? { ...item, status: 'Đã xử lý' } : item))
+  useEffect(() => {
+    Promise.all([getActiveRentals(token), getServiceRequests(token)])
+      .then(([rentals, serviceRequests]) => {
+        setPlots(rentals.map((rental) => ({ id: rental.so_hieu_o, crop: rental.ten_cay_trong || 'Chưa chọn cây trồng', customer: rental.ten_khach_hang, area: `${rental.dien_tich_m2} m²`, stage: 'Đang sinh trưởng', progress: Math.min(Math.max(Math.round((rental.so_ngay_da_trong || 0) / (rental.thoi_gian_sinh_truong_ngay || 90) * 100), 1), 100), next: 'Theo dõi và chăm sóc theo lịch', camera: false, rentalId: rental.ma_hop_dong })))
+        setRequests(serviceRequests.map((request) => ({ id: request.ma_yeu_cau, plot: request.so_hieu_o, customer: request.ten_khach_hang, text: request.ghi_chu_cua_khach, status: request.trang_thai_xu_ly === 'hoan_thanh' ? 'Đã xử lý' : 'Mới', time: request.ngay_gui_yeu_cau })))
+      })
+      .catch((requestError) => setError(requestError.message))
+      .finally(() => setLoading(false))
+  }, [token])
+
+  const updateRequest = async (id) => {
+    try {
+      await updateServiceRequest(id, { status: 'hoan_thanh', ma_nong_dan_xu_ly: user.id }, token)
+      setRequests((items) => items.map((item) => item.id === id ? { ...item, status: 'Đã xử lý' } : item))
+    } catch (requestError) { setError(requestError.message) }
+  }
 
   const submitJournal = (event) => {
     event.preventDefault()
@@ -55,7 +63,7 @@ function FarmerPage({ user, onLogout }) {
       <AccountMenu user={user} roleLabel="Nông dân PlotFarm" onProfile={() => setActiveTab('profile')} onLogout={onLogout} />
     </header>
     <section className="dashboard-shell">
-      <div className="workspace-kicker"><p className="eyebrow">KHU VỰC NÔNG DÂN</p><span className="workspace-date">Mùa vụ 2026 · Đang hoạt động</span></div>
+      <div className="workspace-kicker"><p className="eyebrow">KHU VỰC NÔNG DÂN</p><span className="workspace-date">Mùa vụ 2026 · Đang hoạt động</span></div>{loading && <p className="loading-state" role="status">Đang tải dữ liệu mùa vụ...</p>}{error && <p className="dashboard-error" role="alert">{error}</p>}
       <h1>Xin chào, <em>{user.name.split(' ').pop()}.</em></h1>
       <p className="dashboard-lead">Theo dõi mùa vụ, chăm sóc những ô đất và cập nhật tiến độ canh tác của bạn.</p>
       <div className="dashboard-stat-grid">

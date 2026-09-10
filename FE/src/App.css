@@ -498,6 +498,19 @@ h1 em, h2 em { font-family: inherit; font-style: normal; font-weight: 700; }
 .user-dashboard .user-tabs { top: 0; z-index: 11; height: 72px; box-sizing: border-box; background: transparent; border-bottom: 0; box-shadow: none; }
 .user-dashboard .user-tabs button:last-child, .farmer-dashboard .farmer-tabs button:last-child { display: none; }
 .user-dashboard .dashboard-shell { padding-top: 62px; }
+
+/* Keep signed-in navigation in one centered header row with the account menu at right. */
+.user-dashboard .dashboard-header,
+.farmer-dashboard .dashboard-header { display: grid; grid-template-columns: 1fr auto 1fr; gap: 24px; }
+.user-dashboard .dashboard-header .workspace-nav,
+.farmer-dashboard .dashboard-header .workspace-nav { justify-self: center; margin: 0; }
+.user-dashboard .dashboard-header .account-menu,
+.farmer-dashboard .dashboard-header .account-menu { display: block; justify-self: end; }
+.user-dashboard .user-tabs,
+.farmer-dashboard .farmer-tabs,
+.admin-workspace .admin-tabs { display: none; }
+#root > .dashboard-page > .dashboard-header > .account-menu { display: block; }
+.account-dropdown-heading small + small { margin-top: 2px; }
 @media (max-width: 800px) {
 	.dashboard-header { padding: 0 16px; }
 	#root > .account-menu { top: 10px; right: 16px; }

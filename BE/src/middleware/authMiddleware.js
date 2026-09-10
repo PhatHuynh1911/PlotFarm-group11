@@ -1,5 +1,7 @@
 const jwt = require('jsonwebtoken');
 
+const JWT_SECRET = process.env.JWT_SECRET || 'plotfarm_jwt_secret_key_2026';
+
 const authenticate = (req, res, next) => {
   const authorization = req.headers.authorization || '';
 
@@ -8,7 +10,7 @@ const authenticate = (req, res, next) => {
   }
 
   try {
-    req.user = jwt.verify(authorization.slice(7), process.env.JWT_SECRET);
+    req.user = jwt.verify(authorization.slice(7), JWT_SECRET);
     return next();
   } catch (error) {
     return res.status(401).json({ success: false, message: 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn' });

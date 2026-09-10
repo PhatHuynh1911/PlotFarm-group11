@@ -11,7 +11,7 @@ function AccountMenu({ user, roleLabel, onProfile, onLogout }) {
       <span className="account-chevron">⌄</span>
     </button>
     {open && <div className="account-dropdown">
-      <div className="account-dropdown-heading"><strong>{user.name}</strong><small>{user.email}</small></div>
+      <div className="account-dropdown-heading"><strong>{user.name}</strong><small>{user.email}</small><small>{user.phone || 'Chưa cập nhật số điện thoại'}</small></div>
       <button onClick={() => { onProfile(); setOpen(false) }}><span>◎</span> Hồ sơ cá nhân</button>
       <button className="account-logout" onClick={onLogout}><span>↪</span> Đăng xuất</button>
     </div>}

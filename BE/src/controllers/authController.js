@@ -37,7 +37,13 @@ const login = async (req, res) => {
             .query(`SELECT TOP 1 * FROM NguoiDung WHERE email = @email`);
         const user = result.recordset[0];
 
-        if (!user || user.trang_thai !== 'hoat_dong' || !(await bcrypt.compare(password, user.mat_khau))) {
+        const passwordMatches = user && (
+            (typeof user.mat_khau === 'string' && user.mat_khau.startsWith('$2'))
+                ? await bcrypt.compare(password, user.mat_khau)
+                : user.mat_khau === password
+        );
+
+        if (!user || user.trang_thai !== 'hoat_dong' || !passwordMatches) {
             return res.status(401).json({ success: false, message: 'Email hoặc mật khẩu không đúng' });
         }
 
