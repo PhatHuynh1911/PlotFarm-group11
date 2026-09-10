@@ -2,11 +2,12 @@ import { useState } from 'react'
 import GardenMapView from './GardenMapView.jsx'
 import GardenDetailView from './GardenDetailView.jsx'
 
-function PlotSelector({ plots, loading, error, selectedPlot, onSelectPlot, onReserve }) {
+function PlotSelector({ plots = [], loading = false, error = '', selectedPlot, onSelectPlot, onReserve }) {
   const [showMap, setShowMap] = useState(false)
   const [detailPlot, setDetailPlot] = useState(null)
-  const availablePlots = plots.filter((plot) => plot.status === 'trong')
-  const occupiedPlots = plots.filter((plot) => plot.status !== 'trong')
+  const safePlots = Array.isArray(plots) ? plots : []
+  const availablePlots = safePlots.filter((plot) => plot.status === 'trong')
+  const occupiedPlots = safePlots.filter((plot) => plot.status !== 'trong')
   return <><section className="plots-section section-shell" id="plots"><div className="section-intro"><div><p className="eyebrow">Ô ĐẤT ĐANG SẴN SÀNG</p><h2>Chọn một không gian<br /><em>cho mùa xanh mới.</em></h2></div><button className="outline-button map-view-button" onClick={() => setShowMap(true)} disabled={loading || !!error}>⌖ Bản đồ khu vườn</button></div><p className="section-note listings-note">Tạo một khởi đầu mới với ô đất riêng, được chăm sóc và cập nhật minh bạch trong suốt mùa vụ.</p>{loading && <p className="loading-state" role="status">Đang tải danh sách ô đất...</p>}{error && <p className="dashboard-error" role="alert">{error}</p>}<div className="listing-grid">{availablePlots.slice(0, 3).map((plot, index) => <article className="listing-card" key={plot.id}><div className={`listing-image listing-image-${index + 1}`}><span className="listing-status"><i /> Đang trống</span><span className="listing-heart">♡</span></div><div className="listing-body"><div className="listing-price"><strong>{plot.price.toLocaleString('vi-VN')}đ</strong><small>/ tháng</small></div><p>{plot.location}</p><div className="listing-meta"><span>{plot.code} · {plot.area}m²</span><span>● Có chăm sóc</span></div><button className="listing-select" onClick={() => { onSelectPlot(plot.code); setDetailPlot(plot) }}>Xem chi tiết <span>→</span></button></div></article>)}</div><div className="listing-banner"><div><p className="eyebrow">MÙA VỤ CỦA BẠN</p><h3>Giữ chỗ cho một mùa xanh</h3><p>Chọn ô đất phù hợp và để đội ngũ PlotFarm đồng hành cùng bạn.</p></div><button className="primary-button" onClick={onReserve}>Giữ ô đất {selectedPlot} <span>→</span></button></div></section>{showMap && <GardenMapView plots={availablePlots} occupiedPlots={occupiedPlots} onSelectPlot={(plot) => { onSelectPlot(plot.code); setShowMap(false); setDetailPlot(plot) }} onClose={() => setShowMap(false)} />}{detailPlot && <GardenDetailView plot={detailPlot} occupied={detailPlot.status !== 'trong'} onClose={() => setDetailPlot(null)} onReserve={onReserve} />}</>
 }
 export default PlotSelector
