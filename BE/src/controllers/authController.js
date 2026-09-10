@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const { sql } = require('../config/db');
 
 const publicUser = (user) => ({
@@ -9,6 +10,12 @@ const publicUser = (user) => ({
     phone: user.so_dien_thoai,
     avatar: user.anh_dai_dien
 });
+
+const createToken = (user) => jwt.sign(
+    { sub: user.ma_nguoi_dung, role: user.vai_tro },
+    process.env.JWT_SECRET,
+    { expiresIn: '8h' }
+);
 
 const login = async (req, res) => {
     try {
@@ -27,7 +34,10 @@ const login = async (req, res) => {
             return res.status(401).json({ success: false, message: 'Email hoặc mật khẩu không đúng' });
         }
 
-        return res.json({ success: true, data: publicUser(user) });
+        return res.json({
+            success: true,
+            data: { user: publicUser(user), token: createToken(user) }
+        });
     } catch (error) {
         console.error('Lỗi đăng nhập:', error);
         return res.status(500).json({ success: false, message: 'Không thể kết nối cơ sở dữ liệu' });
@@ -54,7 +64,11 @@ const register = async (req, res) => {
                 VALUES (@name, @email, @password, @role, 'hoat_dong')
             `);
 
-        return res.status(201).json({ success: true, data: publicUser(result.recordset[0]) });
+        const user = result.recordset[0];
+        return res.status(201).json({
+            success: true,
+            data: { user: publicUser(user), token: createToken(user) }
+        });
     } catch (error) {
         if (error.number === 2627 || error.number === 2601) {
             return res.status(409).json({ success: false, message: 'Email này đã được đăng ký' });

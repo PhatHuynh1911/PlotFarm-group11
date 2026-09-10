@@ -5,9 +5,10 @@ const createRental = async (req, res) => {
     const transaction = new sql.Transaction();
 
     try {
-        const { so_hop_dong, ma_nguoi_dung, ma_o_dat, ma_cay_trong, ngay_bat_dau, ngay_ket_thuc, thoi_han_thang } = req.body;
+        const { so_hop_dong, ma_o_dat, ma_cay_trong, ngay_bat_dau, ngay_ket_thuc, thoi_han_thang } = req.body;
+        const ma_nguoi_dung = req.user.sub;
 
-        if (!so_hop_dong || !ma_nguoi_dung || !ma_o_dat || !ngay_bat_dau || !ngay_ket_thuc || !thoi_han_thang) {
+        if (!so_hop_dong || !ma_o_dat || !ngay_bat_dau || !ngay_ket_thuc || !thoi_han_thang) {
             return res.status(400).json({ success: false, message: 'Thiếu thông tin bắt buộc để tạo hợp đồng' });
         }
 

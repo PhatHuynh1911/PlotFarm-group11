@@ -11,7 +11,7 @@ const labels = {
 const money = (value) => `${Number(value || 0).toLocaleString('vi-VN')} đ`
 const date = (value) => value ? new Date(value).toLocaleDateString('vi-VN') : '—'
 
-function AdminPage({ user, onLogout }) {
+function AdminPage({ user, token, onLogout }) {
   const [activeTab, setActiveTab] = useState('overview')
   const [data, setData] = useState({ stats: null, users: [], plots: [], rentals: [], requests: [] })
   const [error, setError] = useState('')
@@ -21,7 +21,7 @@ function AdminPage({ user, onLogout }) {
   const load = async () => {
     try {
       const endpoints = ['dashboard', 'users', 'plots', 'rentals', 'requests']
-      const responses = await Promise.all(endpoints.map((endpoint) => fetch(`${API_URL}/admin/${endpoint}`)))
+      const responses = await Promise.all(endpoints.map((endpoint) => fetch(`${API_URL}/admin/${endpoint}`, { headers: { Authorization: `Bearer ${token}` } })))
       const results = await Promise.all(responses.map(async (response) => {
         const result = await response.json()
         if (!response.ok) throw new Error(result.message || 'Không thể tải dữ liệu quản trị')
@@ -34,7 +34,7 @@ function AdminPage({ user, onLogout }) {
   useEffect(() => { load() }, [])
 
   const update = async (path, method, body) => {
-    const response = await fetch(`${API_URL}/admin/${path}`, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const response = await fetch(`${API_URL}/admin/${path}`, { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body) })
     const result = await response.json()
     if (!response.ok) throw new Error(result.message || 'Thao tác thất bại')
     setNotice(result.message)
@@ -55,10 +55,10 @@ function AdminPage({ user, onLogout }) {
 
   const stats = data.stats || {}
   return <main className="dashboard-page admin-workspace">
-    <header className="dashboard-header"><a className="brand" href="/"><span className="brand-mark">PF</span><span>plot<span>farm</span></span></a><nav className="workspace-nav admin-header-nav" aria-label="Các chức năng quản trị">{tabs.map(([id, label]) => <button className={activeTab === id ? 'active' : ''} key={id} onClick={() => setActiveTab(id)}>{label}</button>)}</nav><div className="dashboard-account"><span className="account-avatar">{user.name.slice(0, 1)}</span><span>{user.name}<small>Quản trị viên</small></span><button className="dashboard-logout" onClick={onLogout}>Đăng xuất</button></div></header>
+    <header className="dashboard-header"><a className="brand" href="/"><span className="brand-mark">PF</span><span>plot<span>farm</span></span></a><div className="dashboard-account"><span>{user.name}<small>Quản trị viên</small></span><button className="dashboard-logout" onClick={onLogout}>Đăng xuất</button></div></header>
     <section className="dashboard-shell">
       <div className="admin-heading"><div><p className="eyebrow">TRUNG TÂM VẬN HÀNH</p><h1>Quản trị <em>PlotFarm.</em></h1><p className="dashboard-lead">Theo dõi tài khoản, mùa vụ và chất lượng phục vụ từ một nơi.</p></div><span className="system-status admin-system"><i /> Hệ thống đang hoạt động</span></div>
-      <nav className="admin-tabs legacy-tabs" aria-label="Các chức năng quản trị">{tabs.map(([id, label]) => <button className={activeTab === id ? 'active' : ''} key={id} onClick={() => setActiveTab(id)}>{label}</button>)}</nav>
+      <nav className="admin-tabs" aria-label="Các chức năng quản trị">{tabs.map(([id, label]) => <button className={activeTab === id ? 'active' : ''} key={id} onClick={() => setActiveTab(id)}>{label}</button>)}</nav>
       {error && <p className="dashboard-error admin-message">{error}</p>}{notice && <p className="admin-success">{notice}</p>}
       {activeTab === 'overview' && <Overview stats={stats} />}
       {activeTab === 'users' && <Users items={data.users} onUpdate={updateUser} />}
@@ -69,7 +69,7 @@ function AdminPage({ user, onLogout }) {
   </main>
 }
 
-function Overview({ stats }) {
+function Overview({ shttps://github.com/PhatHuynh1911/PlotFarm-group11/pull/3/conflict?name=FE%252Fsrc%252Fcomponents%252FAdminPage.jsx&base_oid=9b4b7644e68f3d4dd2153e8684d1a84be7ebe070&head_oid=d081fdf563086a9f8b0b1dae7aa24cf9695c71fftats }) {
   const cards = [['totalUsers', 'Tổng người dùng', 'Tài khoản trên hệ thống'], ['activeUsers', 'Đang hoạt động', 'Người dùng có thể truy cập'], ['rentedPlots', 'Ô đất đã thuê', `${stats.availablePlots || 0} ô đang trống`], ['revenue', 'Doanh thu đã thu', 'Tổng hợp đồng đã thanh toán']]
   const max = Math.max(...(stats.monthly || []).map((item) => Number(item.revenue)), 1)
   return <><div className="dashboard-stat-grid">{cards.map(([key, label, note]) => <article className="dashboard-stat" key={key}><span>{label}</span><strong>{key === 'revenue' ? money(stats[key]) : stats[key] ?? '—'}</strong><small>{note}</small></article>)}</div><div className="admin-overview-grid"><section className="admin-card"><div className="panel-heading"><div><p className="eyebrow">BÁO CÁO TÀI CHÍNH</p><h2>Doanh thu theo tháng</h2></div><span className="result-count">6 kỳ gần nhất</span></div><div className="revenue-chart">{(stats.monthly || []).map((item) => <div className="revenue-column" key={item.month}><span>{money(item.revenue)}</span><i style={{ height: `${Math.max(Number(item.revenue) / max * 150, 8)}px` }} /><small>{item.month}</small></div>)}</div></section><section className="admin-card admin-health"><p className="eyebrow">CẦN XỬ LÝ</p><h2>Nhịp vận hành hôm nay</h2><div><b>{stats.pendingRequests || 0}</b><span>yêu cầu chăm sóc đang chờ</span></div><div><b>{stats.activeContracts || 0}</b><span>hợp đồng đang hiệu lực</span></div></section></div></>
