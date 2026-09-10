@@ -55,10 +55,10 @@ function AdminPage({ user, onLogout }) {
 
   const stats = data.stats || {}
   return <main className="dashboard-page admin-workspace">
-    <header className="dashboard-header"><a className="brand" href="/"><span className="brand-mark">PF</span><span>plot<span>farm</span></span></a><div className="dashboard-account"><span>{user.name}<small>Quản trị viên</small></span><button className="dashboard-logout" onClick={onLogout}>Đăng xuất</button></div></header>
+    <header className="dashboard-header"><a className="brand" href="/"><span className="brand-mark">PF</span><span>plot<span>farm</span></span></a><nav className="workspace-nav admin-header-nav" aria-label="Các chức năng quản trị">{tabs.map(([id, label]) => <button className={activeTab === id ? 'active' : ''} key={id} onClick={() => setActiveTab(id)}>{label}</button>)}</nav><div className="dashboard-account"><span className="account-avatar">{user.name.slice(0, 1)}</span><span>{user.name}<small>Quản trị viên</small></span><button className="dashboard-logout" onClick={onLogout}>Đăng xuất</button></div></header>
     <section className="dashboard-shell">
       <div className="admin-heading"><div><p className="eyebrow">TRUNG TÂM VẬN HÀNH</p><h1>Quản trị <em>PlotFarm.</em></h1><p className="dashboard-lead">Theo dõi tài khoản, mùa vụ và chất lượng phục vụ từ một nơi.</p></div><span className="system-status admin-system"><i /> Hệ thống đang hoạt động</span></div>
-      <nav className="admin-tabs" aria-label="Các chức năng quản trị">{tabs.map(([id, label]) => <button className={activeTab === id ? 'active' : ''} key={id} onClick={() => setActiveTab(id)}>{label}</button>)}</nav>
+      <nav className="admin-tabs legacy-tabs" aria-label="Các chức năng quản trị">{tabs.map(([id, label]) => <button className={activeTab === id ? 'active' : ''} key={id} onClick={() => setActiveTab(id)}>{label}</button>)}</nav>
       {error && <p className="dashboard-error admin-message">{error}</p>}{notice && <p className="admin-success">{notice}</p>}
       {activeTab === 'overview' && <Overview stats={stats} />}
       {activeTab === 'users' && <Users items={data.users} onUpdate={updateUser} />}
