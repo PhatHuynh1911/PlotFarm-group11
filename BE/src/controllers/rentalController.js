@@ -7,6 +7,9 @@ const createRental = async (req, res) => {
 
     try {
         let { so_hop_dong, ma_nguoi_dung, ma_o_dat, ma_cay_trong, ngay_bat_dau, ngay_ket_thuc, thoi_han_thang } = req.body;
+        if (!ma_nguoi_dung && req.user?.sub) {
+            ma_nguoi_dung = req.user.sub;
+        }
 
         if (!ma_nguoi_dung || !ma_o_dat || !thoi_han_thang) {
             return res.status(400).json({ success: false, message: 'Thiếu thông tin bắt buộc để tạo hợp đồng' });
@@ -118,8 +121,9 @@ const getAllRentals = async (req, res) => {
 const getRentalsByUser = async (req, res) => {
     try {
         const pool = await getPool();
+        const targetUserId = req.params.userId || req.user?.sub;
         const result = await pool.request()
-            .input('ma_nguoi_dung', sql.Int, parseInt(req.params.userId, 10))
+            .input('ma_nguoi_dung', sql.Int, parseInt(targetUserId, 10))
             .query(`
                 SELECT h.ma_hop_dong, h.so_hop_dong, h.ngay_bat_dau, h.ngay_ket_thuc,
                        h.tong_tien, h.trang_thai_hop_dong, h.trang_thai_thanh_toan,

@@ -23,12 +23,16 @@ if (serverVal.includes('\\')) {
         password: process.env.DB_PASSWORD || '12345',
         server: serverVal,
         database: process.env.DB_NAME || 'PlotFarmDB',
-        port: parseInt(process.env.DB_PORT, 10) || 1433,
         options: {
             encrypt: false,
-            trustServerCertificate: true
+            trustServerCertificate: true,
+            instanceName: process.env.DB_INSTANCE || undefined
         }
     };
+}
+
+if (process.env.DB_PORT) {
+    dbConfig.port = parseInt(process.env.DB_PORT, 10);
 }
 
 let pool = null;

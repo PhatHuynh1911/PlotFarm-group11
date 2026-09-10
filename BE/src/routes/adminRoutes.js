@@ -1,7 +1,9 @@
 const express = require('express');
 const admin = require('../controllers/adminController');
+const { authenticate, authorize } = require('../middleware/authMiddleware');
 
 const router = express.Router();
+router.use(authenticate, authorize('quan_tri'));
 router.get('/dashboard', admin.dashboard);
 router.get('/users', admin.users);
 router.patch('/users/:id', admin.updateUser);

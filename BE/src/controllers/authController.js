@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const { sql, getPool } = require('../config/db');
 
 const publicUser = (user) => ({
@@ -9,6 +10,19 @@ const publicUser = (user) => ({
     phone: user.so_dien_thoai,
     avatar: user.anh_dai_dien
 });
+
+const createToken = (user) => {
+    const secret = process.env.JWT_SECRET || 'plotfarm_jwt_secret_key_2026';
+    try {
+        return jwt.sign(
+            { sub: user.ma_nguoi_dung, role: user.vai_tro },
+            secret,
+            { expiresIn: '8h' }
+        );
+    } catch (e) {
+        return 'mock_token_' + user.ma_nguoi_dung;
+    }
+};
 
 const login = async (req, res) => {
     try {
@@ -27,7 +41,11 @@ const login = async (req, res) => {
             return res.status(401).json({ success: false, message: 'Email hoặc mật khẩu không đúng' });
         }
 
-        return res.json({ success: true, data: publicUser(user) });
+        const token = createToken(user);
+        return res.json({
+            success: true,
+            data: { ...publicUser(user), user: publicUser(user), token }
+        });
     } catch (error) {
         console.error('Lỗi đăng nhập:', error);
         return res.status(500).json({ success: false, message: 'Không thể kết nối cơ sở dữ liệu' });
@@ -54,7 +72,12 @@ const register = async (req, res) => {
                 VALUES (@name, @email, @password, @role, 'hoat_dong')
             `);
 
-        return res.status(201).json({ success: true, data: publicUser(result.recordset[0]) });
+        const user = result.recordset[0];
+        const token = createToken(user);
+        return res.status(201).json({
+            success: true,
+            data: { ...publicUser(user), user: publicUser(user), token }
+        });
     } catch (error) {
         if (error.number === 2627 || error.number === 2601) {
             return res.status(409).json({ success: false, message: 'Email này đã được đăng ký' });
@@ -66,7 +89,7 @@ const register = async (req, res) => {
 
 const getMe = async (req, res) => {
     try {
-        const userId = req.query.userId || req.params.id;
+        const userId = req.user?.sub || req.query.userId || req.params.id;
         if (!userId) {
             return res.status(400).json({ success: false, message: 'Vui lòng cung cấp userId' });
         }

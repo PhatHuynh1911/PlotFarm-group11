@@ -12,7 +12,7 @@ const availablePlots = [
 const formatMoney = (value) => `${new Intl.NumberFormat('vi-VN').format(value)}đ`
 const formatDate = (value) => value ? new Date(value).toLocaleDateString('vi-VN') : 'Chưa cập nhật'
 
-function UserPage({ user, onLogout }) {
+function UserPage({ user, token, onLogout }) {
   const [rentals, setRentals] = useState([])
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState('gardens')
@@ -24,12 +24,12 @@ function UserPage({ user, onLogout }) {
   const [harvestSent, setHarvestSent] = useState(false)
 
   useEffect(() => {
-    fetch(`${API_URL}/rentals/user/${user.id}`).then(async (response) => {
+    fetch(`${API_URL}/rentals/user/${user.id}`, { headers: { Authorization: `Bearer ${token}` } }).then(async (response) => {
       const result = await response.json()
       if (!response.ok) throw new Error(result.message)
       setRentals(result.data)
     }).catch((requestError) => setError(requestError.message))
-  }, [user.id])
+  }, [user.id, token])
 
   const filteredPlots = useMemo(() => availablePlots.filter((plot) => {
     const search = filters.search.toLowerCase()
