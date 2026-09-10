@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const rentalController = require('../controllers/rentalController');
+const { createRental, getAllRentals, getRentalsByUser, getActiveRentals, getRentalById } = require('../controllers/rentalController');
 
-// Đảm bảo trong rentalController có các hàm này
-router.get('/', rentalController.getAllRentals);
-router.get('/user/:userId', rentalController.getRentalsByUser);
-router.post('/', rentalController.createRental);
+router.post('/', createRental);
+router.get('/', getAllRentals);
+router.get('/active', getActiveRentals);
+router.get('/user/:userId', getRentalsByUser);
+router.get('/:id', getRentalById);
 
 module.exports = router;
