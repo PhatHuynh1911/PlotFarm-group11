@@ -27,7 +27,7 @@ PlotFarm là giải pháp công nghệ mang lại trải nghiệm làm nông ngh
 ## Công nghệ
 
 - Frontend: React + Vite
-- Backend: Node.js + PostgreSQL
+- Backend: Node.js + SQL Sever
 
 ## Team thực hiện
 
