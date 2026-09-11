@@ -6,6 +6,7 @@ const router = express.Router();
 router.use(authenticate, authorize('quan_tri'));
 router.get('/dashboard', admin.dashboard);
 router.get('/users', admin.users);
+router.post('/users', admin.createUser);
 router.patch('/users/:id', admin.updateUser);
 router.get('/plots', admin.plots);
 router.post('/plots', admin.createPlot);

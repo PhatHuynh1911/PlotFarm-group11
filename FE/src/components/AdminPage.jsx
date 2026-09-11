@@ -43,6 +43,14 @@ function AdminPage({ user, token, onLogout }) {
   }
   const updateUser = (item, field, value) => update(`users/${item.id}`, 'PATCH', { role: field === 'role' ? value : item.role, status: field === 'status' ? value : item.status }).catch((e) => setError(e.message))
   const updateRequest = (item, value) => update(`requests/${item.id}`, 'PATCH', { status: value }).catch((e) => setError(e.message))
+  const createUser = async (event) => {
+    event.preventDefault()
+    const form = new FormData(event.currentTarget)
+    try {
+      await update('users', 'POST', Object.fromEntries(form.entries()))
+      event.currentTarget.reset()
+    } catch (e) { setError(e.message) }
+  }
   const savePlot = async (event) => {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
@@ -62,7 +70,7 @@ function AdminPage({ user, token, onLogout }) {
       <nav className="admin-tabs" aria-label="Các chức năng quản trị">{tabs.map(([id, label]) => <button className={activeTab === id ? 'active' : ''} key={id} onClick={() => setActiveTab(id)}>{label}</button>)}</nav>
       {loading && <p className="loading-state" role="status">Đang tải dữ liệu quản trị...</p>}{error && <p className="dashboard-error admin-message" role="alert">{error}</p>}{notice && <p className="admin-success">{notice}</p>}
       {activeTab === 'overview' && <Overview stats={stats} />}
-      {activeTab === 'users' && <Users items={data.users} onUpdate={updateUser} />}
+      {activeTab === 'users' && <UserManagement items={data.users} onUpdate={updateUser} onCreate={createUser} />}
       {activeTab === 'plots' && <Plots items={data.plots} editingPlot={editingPlot} setEditingPlot={setEditingPlot} onSubmit={savePlot} onCancel={() => setEditingPlot(null)} />}
       {activeTab === 'rentals' && <Rentals items={data.rentals} />}
       {activeTab === 'requests' && <Requests items={data.requests} onUpdate={updateRequest} />}
@@ -74,6 +82,10 @@ function Overview({ stats }) {
   const cards = [['totalUsers', 'Tổng người dùng', 'Tài khoản trên hệ thống'], ['activeUsers', 'Đang hoạt động', 'Người dùng có thể truy cập'], ['rentedPlots', 'Ô đất đã thuê', `${stats.availablePlots || 0} ô đang trống`], ['revenue', 'Doanh thu đã thu', 'Tổng hợp đồng đã thanh toán']]
   const max = Math.max(...(stats.monthly || []).map((item) => Number(item.revenue)), 1)
   return <><div className="dashboard-stat-grid">{cards.map(([key, label, note]) => <article className="dashboard-stat" key={key}><span>{label}</span><strong>{key === 'revenue' ? money(stats[key]) : stats[key] ?? '—'}</strong><small>{note}</small></article>)}</div><div className="admin-overview-grid"><section className="admin-card"><div className="panel-heading"><div><p className="eyebrow">BÁO CÁO TÀI CHÍNH</p><h2>Doanh thu theo tháng</h2></div><span className="result-count">6 kỳ gần nhất</span></div><div className="revenue-chart">{(stats.monthly || []).map((item) => <div className="revenue-column" key={item.month}><span>{money(item.revenue)}</span><i style={{ height: `${Math.max(Number(item.revenue) / max * 150, 8)}px` }} /><small>{item.month}</small></div>)}</div></section><section className="admin-card admin-health"><p className="eyebrow">CẦN XỬ LÝ</p><h2>Nhịp vận hành hôm nay</h2><div><b>{stats.pendingRequests || 0}</b><span>yêu cầu chăm sóc đang chờ</span></div><div><b>{stats.activeContracts || 0}</b><span>hợp đồng đang hiệu lực</span></div></section></div></>
+}
+
+function UserManagement({ items, onUpdate, onCreate }) {
+  return <div className="admin-two-column"><section className="admin-card"><p className="eyebrow">THÊM TÀI KHOẢN</p><h2>Tạo người dùng mới</h2><form className="admin-form" onSubmit={onCreate}><label>Họ và tên<input name="name" required /></label><label>Email<input name="email" type="email" required /></label><label>Mật khẩu tạm<input name="password" type="password" minLength="6" required /></label><label>Vai trò<select name="role" defaultValue="khach_hang">{Object.entries(labels.role).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><button className="primary-button">Tạo tài khoản <span>→</span></button></form></section><Users items={items} onUpdate={onUpdate} /></div>
 }
 
 function Users({ items, onUpdate }) { return <section className="admin-card"><div className="panel-heading"><div><p className="eyebrow">TÀI KHOẢN & PHÂN QUYỀN</p><h2>Quản lý người dùng</h2></div><span className="result-count">{items.length} tài khoản</span></div><div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Người dùng</th><th>Vai trò</th><th>Ngày tham gia</th><th>Trạng thái</th><th /></tr></thead><tbody>{items.map((item) => <tr key={item.id}><td><strong>{item.name}</strong><small>{item.email}</small></td><td><select value={item.role} onChange={(e) => onUpdate(item, 'role', e.target.value)}>{Object.entries(labels.role).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></td><td>{date(item.createdAt)}</td><td><span className={`status-pill ${item.status === 'hoat_dong' ? 'is-good' : 'is-blocked'}`}>{labels.userStatus[item.status]}</span></td><td><button className="table-action" onClick={() => onUpdate(item, 'status', item.status === 'hoat_dong' ? 'bi_khoa' : 'hoat_dong')}>{item.status === 'hoat_dong' ? 'Khóa' : 'Mở khóa'}</button></td></tr>)}</tbody></table></div></section> }
