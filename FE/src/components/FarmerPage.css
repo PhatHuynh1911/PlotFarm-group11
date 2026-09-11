@@ -18,3 +18,10 @@
 .harvest-list { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
 .harvest-item { min-height: 150px; align-items: flex-start; border-color: #ead7bd; background: #fff; }
 .harvest-item .primary-button { margin-top: 12px; }
+
+.farmer-plot-card .primary-button { margin-top: 14px; }
+.plot-special-request { margin: 12px 0 0; padding: 10px 12px; border-left: 3px solid #d9a441; background: #fff9e9; font-size: .9rem; }
+.request-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+.request-actions input[type='text'], .request-actions input:not([type]) { min-width: 180px; }
+.request-proof { display: block; width: 110px; aspect-ratio: 4 / 3; object-fit: cover; margin-top: 10px; border-radius: 6px; }
+.request-reply { margin: 10px 0 0; color: #44604a; }

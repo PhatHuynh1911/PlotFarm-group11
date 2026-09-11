@@ -17,6 +17,7 @@ GO
 -- 1. XÓA BẢNG CŨ THEO THỨ TỰ RÀNG BUỘC KHÓA NGOẠI
 -- ==============================================================================
 IF OBJECT_ID(N'dbo.LienHeTuVan', N'U') IS NOT NULL DROP TABLE dbo.LienHeTuVan;
+IF OBJECT_ID(N'dbo.PhanCongNongDan', N'U') IS NOT NULL DROP TABLE dbo.PhanCongNongDan;
 IF OBJECT_ID(N'dbo.GiaoHang', N'U') IS NOT NULL DROP TABLE dbo.GiaoHang;
 IF OBJECT_ID(N'dbo.ThuHoach', N'U') IS NOT NULL DROP TABLE dbo.ThuHoach;
 IF OBJECT_ID(N'dbo.YeuCauDichVu', N'U') IS NOT NULL DROP TABLE dbo.YeuCauDichVu;
@@ -166,13 +167,28 @@ CREATE TABLE dbo.HopDongThue (
     trang_thai_thanh_toan VARCHAR(20) NOT NULL DEFAULT 'da_thanh_toan', -- 'cho_thanh_toan', 'da_thanh_toan', 'hoan_tien'
     phuong_thuc_thanh_toan VARCHAR(20) NOT NULL DEFAULT 'chuyen_khoan', -- 'chuyen_khoan', 'the_tin_dung', 'tien_mat'
     trang_thai_hop_dong VARCHAR(20) NOT NULL DEFAULT 'hieu_luc', -- 'hieu_luc', 'da_ket_thuc', 'da_huy'
+    trang_thai_canh_tac VARCHAR(30) NOT NULL DEFAULT 'cho_gieo_trong', -- 'cho_gieo_trong', 'dang_canh_tac', 'san_sang_thu_hoach'
     yeu_cau_dac_biet NVARCHAR(500) NULL,
     ngay_tao DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
     ngay_cap_nhat DATETIME2 NOT NULL DEFAULT SYSDATETIME()
 );
 GO
 
--- 2.8 Bảng Nhật Ký Canh Tác (NhatKyCanhTac)
+-- 2.8 Bảng Phân Công Nông Dân (PhanCongNongDan)
+CREATE TABLE dbo.PhanCongNongDan (
+    ma_phan_cong INT IDENTITY(1,1) PRIMARY KEY,
+    ma_hop_dong INT NOT NULL FOREIGN KEY REFERENCES dbo.HopDongThue(ma_hop_dong) ON DELETE CASCADE,
+    ma_nong_dan INT NOT NULL FOREIGN KEY REFERENCES dbo.NguoiDung(ma_nguoi_dung),
+    ma_quan_tri INT NOT NULL FOREIGN KEY REFERENCES dbo.NguoiDung(ma_nguoi_dung),
+    trang_thai VARCHAR(20) NOT NULL DEFAULT 'cho_tiep_nhan', -- 'cho_tiep_nhan', 'da_chap_nhan', 'tu_choi', 'da_huy'
+    ghi_chu NVARCHAR(500) NULL,
+    ngay_gui DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    ngay_phan_hoi DATETIME2 NULL,
+    UNIQUE (ma_hop_dong, ma_nong_dan)
+);
+GO
+
+-- 2.9 Bảng Nhật Ký Canh Tác (NhatKyCanhTac)
 CREATE TABLE dbo.NhatKyCanhTac (
     ma_nhat_ky INT IDENTITY(1,1) PRIMARY KEY,
     ma_hop_dong INT NOT NULL FOREIGN KEY REFERENCES dbo.HopDongThue(ma_hop_dong) ON DELETE CASCADE,
@@ -194,7 +210,7 @@ CREATE TABLE dbo.NhatKyCanhTac (
 );
 GO
 
--- 2.9 Bảng Loại Dịch Vụ Chăm Sóc (LoaiDichVu)
+-- 2.10 Bảng Loại Dịch Vụ Chăm Sóc (LoaiDichVu)
 CREATE TABLE dbo.LoaiDichVu (
     ma_loai_dich_vu INT IDENTITY(1,1) PRIMARY KEY,
     ten_dich_vu NVARCHAR(100) NOT NULL UNIQUE,
@@ -207,7 +223,7 @@ CREATE TABLE dbo.LoaiDichVu (
 );
 GO
 
--- 2.10 Bảng Yêu Cầu Dịch Vụ (YeuCauDichVu)
+-- 2.11 Bảng Yêu Cầu Dịch Vụ (YeuCauDichVu)
 CREATE TABLE dbo.YeuCauDichVu (
     ma_yeu_cau INT IDENTITY(1,1) PRIMARY KEY,
     so_phieu_yeu_cau VARCHAR(30) NOT NULL UNIQUE,

@@ -13,7 +13,7 @@ const date = (value) => value ? new Date(value).toLocaleDateString('vi-VN') : '�
 
 function AdminPage({ user, token, onLogout }) {
   const [activeTab, setActiveTab] = useState('overview')
-  const [data, setData] = useState({ stats: null, users: [], plots: [], rentals: [], requests: [] })
+  const [data, setData] = useState({ stats: null, users: [], plots: [], rentals: [], requests: [], farmers: [], assignments: [] })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [notice, setNotice] = useState('')
@@ -21,14 +21,14 @@ function AdminPage({ user, token, onLogout }) {
 
   const load = useCallback(async () => {
     try {
-      const endpoints = ['dashboard', 'users', 'plots', 'rentals', 'requests']
+      const endpoints = ['dashboard', 'users', 'plots', 'rentals', 'requests', 'farmers', 'assignments']
       const responses = await Promise.all(endpoints.map((endpoint) => fetch(`${API_URL}/admin/${endpoint}`, { headers: { Authorization: `Bearer ${token}` } })))
       const results = await Promise.all(responses.map(async (response) => {
         const result = await response.json()
         if (!response.ok) throw new Error(result.message || 'Không thể tải dữ liệu quản trị')
         return result.data
       }))
-      setData({ stats: results[0], users: results[1], plots: results[2], rentals: results[3], requests: results[4] })
+      setData({ stats: results[0], users: results[1], plots: results[2], rentals: results[3], requests: results[4], farmers: results[5], assignments: results[6] })
       setError('')
     } catch (requestError) { setError(requestError.message) } finally { setLoading(false) }
   }, [token])
@@ -64,7 +64,7 @@ function AdminPage({ user, token, onLogout }) {
       {activeTab === 'overview' && <Overview stats={stats} />}
       {activeTab === 'users' && <UserList items={data.users.filter((item) => item.role !== 'quan_tri')} onToggleStatus={updateUser} />}
       {activeTab === 'plots' && <Plots items={data.plots} editingPlot={editingPlot} setEditingPlot={setEditingPlot} onSubmit={savePlot} onCancel={() => setEditingPlot(null)} />}
-      {activeTab === 'rentals' && <Rentals items={data.rentals} />}
+      {activeTab === 'rentals' && <Rentals items={data.rentals} farmers={data.farmers} assignments={data.assignments} onAssign={(payload) => update('assignments', 'POST', payload)} />}
       {activeTab === 'requests' && <Requests items={data.requests} onUpdate={updateRequest} />}
     </section>
   </main>
@@ -88,7 +88,7 @@ function Users({ items, onUpdate }) { return <section className="admin-card"><di
 
 function Plots({ items, editingPlot, setEditingPlot, onSubmit, onCancel }) { return <div className="admin-two-column"><section className="admin-card"><div className="panel-heading"><div><p className="eyebrow">TÀI SẢN & VỊ TRÍ</p><h2>Danh sách ô đất</h2></div><span className="result-count">{items.length} ô đất</span></div><div className="admin-plot-list">{items.map((item) => <article className="admin-plot-row" key={item.id}><div><strong>{item.code}</strong><span>{item.name}</span><small>{item.area} m² · {money(item.price)}/tháng</small></div><span className="status-pill">{labels.plotStatus[item.status] || item.status}</span><button className="table-action" onClick={() => setEditingPlot(item)}>Sửa</button></article>)}</div></section><section className="admin-card"><p className="eyebrow">{editingPlot ? 'CHỈNH SỬA' : 'TẠO MỚI'}</p><h2>{editingPlot ? 'Cập nhật ô đất' : 'Thêm ô đất'}</h2><form className="admin-form" onSubmit={onSubmit} key={editingPlot?.id || 'new'}><label>Mã ô đất<input name="code" defaultValue={editingPlot?.code || ''} required /></label><label>Tên ô đất<input name="name" defaultValue={editingPlot?.name || ''} required /></label><label>Mã nông trại<input name="farmId" type="number" defaultValue={editingPlot?.farmId || 1} required /></label><div className="form-row"><label>Diện tích (m²)<input name="area" type="number" step=".01" defaultValue={editingPlot?.area || ''} required /></label><label>Giá thuê/tháng<input name="price" type="number" defaultValue={editingPlot?.price || ''} required /></label></div><label>Trạng thái<select name="status" defaultValue={editingPlot?.status || 'trong'}>{Object.entries(labels.plotStatus).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>Mô tả<textarea name="description" defaultValue={editingPlot?.description || ''} /></label><div className="form-actions"><button className="primary-button" type="submit">{editingPlot ? 'Lưu thay đổi' : 'Thêm ô đất'}</button>{editingPlot && <button className="text-button" type="button" onClick={onCancel}>Hủy</button>}</div></form></section></div> }
 
-function Rentals({ items }) { return <section className="admin-card"><div className="panel-heading"><div><p className="eyebrow">HỢP ĐỒNG & THANH TOÁN</p><h2>Đơn thuê đất & giao dịch</h2></div><span className="result-count">{items.length} hợp đồng</span></div><div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Hợp đồng</th><th>Khách hàng</th><th>Ô đất</th><th>Giá trị</th><th>Thanh toán</th><th>Ngày tạo</th></tr></thead><tbody>{items.map((item) => <tr key={item.id}><td><strong>{item.code}</strong><small>{item.status}</small></td><td>{item.customer}</td><td>{item.plot}</td><td><strong>{money(item.total)}</strong></td><td><span className={`status-pill ${item.paymentStatus === 'da_thanh_toan' ? 'is-good' : 'is-pending'}`}>{item.paymentStatus === 'da_thanh_toan' ? 'Đã thanh toán' : item.paymentStatus}</span></td><td>{date(item.createdAt)}</td></tr>)}</tbody></table></div></section> }
+function Rentals({ items, farmers, assignments, onAssign }) { return <section className="admin-card"><div className="panel-heading"><div><p className="eyebrow">HỢP ĐỒNG & PHÂN CÔNG</p><h2>Đơn thuê đất & giao dịch</h2></div><span className="result-count">{items.length} hợp đồng</span></div><div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Hợp đồng</th><th>Khách hàng</th><th>Ô đất</th><th>Giá trị</th><th>Phân công farmer</th><th>Trạng thái</th></tr></thead><tbody>{items.map((item) => { const assignment = assignments.find((entry) => entry.ma_hop_dong === item.id); return <tr key={item.id}><td><strong>{item.code}</strong><small>{item.status}</small></td><td>{item.customer}</td><td>{item.plot}</td><td><strong>{money(item.total)}</strong></td><td><select value={assignment?.ma_nong_dan || ''} onChange={(event) => event.target.value && onAssign({ ma_hop_dong: item.id, ma_nong_dan: Number(event.target.value) })}><option value="">Chọn farmer</option>{farmers.map((farmer) => <option key={farmer.id} value={farmer.id}>{farmer.name}</option>)}</select></td><td><span className="status-pill">{assignment ? assignment.trang_thai : 'Chưa phân công'}</span></td></tr> })}</tbody></table></div></section> }
 
 function Requests({ items, onUpdate }) { return <section className="admin-card"><div className="panel-heading"><div><p className="eyebrow">CHẤT LƯỢNG DỊCH VỤ</p><h2>Yêu cầu chăm sóc & khiếu nại</h2></div><span className="result-count">{items.length} yêu cầu</span></div><div className="admin-request-list">{items.map((item) => <article key={item.id}><div><strong>{item.service || 'Yêu cầu chăm sóc'} · {item.plot}</strong><span>{item.customer} · lịch {date(item.scheduledAt)}</span><p>{item.note || 'Không có ghi chú'}</p></div><select value={item.status} onChange={(e) => onUpdate(item, e.target.value)}>{Object.entries(labels.requestStatus).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></article>)}</div></section> }
 

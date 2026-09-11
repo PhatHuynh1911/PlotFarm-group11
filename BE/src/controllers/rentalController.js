@@ -64,9 +64,9 @@ const createRental = async (req, res) => {
             .input('don_gia_thang', sql.Decimal(14, 2), donGiaThang)
             .input('tong_tien', sql.Decimal(14, 2), tongTien)
             .query(`
-                INSERT INTO HopDongThue (so_hop_dong, ma_nguoi_dung, ma_o_dat, ma_cay_trong, ngay_bat_dau, ngay_ket_thuc, thoi_han_thang, don_gia_thang, tong_tien, trang_thai_hop_dong, trang_thai_thanh_toan)
+                INSERT INTO HopDongThue (so_hop_dong, ma_nguoi_dung, ma_o_dat, ma_cay_trong, ngay_bat_dau, ngay_ket_thuc, thoi_han_thang, don_gia_thang, tong_tien, trang_thai_hop_dong, trang_thai_thanh_toan, trang_thai_canh_tac)
                 OUTPUT INSERTED.*
-                VALUES (@so_hop_dong, @ma_nguoi_dung, @ma_o_dat, @ma_cay_trong, @ngay_bat_dau, @ngay_ket_thuc, @thoi_han_thang, @don_gia_thang, @tong_tien, 'hieu_luc', 'da_thanh_toan')
+                VALUES (@so_hop_dong, @ma_nguoi_dung, @ma_o_dat, @ma_cay_trong, @ngay_bat_dau, @ngay_ket_thuc, @thoi_han_thang, @don_gia_thang, @tong_tien, 'hieu_luc', 'da_thanh_toan', 'cho_gieo_trong')
             `);
 
         // 3. Cập nhật trạng thái ô đất thành đã thuê
@@ -125,17 +125,20 @@ const getAllRentals = async (req, res) => {
 const getRentalsByUser = async (req, res) => {
     try {
         const pool = await getPool();
-        const targetUserId = req.params.userId || req.user?.sub;
+        const targetUserId = req.user?.role === 'khach_hang' ? req.user.sub : (req.params.userId || req.user?.sub);
         const result = await pool.request()
             .input('ma_nguoi_dung', sql.Int, parseInt(targetUserId, 10))
             .query(`
                 SELECT h.ma_hop_dong, h.so_hop_dong, h.ngay_bat_dau, h.ngay_ket_thuc,
                        h.tong_tien, h.trang_thai_hop_dong, h.trang_thai_thanh_toan,
                        o.ma_o_dat, o.so_hieu_o, o.ten_o_dat, o.dien_tich_m2,
-                       c.ma_cay_trong, c.ten_cay_trong, c.hinh_anh_cay
+                      c.ma_cay_trong, c.ten_cay_trong, c.hinh_anh_cay,
+                      n.ho_va_ten AS ten_nong_dan, p.trang_thai AS trang_thai_phan_cong
                 FROM HopDongThue h
                 INNER JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
                 LEFT JOIN CayTrong c ON c.ma_cay_trong = h.ma_cay_trong
+                  LEFT JOIN PhanCongNongDan p ON p.ma_hop_dong = h.ma_hop_dong AND p.trang_thai = 'da_chap_nhan'
+                  LEFT JOIN NguoiDung n ON n.ma_nguoi_dung = p.ma_nong_dan
                 WHERE h.ma_nguoi_dung = @ma_nguoi_dung
                 ORDER BY h.ngay_tao DESC
             `);
@@ -150,9 +153,16 @@ const getRentalsByUser = async (req, res) => {
 const getActiveRentals = async (req, res) => {
     try {
         const pool = await getPool();
-        const result = await pool.request().query(`
+        const request = pool.request();
+        let farmerFilter = '';
+        if (req.user?.role === 'nong_dan') {
+            request.input('farmerId', sql.Int, Number(req.user.sub));
+            farmerFilter = `AND EXISTS (SELECT 1 FROM PhanCongNongDan p WHERE p.ma_hop_dong = h.ma_hop_dong AND p.ma_nong_dan = @farmerId AND p.trang_thai = 'da_chap_nhan')`;
+        }
+        const result = await request.query(`
             SELECT h.ma_hop_dong, h.so_hop_dong, h.ngay_bat_dau, h.ngay_ket_thuc,
                    o.ma_o_dat, o.so_hieu_o, o.ten_o_dat, o.dien_tich_m2,
+                   h.trang_thai_thanh_toan, h.trang_thai_canh_tac, h.yeu_cau_dac_biet,
                    u.ho_va_ten AS ten_khach_hang, u.so_dien_thoai AS sdt_khach_hang,
                    c.ma_cay_trong, c.ten_cay_trong, c.thoi_gian_sinh_truong_ngay,
                    DATEDIFF(day, h.ngay_bat_dau, SYSDATETIME()) AS so_ngay_da_trong
@@ -160,13 +170,40 @@ const getActiveRentals = async (req, res) => {
             JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
             JOIN NguoiDung u ON u.ma_nguoi_dung = h.ma_nguoi_dung
             LEFT JOIN CayTrong c ON c.ma_cay_trong = h.ma_cay_trong
-            WHERE h.trang_thai_hop_dong = 'hieu_luc'
+            WHERE h.trang_thai_hop_dong = 'hieu_luc' ${farmerFilter}
             ORDER BY o.so_hieu_o ASC
         `);
 
         return res.json({ success: true, count: result.recordset.length, data: result.recordset });
     } catch (error) {
         console.error('Lỗi lấy danh sách ô đất đang canh tác:', error);
+        return res.status(500).json({ success: false, message: 'Lỗi server nội bộ' });
+    }
+};
+
+// Nông dân xác nhận đã nhận giống và bắt đầu gieo trồng
+const updateCultivationStatus = async (req, res) => {
+    try {
+        const status = req.body.status || 'dang_canh_tac';
+        if (!['dang_canh_tac', 'san_sang_thu_hoach'].includes(status)) {
+            return res.status(400).json({ success: false, message: 'Trạng thái canh tác không hợp lệ' });
+        }
+
+        const pool = await getPool();
+        const result = await pool.request()
+            .input('id', sql.Int, parseInt(req.params.id, 10))
+            .input('status', sql.VarChar(30), status)
+            .query(`
+                UPDATE HopDongThue
+                SET trang_thai_canh_tac = @status, ngay_cap_nhat = SYSDATETIME()
+                OUTPUT INSERTED.ma_hop_dong, INSERTED.trang_thai_canh_tac
+                WHERE ma_hop_dong = @id AND trang_thai_hop_dong = 'hieu_luc'
+            `);
+
+        if (!result.recordset[0]) return res.status(404).json({ success: false, message: 'Không tìm thấy hợp đồng đang hoạt động' });
+        return res.json({ success: true, message: 'Đã cập nhật trạng thái canh tác', data: result.recordset[0] });
+    } catch (error) {
+        console.error('Lỗi cập nhật trạng thái canh tác:', error);
         return res.status(500).json({ success: false, message: 'Lỗi server nội bộ' });
     }
 };
@@ -200,4 +237,4 @@ const getRentalById = async (req, res) => {
     }
 };
 
-module.exports = { createRental, getAllRentals, getRentalsByUser, getActiveRentals, getRentalById };
+module.exports = { createRental, getAllRentals, getRentalsByUser, getActiveRentals, getRentalById, updateCultivationStatus };

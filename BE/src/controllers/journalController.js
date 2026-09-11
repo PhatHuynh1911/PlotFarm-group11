@@ -136,4 +136,37 @@ const getJournalsByRental = async (req, res) => {
     }
 };
 
-module.exports = { createJournal, getJournalsByRental };
+// Nông dân chỉnh sửa một bản ghi khi nhập sai thông tin
+const updateJournal = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { giai_doan_sinh_truong, cong_viec_da_lam, loai_phan_bon_da_dung, ghi_chu_chi_tiet, danh_sach_hinh_anh, video_ghi_hinh } = req.body;
+        const pool = await getPool();
+        const result = await pool.request()
+            .input('id', sql.Int, parseInt(id, 10))
+            .input('stage', sql.NVarChar(50), giai_doan_sinh_truong || null)
+            .input('task', sql.NVarChar(150), cong_viec_da_lam || null)
+            .input('fertilizer', sql.NVarChar(150), loai_phan_bon_da_dung || null)
+            .input('note', sql.NVarChar(sql.MAX), ghi_chu_chi_tiet || null)
+            .input('images', sql.NVarChar(sql.MAX), danh_sach_hinh_anh || null)
+            .input('video', sql.NVarChar(500), video_ghi_hinh || null)
+            .query(`
+                UPDATE NhatKyCanhTac
+                SET giai_doan_sinh_truong = COALESCE(@stage, giai_doan_sinh_truong),
+                    cong_viec_da_lam = COALESCE(@task, cong_viec_da_lam),
+                    loai_phan_bon_da_dung = COALESCE(@fertilizer, loai_phan_bon_da_dung),
+                    ghi_chu_chi_tiet = COALESCE(@note, ghi_chu_chi_tiet),
+                    danh_sach_hinh_anh = COALESCE(@images, danh_sach_hinh_anh),
+                    video_ghi_hinh = COALESCE(@video, video_ghi_hinh)
+                OUTPUT INSERTED.*
+                WHERE ma_nhat_ky = @id
+            `);
+        if (!result.recordset[0]) return res.status(404).json({ success: false, message: 'Không tìm thấy nhật ký' });
+        return res.json({ success: true, message: 'Đã cập nhật nhật ký', data: result.recordset[0] });
+    } catch (error) {
+        console.error('Lỗi cập nhật nhật ký:', error);
+        return res.status(500).json({ success: false, message: 'Lỗi server nội bộ' });
+    }
+};
+
+module.exports = { createJournal, getJournalsByRental, updateJournal };

@@ -1,6 +1,7 @@
 const express = require('express');
 const admin = require('../controllers/adminController');
 const { authenticate, authorize } = require('../middleware/authMiddleware');
+const { getFarmers, getAssignments, createAssignment } = require('../controllers/assignmentController');
 
 const router = express.Router();
 router.use(authenticate, authorize('quan_tri'));
@@ -14,5 +15,8 @@ router.patch('/plots/:id', admin.updatePlot);
 router.get('/rentals', admin.rentals);
 router.get('/requests', admin.requests);
 router.patch('/requests/:id', admin.updateRequest);
+router.get('/farmers', getFarmers);
+router.get('/assignments', getAssignments);
+router.post('/assignments', createAssignment);
 
 module.exports = router;

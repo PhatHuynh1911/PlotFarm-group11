@@ -82,3 +82,25 @@ export async function getJournalsByRental(rentalId, token) {
   const result = await apiRequest(`/journals/rental/${rentalId}`, { token })
   return result.data
 }
+
+export async function updateCultivationStatus(id, status, token) {
+  return apiRequest(`/rentals/${id}/cultivation-status`, { method: 'PATCH', body: JSON.stringify({ status }), token })
+}
+
+export async function updateJournal(id, payload, token) {
+  return apiRequest(`/journals/${id}`, { method: 'PATCH', body: JSON.stringify(payload), token })
+}
+
+export async function getAssignments(token) {
+  const result = await apiRequest('/rentals/assignments/mine', { token })
+  return result.data
+}
+
+export async function respondToAssignment(id, status, token) {
+  return apiRequest(`/rentals/assignments/${id}/respond`, { method: 'PATCH', body: JSON.stringify({ status }), token })
+}
+
+export async function getUserServiceRequests(userId, token) {
+  const result = await apiRequest(`/services/user/${userId}`, { token })
+  return result.data
+}

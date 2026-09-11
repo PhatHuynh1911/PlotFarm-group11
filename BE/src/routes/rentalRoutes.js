@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { createRental, getAllRentals, getRentalsByUser, getActiveRentals, getRentalById } = require('../controllers/rentalController');
+const { createRental, getAllRentals, getRentalsByUser, getActiveRentals, getRentalById, updateCultivationStatus } = require('../controllers/rentalController');
+const { authenticate, authorize } = require('../middleware/authMiddleware');
+const { getAssignments, respondToAssignment } = require('../controllers/assignmentController');
 
 // Soft auth: Nếu có Bearer token thì giải mã vào req.user, nếu không thì vẫn cho qua để test Swagger
 const softAuth = (req, res, next) => {
@@ -17,6 +19,9 @@ const softAuth = (req, res, next) => {
 router.post('/', softAuth, createRental);
 router.get('/', softAuth, getAllRentals);
 router.get('/active', softAuth, getActiveRentals);
+router.get('/assignments/mine', authenticate, authorize('nong_dan'), getAssignments);
+router.patch('/assignments/:id/respond', authenticate, authorize('nong_dan'), respondToAssignment);
+router.patch('/:id/cultivation-status', softAuth, updateCultivationStatus);
 router.get('/user/:userId', softAuth, getRentalsByUser);
 router.get('/:id', softAuth, getRentalById);
 
