@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import './FarmerPage.css'
 import ProfilePanel from './ProfilePanel.jsx'
 import AccountMenu from './AccountMenu.jsx'
 import { getActiveRentals, getServiceRequests, updateServiceRequest, createJournal, getJournalsByRental } from '../api.js'
