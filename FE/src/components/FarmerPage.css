@@ -1,0 +1,20 @@
+.journal-workspace { background: linear-gradient(135deg, #fffdf6 0%, #ffffff 62%); border-top: 4px solid #d9a441; }
+.journal-workspace .farmer-form { padding: 20px; max-width: 760px; border: 1px dashed #d8c486; border-radius: 10px; background: rgba(255, 252, 239, .7); }
+.journal-workspace .journal-history { max-width: 760px; }
+.journal-workspace .journal-history article { padding: 15px; border: 1px solid #edf0e8; border-radius: 8px; background: #fff; }
+
+.farmer-content-panel:has(.request-list) { background: #f8fbf7; border-top: 4px solid #5c9563; }
+.request-list { grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); }
+.care-request { min-height: 164px; display: flex; flex-direction: column; align-items: stretch; justify-content: space-between; border-left: 4px solid #d5a143; background: #fff; }
+.care-request.resolved { border-left-color: #68a86c; background: #f6fbf4; }
+.care-request .outline-button { align-self: flex-start; }
+
+.farmer-content-panel:has(.camera-settings) { background: #f5f9fb; border-top: 4px solid #5f8fa7; }
+.camera-settings { gap: 14px; }
+.camera-setting { padding: 22px; border-color: #d7e4e9; background: #fff; box-shadow: 0 5px 16px rgba(54, 102, 122, .06); }
+.camera-setting strong::before { content: '●'; margin-right: 8px; color: #4f9b75; }
+
+.farmer-content-panel:has(.harvest-list) { background: #fffaf3; border-top: 4px solid #cf7c39; }
+.harvest-list { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.harvest-item { min-height: 150px; align-items: flex-start; border-color: #ead7bd; background: #fff; }
+.harvest-item .primary-button { margin-top: 12px; }
