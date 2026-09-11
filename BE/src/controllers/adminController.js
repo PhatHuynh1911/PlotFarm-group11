@@ -1,5 +1,4 @@
 const { sql, getPool } = require('../config/db');
-const bcrypt = require('bcryptjs');
 
 const dashboard = async (req, res) => {
     try {
@@ -43,29 +42,6 @@ const users = async (req, res) => {
         `);
         return res.json({ success: true, data: result.recordset });
     } catch (error) { return res.status(500).json({ success: false, message: 'Không thể tải danh sách người dùng' }); }
-};
-
-const createUser = async (req, res) => {
-    try {
-        const { name, email, password, role = 'khach_hang' } = req.body;
-        if (!name || !email || !password || password.length < 6 || !['khach_hang', 'nong_dan', 'quan_tri'].includes(role)) {
-            return res.status(400).json({ success: false, message: 'Nhập đủ tên, email, mật khẩu tối thiểu 6 ký tự và vai trò hợp lệ' });
-        }
-        const passwordHash = await bcrypt.hash(password, 10);
-        const pool = await getPool();
-        const result = await pool.request()
-            .input('name', sql.NVarChar(100), name.trim())
-            .input('email', sql.VarChar(150), email.trim().toLowerCase())
-            .input('password', sql.VarChar(100), passwordHash)
-            .input('role', sql.VarChar(20), role)
-            .query(`INSERT INTO NguoiDung (ho_va_ten, email, mat_khau, vai_tro, trang_thai)
-                    OUTPUT INSERTED.ma_nguoi_dung AS id, INSERTED.ho_va_ten AS name, INSERTED.email, INSERTED.vai_tro AS role, INSERTED.trang_thai AS status, INSERTED.ngay_tao AS createdAt
-                    VALUES (@name, @email, @password, @role, 'hoat_dong')`);
-        return res.status(201).json({ success: true, message: 'Đã tạo tài khoản mới', data: result.recordset[0] });
-    } catch (error) {
-        if (error.number === 2627 || error.number === 2601) return res.status(409).json({ success: false, message: 'Email này đã tồn tại' });
-        return res.status(500).json({ success: false, message: 'Không thể tạo tài khoản' });
-    }
 };
 
 const updateUser = async (req, res) => {
@@ -150,4 +126,4 @@ const updateRequest = async (req, res) => {
     } catch (error) { return res.status(500).json({ success: false, message: 'Không thể cập nhật yêu cầu' }); }
 };
 
-module.exports = { dashboard, users, createUser, updateUser, plots, createPlot, updatePlot, rentals, requests, updateRequest };
+module.exports = { dashboard, users, updateUser, plots, createPlot, updatePlot, rentals, requests, updateRequest };

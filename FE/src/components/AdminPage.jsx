@@ -43,14 +43,6 @@ function AdminPage({ user, token, onLogout }) {
   }
   const updateUser = (item, field, value) => update(`users/${item.id}`, 'PATCH', { role: field === 'role' ? value : item.role, status: field === 'status' ? value : item.status }).catch((e) => setError(e.message))
   const updateRequest = (item, value) => update(`requests/${item.id}`, 'PATCH', { status: value }).catch((e) => setError(e.message))
-  const createUser = async (event) => {
-    event.preventDefault()
-    const form = new FormData(event.currentTarget)
-    try {
-      await update('users', 'POST', Object.fromEntries(form.entries()))
-      event.currentTarget.reset()
-    } catch (e) { setError(e.message) }
-  }
   const savePlot = async (event) => {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
@@ -70,7 +62,7 @@ function AdminPage({ user, token, onLogout }) {
       <nav className="admin-tabs" aria-label="Các chức năng quản trị">{tabs.map(([id, label]) => <button className={activeTab === id ? 'active' : ''} key={id} onClick={() => setActiveTab(id)}>{label}</button>)}</nav>
       {loading && <p className="loading-state" role="status">Đang tải dữ liệu quản trị...</p>}{error && <p className="dashboard-error admin-message" role="alert">{error}</p>}{notice && <p className="admin-success">{notice}</p>}
       {activeTab === 'overview' && <Overview stats={stats} />}
-      {activeTab === 'users' && <UserManagement items={data.users} onUpdate={updateUser} onCreate={createUser} />}
+      {activeTab === 'users' && <Users items={data.users.filter((item) => item.role !== 'quan_tri')} onUpdate={updateUser} />}
       {activeTab === 'plots' && <Plots items={data.plots} editingPlot={editingPlot} setEditingPlot={setEditingPlot} onSubmit={savePlot} onCancel={() => setEditingPlot(null)} />}
       {activeTab === 'rentals' && <Rentals items={data.rentals} />}
       {activeTab === 'requests' && <Requests items={data.requests} onUpdate={updateRequest} />}
