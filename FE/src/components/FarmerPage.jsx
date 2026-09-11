@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import ProfilePanel from './ProfilePanel.jsx'
 import AccountMenu from './AccountMenu.jsx'
-import { getActiveRentals, getServiceRequests, updateServiceRequest } from '../api.js'
+import { getActiveRentals, getServiceRequests, updateServiceRequest, createJournal, getJournalsByRental } from '../api.js'
 
 function FarmerPage({ user, onLogout }) {
   const token = JSON.parse(sessionStorage.getItem('plotfarm_auth') || '{}').token
@@ -11,17 +11,40 @@ function FarmerPage({ user, onLogout }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [journal, setJournal] = useState([])
-  const [journalForm, setJournalForm] = useState({ plot: 'A-12', note: '', water: '10 lít', fertilizer: 'Chưa bón', photo: '' })
+  const [journalForm, setJournalForm] = useState({ plot: 'A-03', note: '', water: '10 lít', fertilizer: 'Chưa bón', photo: '' })
   const [journalMessage, setJournalMessage] = useState('')
-  const [cameraUrls, setCameraUrls] = useState({ 'A-12': 'https://camera.plotfarm.vn/a12', 'B-07': '' })
+  const [cameraUrls, setCameraUrls] = useState({ 'A-03': 'https://camera.plotfarm.vn/a03', 'C-09': '' })
   const [cameraMessage, setCameraMessage] = useState('')
   const [harvested, setHarvested] = useState([])
 
   useEffect(() => {
     Promise.all([getActiveRentals(token), getServiceRequests(token)])
-      .then(([rentals, serviceRequests]) => {
-        setPlots(rentals.map((rental) => ({ id: rental.so_hieu_o, crop: rental.ten_cay_trong || 'Chưa chọn cây trồng', customer: rental.ten_khach_hang, area: `${rental.dien_tich_m2} m²`, stage: 'Đang sinh trưởng', progress: Math.min(Math.max(Math.round((rental.so_ngay_da_trong || 0) / (rental.thoi_gian_sinh_truong_ngay || 90) * 100), 1), 100), next: 'Theo dõi và chăm sóc theo lịch', camera: false, rentalId: rental.ma_hop_dong })))
+      .then(async ([rentals, serviceRequests]) => {
+        const mappedPlots = rentals.map((rental) => ({ id: rental.so_hieu_o, crop: rental.ten_cay_trong || 'Chưa chọn cây trồng', customer: rental.ten_khach_hang, area: `${rental.dien_tich_m2} m²`, stage: 'Đang sinh trưởng', progress: Math.min(Math.max(Math.round((rental.so_ngay_da_trong || 0) / (rental.thoi_gian_sinh_truong_ngay || 90) * 100), 1), 100), next: 'Theo dõi và chăm sóc theo lịch', camera: false, rentalId: rental.ma_hop_dong }))
+        setPlots(mappedPlots)
+        if (mappedPlots[0]?.id) {
+          setJournalForm((prev) => ({ ...prev, plot: mappedPlots[0].id }))
+        }
         setRequests(serviceRequests.map((request) => ({ id: request.ma_yeu_cau, plot: request.so_hieu_o, customer: request.ten_khach_hang, text: request.ghi_chu_cua_khach, status: request.trang_thai_xu_ly === 'hoan_thanh' ? 'Đã xử lý' : 'Mới', time: request.ngay_gui_yeu_cau })))
+
+        // Lấy lịch sử nhật ký từ DB
+        const firstRentalId = rentals[0]?.ma_hop_dong
+        if (firstRentalId) {
+          try {
+            const dbJournals = await getJournalsByRental(firstRentalId, token)
+            if (Array.isArray(dbJournals)) {
+              setJournal(dbJournals.map((j) => ({
+                id: j.ma_nhat_ky,
+                plot: rentals[0].so_hieu_o,
+                date: j.ngay_ghi_nhat_ky ? new Date(j.ngay_ghi_nhat_ky).toLocaleDateString('vi-VN') : 'Định kỳ',
+                water: j.tieu_de || 'Tưới nước & chăm sóc',
+                fertilizer: j.loai_phan_bon_da_dung || 'Hữu cơ',
+                note: j.noi_dung || j.ghi_chu_chi_tiet,
+                photo: j.hinh_anh
+              })))
+            }
+          } catch (jErr) {}
+        }
       })
       .catch((requestError) => setError(requestError.message))
       .finally(() => setLoading(false))
@@ -34,12 +57,28 @@ function FarmerPage({ user, onLogout }) {
     } catch (requestError) { setError(requestError.message) }
   }
 
-  const submitJournal = (event) => {
+  const submitJournal = async (event) => {
     event.preventDefault()
     if (!journalForm.note.trim()) return
-    setJournal((items) => [{ ...journalForm, id: Date.now(), date: 'Vừa cập nhật' }, ...items])
-    setJournalForm({ ...journalForm, note: '', photo: '' })
-    setJournalMessage('Đã gửi nhật ký để khách hàng theo dõi.')
+    try {
+      const targetPlot = plots.find((p) => p.id === journalForm.plot) || plots[0]
+      const rentalId = targetPlot?.rentalId || 1
+      await createJournal({
+        ma_hop_dong: rentalId,
+        ma_nong_dan: user.id,
+        giai_doan_sinh_truong: 'Sinh trưởng',
+        cong_viec_da_lam: `Tưới: ${journalForm.water || '10 lít'} · Phân: ${journalForm.fertilizer || 'Chưa bón'}`,
+        ghi_chu_chi_tiet: journalForm.note,
+        loai_phan_bon_da_dung: journalForm.fertilizer,
+        danh_sach_hinh_anh: journalForm.photo || 'https://images.unsplash.com/photo-1592982537447-7440770cbfc9?auto=format&fit=crop&w=900&q=85'
+      }, token)
+      setJournal((items) => [{ ...journalForm, id: Date.now(), date: 'Vừa cập nhật' }, ...items])
+      setJournalForm({ ...journalForm, note: '', photo: '' })
+      setJournalMessage('Đã gửi và lưu nhật ký thành công vào cơ sở dữ liệu!')
+      setTimeout(() => setJournalMessage(''), 3000)
+    } catch (journalErr) {
+      setError(journalErr.message)
+    }
   }
 
   const handlePhoto = (event) => {

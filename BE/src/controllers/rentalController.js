@@ -53,7 +53,7 @@ const createRental = async (req, res) => {
         const tongTien = donGiaThang * thoi_han_thang;
 
         // 2. Thêm hợp đồng
-        await new sql.Request(transaction)
+        const insertResult = await new sql.Request(transaction)
             .input('so_hop_dong', sql.VarChar(50), so_hop_dong)
             .input('ma_nguoi_dung', sql.Int, parseInt(ma_nguoi_dung, 10))
             .input('ma_o_dat', sql.Int, parseInt(ma_o_dat, 10))
@@ -65,6 +65,7 @@ const createRental = async (req, res) => {
             .input('tong_tien', sql.Decimal(14, 2), tongTien)
             .query(`
                 INSERT INTO HopDongThue (so_hop_dong, ma_nguoi_dung, ma_o_dat, ma_cay_trong, ngay_bat_dau, ngay_ket_thuc, thoi_han_thang, don_gia_thang, tong_tien, trang_thai_hop_dong, trang_thai_thanh_toan)
+                OUTPUT INSERTED.*
                 VALUES (@so_hop_dong, @ma_nguoi_dung, @ma_o_dat, @ma_cay_trong, @ngay_bat_dau, @ngay_ket_thuc, @thoi_han_thang, @don_gia_thang, @tong_tien, 'hieu_luc', 'da_thanh_toan')
             `);
 
@@ -75,10 +76,13 @@ const createRental = async (req, res) => {
 
         await transaction.commit();
 
+        const createdContract = insertResult.recordset[0];
+
         res.status(201).json({
             success: true,
             message: 'Tạo hợp đồng thuê đất thành công và cập nhật trạng thái ô đất!',
             data: {
+                ...createdContract,
                 so_hop_dong,
                 donGiaThang,
                 thoi_han_thang,

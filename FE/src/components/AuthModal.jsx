@@ -41,7 +41,7 @@ function AuthModal({ mode, onClose, onSwitchMode, onAuthenticated }) {
         {mode === 'register' && <label>Họ và tên<input name="name" required placeholder="Nguyễn Minh An" /></label>}
         {mode === 'register' && <label>Vai trò<select name="role" defaultValue="khach_hang" required><option value="khach_hang">Khách hàng</option><option value="nong_dan">Nông dân</option></select></label>}
         <label>Email<input name="email" required type="email" placeholder="ten@email.com" /></label>
-        <label>Mật khẩu<div className="password-field"><input name="password" required type={showPassword ? 'text' : 'password'} minLength="6" placeholder="Tối thiểu 6 ký tự" /><button type="button" onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Ẩn' : 'Hiện'}</button></div></label>
+        <label>Mật khẩu<div className="password-field"><input name="password" required type={showPassword ? 'text' : 'password'} minLength={mode === 'register' ? 6 : undefined} placeholder={mode === 'register' ? 'Tối thiểu 6 ký tự' : 'Nhập mật khẩu'} /><button type="button" onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Ẩn' : 'Hiện'}</button></div></label>
         {mode === 'register' && <label className="checkbox-label"><input type="checkbox" required /> Tôi đồng ý với điều khoản sử dụng của PlotFarm</label>}
         {error && <p className="auth-error" role="alert">{error}</p>}
         <button className="primary-button auth-submit" disabled={loading}>{loading ? 'Đang xử lý...' : mode === 'login' ? 'Đăng nhập vào PlotFarm' : 'Tạo tài khoản'} <span>→</span></button>

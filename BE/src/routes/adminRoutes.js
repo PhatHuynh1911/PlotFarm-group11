@@ -5,6 +5,7 @@ const { authenticate, authorize } = require('../middleware/authMiddleware');
 const router = express.Router();
 router.use(authenticate, authorize('quan_tri'));
 router.get('/dashboard', admin.dashboard);
+router.get('/stats', admin.dashboard);
 router.get('/users', admin.users);
 router.patch('/users/:id', admin.updateUser);
 router.get('/plots', admin.plots);
