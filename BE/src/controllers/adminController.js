@@ -46,13 +46,13 @@ const users = async (req, res) => {
 
 const updateUser = async (req, res) => {
     try {
-        const { role, status } = req.body;
-        if (!['khach_hang', 'nong_dan', 'quan_tri'].includes(role) || !['hoat_dong', 'bi_khoa'].includes(status)) {
-            return res.status(400).json({ success: false, message: 'Quyền hoặc trạng thái không hợp lệ' });
+        const { status } = req.body;
+        if (!['hoat_dong', 'bi_khoa'].includes(status)) {
+            return res.status(400).json({ success: false, message: 'Trạng thái không hợp lệ' });
         }
         const pool = await getPool();
-        await pool.request().input('id', sql.Int, Number(req.params.id)).input('role', sql.VarChar(20), role).input('status', sql.VarChar(20), status)
-            .query(`UPDATE NguoiDung SET vai_tro = @role, trang_thai = @status, ngay_cap_nhat = SYSDATETIME() WHERE ma_nguoi_dung = @id`);
+        await pool.request().input('id', sql.Int, Number(req.params.id)).input('status', sql.VarChar(20), status)
+            .query(`UPDATE NguoiDung SET trang_thai = @status, ngay_cap_nhat = SYSDATETIME() WHERE ma_nguoi_dung = @id`);
         return res.json({ success: true, message: 'Đã cập nhật tài khoản' });
     } catch (error) { return res.status(500).json({ success: false, message: 'Không thể cập nhật tài khoản' }); }
 };
