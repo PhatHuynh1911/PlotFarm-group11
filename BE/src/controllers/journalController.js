@@ -10,40 +10,92 @@ const createJournal = async (req, res) => {
             tieu_de,
             noi_dung,
             hinh_anh,
-            luong_nuoc_tuoi_lit,
+            chieu_cao_cay_cm,
+            do_am_dat_phan_tram,
+            nhiet_do_moi_truong_c,
+            do_am_khong_khi_phan_tram,
+            thoi_tiet,
+            cong_viec_da_lam,
+            loai_phan_bon_da_dung,
             loai_phan_bon,
-            ghi_chu_sau_benh
+            thuoc_sinh_hoc_da_dung,
+            ghi_chu_chi_tiet,
+            danh_sach_hinh_anh,
+            video_ghi_hinh
         } = req.body;
 
-        if (!ma_hop_dong || !tieu_de || !noi_dung) {
-            return res.status(400).json({ success: false, message: 'Vui lòng cung cấp mã hợp đồng, tiêu đề và nội dung nhật ký' });
+        const effectiveHopDong = ma_hop_dong ? parseInt(ma_hop_dong, 10) : null;
+        if (!effectiveHopDong) {
+            return res.status(400).json({ success: false, message: 'Vui lòng cung cấp mã hợp đồng (ma_hop_dong)' });
         }
+
+        // Nông dân ghi: lấy từ user token nếu có, hoặc từ body, hoặc mặc định 2 (nông dân mẫu)
+        const farmerId = req.user?.sub ? parseInt(req.user.sub, 10) : (ma_nong_dan ? parseInt(ma_nong_dan, 10) : 2);
+
+        // Công việc đã làm / tiêu đề
+        const task = (cong_viec_da_lam || tieu_de || 'Chăm sóc định kỳ cây trồng').trim();
+
+        // Ghi chú chi tiết / nội dung
+        const note = (ghi_chu_chi_tiet || noi_dung || 'Cây phát triển đều, tình trạng tốt.').trim();
+
+        // Hình ảnh: hỗ trợ mảng hoặc chuỗi đơn
+        let imagesJson = null;
+        if (danh_sach_hinh_anh) {
+            imagesJson = typeof danh_sach_hinh_anh === 'string' ? danh_sach_hinh_anh : JSON.stringify(danh_sach_hinh_anh);
+        } else if (hinh_anh) {
+            imagesJson = JSON.stringify([hinh_anh]);
+        }
+
+        const stage = giai_doan_sinh_truong || 'Sinh trưởng';
+        const fertilizer = loai_phan_bon_da_dung || loai_phan_bon || null;
 
         const pool = await getPool();
         const result = await pool.request()
-            .input('ma_hop_dong', sql.Int, parseInt(ma_hop_dong, 10))
-            .input('ma_nong_dan', sql.Int, ma_nong_dan ? parseInt(ma_nong_dan, 10) : null)
-            .input('giai_doan_sinh_truong', sql.NVarChar(50), giai_doan_sinh_truong || 'Sinh trưởng')
-            .input('tieu_de', sql.NVarChar(200), tieu_de.trim())
-            .input('noi_dung', sql.NVarChar(sql.MAX), noi_dung.trim())
-            .input('hinh_anh', sql.VarChar(500), hinh_anh || null)
-            .input('luong_nuoc_tuoi_lit', sql.Decimal(5, 2), luong_nuoc_tuoi_lit ? parseFloat(luong_nuoc_tuoi_lit) : null)
-            .input('loai_phan_bon', sql.NVarChar(100), loai_phan_bon || null)
-            .input('ghi_chu_sau_benh', sql.NVarChar(255), ghi_chu_sau_benh || null)
+            .input('ma_hop_dong', sql.Int, effectiveHopDong)
+            .input('ma_nong_dan', sql.Int, farmerId)
+            .input('giai_doan_sinh_truong', sql.NVarChar(50), stage)
+            .input('chieu_cao_cay_cm', sql.Decimal(5, 2), chieu_cao_cay_cm ? parseFloat(chieu_cao_cay_cm) : null)
+            .input('do_am_dat_phan_tram', sql.Decimal(5, 2), do_am_dat_phan_tram ? parseFloat(do_am_dat_phan_tram) : null)
+            .input('nhiet_do_moi_truong_c', sql.Decimal(5, 2), nhiet_do_moi_truong_c ? parseFloat(nhiet_do_moi_truong_c) : null)
+            .input('do_am_khong_khi_phan_tram', sql.Decimal(5, 2), do_am_khong_khi_phan_tram ? parseFloat(do_am_khong_khi_phan_tram) : null)
+            .input('thoi_tiet', sql.NVarChar(50), thoi_tiet || 'Nắng ấm')
+            .input('cong_viec_da_lam', sql.NVarChar(150), task)
+            .input('loai_phan_bon_da_dung', sql.NVarChar(150), fertilizer)
+            .input('thuoc_sinh_hoc_da_dung', sql.NVarChar(150), thuoc_sinh_hoc_da_dung || null)
+            .input('ghi_chu_chi_tiet', sql.NVarChar(sql.MAX), note)
+            .input('danh_sach_hinh_anh', sql.NVarChar(sql.MAX), imagesJson)
+            .input('video_ghi_hinh', sql.NVarChar(500), video_ghi_hinh || null)
             .query(`
-                INSERT INTO NhatKyCanhTac (ma_hop_dong, ma_nong_dan, giai_doan_sinh_truong, tieu_de, noi_dung, hinh_anh, luong_nuoc_tuoi_lit, loai_phan_bon, ghi_chu_sau_benh)
+                INSERT INTO NhatKyCanhTac (
+                    ma_hop_dong, ma_nong_dan, giai_doan_sinh_truong,
+                    chieu_cao_cay_cm, do_am_dat_phan_tram, nhiet_do_moi_truong_c, do_am_khong_khi_phan_tram,
+                    thoi_tiet, cong_viec_da_lam, loai_phan_bon_da_dung, thuoc_sinh_hoc_da_dung,
+                    ghi_chu_chi_tiet, danh_sach_hinh_anh, video_ghi_hinh
+                )
                 OUTPUT INSERTED.*
-                VALUES (@ma_hop_dong, @ma_nong_dan, @giai_doan_sinh_truong, @tieu_de, @noi_dung, @hinh_anh, @luong_nuoc_tuoi_lit, @loai_phan_bon, @ghi_chu_sau_benh)
+                VALUES (
+                    @ma_hop_dong, @ma_nong_dan, @giai_doan_sinh_truong,
+                    @chieu_cao_cay_cm, @do_am_dat_phan_tram, @nhiet_do_moi_truong_c, @do_am_khong_khi_phan_tram,
+                    @thoi_tiet, @cong_viec_da_lam, @loai_phan_bon_da_dung, @thuoc_sinh_hoc_da_dung,
+                    @ghi_chu_chi_tiet, @danh_sach_hinh_anh, @video_ghi_hinh
+                )
             `);
+
+        const created = result.recordset[0];
 
         res.status(201).json({
             success: true,
             message: 'Đã thêm nhật ký canh tác thành công',
-            data: result.recordset[0]
+            data: {
+                ...created,
+                tieu_de: created.cong_viec_da_lam,
+                noi_dung: created.ghi_chu_chi_tiet,
+                hinh_anh: imagesJson ? (imagesJson.startsWith('[') ? (JSON.parse(imagesJson)[0] || null) : imagesJson) : null
+            }
         });
     } catch (error) {
         console.error('Lỗi khi thêm nhật ký canh tác:', error);
-        res.status(500).json({ success: false, message: 'Lỗi server nội bộ' });
+        res.status(500).json({ success: false, message: 'Lỗi server nội bộ: ' + (error.message || '') });
     }
 };
 
@@ -55,21 +107,32 @@ const getJournalsByRental = async (req, res) => {
         const result = await pool.request()
             .input('ma_hop_dong', sql.Int, parseInt(rentalId, 10))
             .query(`
-                SELECT j.*, u.ho_va_ten AS ten_nong_dan
+                SELECT j.*, u.ho_va_ten AS ten_nong_dan, u.email AS email_nong_dan,
+                       c.ten_cay_trong, o.so_hieu_o, o.ten_o_dat
                 FROM NhatKyCanhTac j
                 LEFT JOIN NguoiDung u ON u.ma_nguoi_dung = j.ma_nong_dan
+                LEFT JOIN HopDongThue h ON h.ma_hop_dong = j.ma_hop_dong
+                LEFT JOIN CayTrong c ON c.ma_cay_trong = h.ma_cay_trong
+                LEFT JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
                 WHERE j.ma_hop_dong = @ma_hop_dong
                 ORDER BY j.ngay_ghi_nhat_ky DESC, j.ngay_tao DESC
             `);
 
+        const formatted = result.recordset.map(item => ({
+            ...item,
+            tieu_de: item.cong_viec_da_lam,
+            noi_dung: item.ghi_chu_chi_tiet,
+            hinh_anh: item.danh_sach_hinh_anh ? (item.danh_sach_hinh_anh.startsWith('[') ? (JSON.parse(item.danh_sach_hinh_anh)[0] || null) : item.danh_sach_hinh_anh) : null
+        }));
+
         res.status(200).json({
             success: true,
-            count: result.recordset.length,
-            data: result.recordset
+            count: formatted.length,
+            data: formatted
         });
     } catch (error) {
         console.error('Lỗi khi lấy nhật ký canh tác:', error);
-        res.status(500).json({ success: false, message: 'Lỗi server nội bộ' });
+        res.status(500).json({ success: false, message: 'Lỗi server nội bộ: ' + (error.message || '') });
     }
 };
 

@@ -17,6 +17,19 @@ const swaggerSpec = {
             description: 'Local Development Server (Port 5000)'
         }
     ],
+    components: {
+        securitySchemes: {
+            bearerAuth: {
+                type: 'http',
+                scheme: 'bearer',
+                bearerFormat: 'JWT',
+                description: 'Nhập Token JWT (sau khi đăng nhập tại /api/auth/login)'
+            }
+        }
+    },
+    security: [
+        { bearerAuth: [] }
+    ],
     tags: [
         { name: '1. Auth', description: 'Đăng nhập, đăng ký tài khoản và thông tin người dùng' },
         { name: '2. Plots', description: 'Danh sách và thông tin chi tiết ô đất canh tác' },
@@ -432,6 +445,15 @@ const swaggerSpec = {
                 summary: 'Lấy số liệu tổng quan hệ thống và biểu đồ doanh thu',
                 responses: {
                     200: { description: 'Số liệu người dùng, ô đất, hợp đồng, doanh thu' }
+                }
+            }
+        },
+        '/api/admin/stats': {
+            get: {
+                tags: ['9. Admin'],
+                summary: 'Lấy số liệu thống kê cơ bản cho Admin Dashboard (Alias của dashboard)',
+                responses: {
+                    200: { description: 'Thống kê ô đất, người dùng và doanh thu' }
                 }
             }
         },

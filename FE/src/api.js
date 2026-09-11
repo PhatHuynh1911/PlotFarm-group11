@@ -73,3 +73,12 @@ export async function updateServiceRequest(id, payload, token) {
 export async function submitContact(payload) {
   return apiRequest('/contact', { method: 'POST', body: JSON.stringify(payload) })
 }
+
+export async function createJournal(payload, token) {
+  return apiRequest('/journals', { method: 'POST', body: JSON.stringify(payload), token })
+}
+
+export async function getJournalsByRental(rentalId, token) {
+  const result = await apiRequest(`/journals/rental/${rentalId}`, { token })
+  return result.data
+}
