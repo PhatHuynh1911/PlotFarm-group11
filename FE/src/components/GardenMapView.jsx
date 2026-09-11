@@ -3,7 +3,8 @@ import { useState } from 'react'
 function GardenMapView({ plots, occupiedPlots, onSelectPlot, onClose }) {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('Tất cả trạng thái')
-  const visiblePlots = plots.filter((plot) => {
+  const mapPlots = [...plots, ...occupiedPlots.filter((occupiedPlot) => !plots.some((plot) => plot.id === occupiedPlot.id))]
+  const visiblePlots = mapPlots.filter((plot) => {
     const matchesQuery = `${plot.code} ${plot.location} ${plot.soil}`.toLowerCase().includes(query.toLowerCase())
     const isOccupied = occupiedPlots.some((occupiedPlot) => occupiedPlot.id === plot.id)
     const matchesStatus = status === 'Tất cả trạng thái' || (status === 'Đang trống' && !isOccupied) || (status === 'Đã thuê' && isOccupied)
