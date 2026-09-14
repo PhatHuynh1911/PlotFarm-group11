@@ -10,6 +10,7 @@ import Footer from './components/Footer.jsx'
 import AdminPage from './components/AdminPage.jsx'
 import UserPage from './components/UserPage.jsx'
 import FarmerPage from './components/FarmerPage.jsx'
+import { ToastProvider } from './components/ToastProvider.jsx'
 import { getDashboardStats, getPlots } from './api.js'
 
 const dashboardPath = (role) => ({ quan_tri: '/admin', nong_dan: '/farmer', khach_hang: '/dashboard' }[role] || '/')
@@ -87,13 +88,13 @@ function App() {
     navigate('/', { replace: true })
   }
 
-  return <Routes>
+  return <ToastProvider><Routes>
     <Route path="/" element={<HomePage authMode={authMode} setAuthMode={setAuthMode} onAuthenticated={handleAuth} />} />
     <Route path="/admin" element={<ProtectedRoute auth={auth} allowedRoles={['quan_tri']}><AdminPage user={auth?.user} token={auth?.token} onLogout={logout} /></ProtectedRoute>} />
     <Route path="/farmer" element={<ProtectedRoute auth={auth} allowedRoles={['nong_dan']}><FarmerPage user={auth?.user} onLogout={logout} /></ProtectedRoute>} />
     <Route path="/dashboard" element={<ProtectedRoute auth={auth} allowedRoles={['khach_hang']}><UserPage user={auth?.user} token={auth?.token} onLogout={logout} /></ProtectedRoute>} />
     <Route path="*" element={<Navigate to={auth ? dashboardPath(auth.user.role) : '/'} replace />} />
-  </Routes>
+  </Routes></ToastProvider>
 }
 
 export default App

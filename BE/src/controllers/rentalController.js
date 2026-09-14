@@ -131,7 +131,7 @@ const getRentalsByUser = async (req, res) => {
             .query(`
                 SELECT h.ma_hop_dong, h.so_hop_dong, h.ngay_bat_dau, h.ngay_ket_thuc,
                        h.tong_tien, h.trang_thai_hop_dong, h.trang_thai_thanh_toan,
-                       o.ma_o_dat, o.so_hieu_o, o.ten_o_dat, o.dien_tich_m2,
+                       o.ma_o_dat, o.so_hieu_o, o.ten_o_dat, o.dien_tich_m2, o.hinh_anh_o_dat,
                       c.ma_cay_trong, c.ten_cay_trong, c.hinh_anh_cay,
                       n.ho_va_ten AS ten_nong_dan, p.trang_thai AS trang_thai_phan_cong
                 FROM HopDongThue h
