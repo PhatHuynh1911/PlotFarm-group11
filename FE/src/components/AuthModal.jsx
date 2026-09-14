@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { notify } from './ToastProvider.jsx'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
@@ -24,9 +25,11 @@ function AuthModal({ mode, onClose, onSwitchMode, onAuthenticated }) {
       })
       const result = await response.json()
       if (!response.ok) throw new Error(result.message || 'Không thể xác thực tài khoản')
+      notify(mode === 'login' ? 'Đăng nhập thành công. Đang mở không gian làm việc của bạn.' : 'Tạo tài khoản thành công.', 'success')
       onAuthenticated(result.data)
     } catch (requestError) {
       setError(requestError.message)
+      notify(requestError.message, 'error')
     } finally {
       setLoading(false)
     }

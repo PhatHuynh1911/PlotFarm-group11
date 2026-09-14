@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import './FarmerPage.css'
 import ProfilePanel from './ProfilePanel.jsx'
 import AccountMenu from './AccountMenu.jsx'
+import { notify } from './ToastProvider.jsx'
 import { getActiveRentals, getAssignments, getServiceRequests, respondToAssignment, updateServiceRequest, createJournal, getJournalsByRental, updateJournal, updateCultivationStatus } from '../api.js'
 
 const requestLabels = { cho_tiep_nhan: 'Chờ tiếp nhận', da_tiep_nhan: 'Đã tiếp nhận', dang_thuc_hien: 'Đang thực hiện', hoan_thanh: 'Hoàn thành', tu_choi: 'Từ chối' }
@@ -83,10 +84,13 @@ function FarmerPage({ user, onLogout }) {
       setJournal((items) => editingJournal ? items.map((item) => item.id === editingJournal.id ? { ...item, ...journalForm, date: 'Vừa cập nhật' } : item) : [{ ...journalForm, id: Date.now(), plot: targetPlot.id, date: 'Vừa cập nhật' }, ...items])
       setEditingJournal(null)
       setJournalForm({ ...journalForm, note: '', photo: '', video: '' })
-      setJournalMessage(editingJournal ? 'Đã cập nhật nhật ký.' : 'Đã gửi và lưu nhật ký thành công vào cơ sở dữ liệu!')
+      const message = editingJournal ? 'Đã cập nhật nhật ký.' : 'Đã gửi và lưu nhật ký thành công vào cơ sở dữ liệu!'
+      setJournalMessage(message)
+      notify(message)
       setTimeout(() => setJournalMessage(''), 3000)
     } catch (journalErr) {
       setError(journalErr.message)
+      notify(journalErr.message, 'error')
     }
   }
 

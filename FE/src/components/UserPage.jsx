@@ -1,16 +1,24 @@
 import { useEffect, useMemo, useState } from 'react'
-import { createRental, createServiceRequest, getPlots, getServiceTypes, getUserRentals, getUserServiceRequests } from '../api.js'
+import { createRental, createServiceRequest, getJournalsByRental, getPlots, getServiceTypes, getUserRentals, getUserServiceRequests } from '../api.js'
 import AccountMenu from './AccountMenu.jsx'
 import ProfilePanel from './ProfilePanel.jsx'
+import { notify } from './ToastProvider.jsx'
 
 const formatMoney = (value) => `${new Intl.NumberFormat('vi-VN').format(value)}đ`
 const formatDate = (value) => value ? new Date(value).toLocaleDateString('vi-VN') : 'Chưa cập nhật'
+const daysRemaining = (value) => Math.max(0, Math.ceil((new Date(value).getTime() - Date.now()) / 86400000))
+const requestStatus = { cho_tiep_nhan: 'Chờ tiếp nhận', da_tiep_nhan: 'Đã tiếp nhận', dang_thuc_hien: 'Đang xử lý', hoan_thanh: 'Đã hoàn thành', tu_choi: 'Từ chối' }
+
+function journalImages(item) {
+  try { return Array.isArray(item.danh_sach_hinh_anh) ? item.danh_sach_hinh_anh : JSON.parse(item.danh_sach_hinh_anh || '[]') } catch { return item.hinh_anh ? [item.hinh_anh] : [] }
+}
 
 function UserPage({ user, token, onLogout }) {
   const [rentals, setRentals] = useState([])
   const [availablePlots, setAvailablePlots] = useState([])
   const [serviceTypes, setServiceTypes] = useState([])
   const [serviceRequests, setServiceRequests] = useState([])
+  const [journals, setJournals] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState('gardens')
@@ -26,12 +34,14 @@ function UserPage({ user, token, onLogout }) {
 
   useEffect(() => {
     Promise.all([getUserRentals(user.id, token), getPlots(), getServiceTypes(), getUserServiceRequests(user.id, token)])
-      .then(([nextRentals, nextPlots, nextServiceTypes, nextServiceRequests]) => {
+      .then(async ([nextRentals, nextPlots, nextServiceTypes, nextServiceRequests]) => {
         setRentals(nextRentals)
         setSelectedCareRental(String(nextRentals[0]?.ma_hop_dong || ''))
         setAvailablePlots(nextPlots.filter((plot) => plot.status === 'trong'))
         setServiceTypes(nextServiceTypes)
         setServiceRequests(nextServiceRequests)
+        const grouped = await Promise.all(nextRentals.map((rental) => getJournalsByRental(rental.ma_hop_dong, token).catch(() => [])))
+        setJournals(grouped.flat().sort((a, b) => new Date(b.ngay_ghi_nhat_ky || b.ngay_tao) - new Date(a.ngay_ghi_nhat_ky || a.ngay_tao)))
       })
       .catch((requestError) => setError(requestError.message))
       .finally(() => setLoading(false))
@@ -44,7 +54,7 @@ function UserPage({ user, token, onLogout }) {
       (filters.maxPrice === 'Tất cả mức giá' || plot.price <= Number(filters.maxPrice))
   }), [availablePlots, filters])
   const tabs = [['gardens', 'Khu vườn của tôi'], ['find', 'Tìm & lọc ô đất'], ['journal', 'Nhật ký canh tác'], ['live', 'Camera trực tiếp'], ['support', 'Yêu cầu chăm sóc'], ['harvest', 'Quản lý thu hoạch']]
-  const showNotice = (message) => { setNotice(message); window.setTimeout(() => setNotice(''), 3500) }
+  const showNotice = (message) => { setNotice(message); notify(message); window.setTimeout(() => setNotice(''), 3500) }
   const openBooking = (plot) => { setSelectedPlot(plot); setBookingStep('details'); setBooking({ duration: '3', crop: 'Rau xà lách', payment: 'Chuyển khoản' }) }
   const closeBooking = () => { setSelectedPlot(null); setBookingStep('details') }
   const continueToPayment = (event) => { event.preventDefault(); setBookingStep('payment') }
@@ -74,6 +84,14 @@ function UserPage({ user, token, onLogout }) {
       showNotice('Đã gửi yêu cầu chăm sóc tới đội ngũ PlotFarm.')
     } catch (requestError) { setError(requestError.message) }
   }
+
+  const workspace = (content) => <main className="dashboard-page user-dashboard"><header className="dashboard-header"><a className="brand" href="/"><span className="brand-mark">PF</span><span>plot<span>farm</span></span></a><nav className="workspace-nav" aria-label="Điều hướng khách hàng">{tabs.map(([id, label]) => <button key={id} className={activeTab === id ? 'active' : ''} onClick={() => setActiveTab(id)}>{label}</button>)}</nav><AccountMenu user={user} roleLabel="Khách hàng PlotFarm" onProfile={() => setActiveTab('profile')} onLogout={onLogout} /></header><section className="dashboard-shell"><p className="eyebrow">KHU VƯỜN CỦA BẠN</p><h1>Chào mừng, <em>{user.name.split(' ').pop()}.</em></h1><p className="dashboard-lead">Theo dõi khu vườn và mọi cập nhật từ nông dân trong một nơi.</p><nav className="user-tabs" aria-label="Điều hướng tài khoản">{tabs.map(([id, label]) => <button key={id} className={activeTab === id ? 'active' : ''} onClick={() => setActiveTab(id)}>{label}</button>)}</nav>{notice && <p className="dashboard-notice" role="status">{notice}</p>}{content}</section></main>
+
+  if (activeTab === 'gardens') return workspace(<><div className="user-summary"><div><span>Hợp đồng của tôi</span><strong>{rentals.length}</strong></div><div><span>Đang canh tác</span><strong>{rentals.filter((item) => item.trang_thai_hop_dong === 'hieu_luc').length}</strong></div><div><span>Email tài khoản</span><strong className="user-email">{user.email}</strong></div></div><section className="dashboard-panel rental-panel"><div className="panel-heading"><div><p className="eyebrow">MY PLOTS</p><h2>Những ô đất đang thuê</h2></div><button className="dashboard-link-button" onClick={() => setActiveTab('find')}>Khám phá ô đất <span>→</span></button></div>{loading && <p className="loading-state">Đang tải khu vườn...</p>}{!loading && rentals.length === 0 && <p className="empty-state">Bạn chưa có hợp đồng nào. Hãy chọn một ô đất cho mùa vụ đầu tiên.</p>}<div className="my-plot-grid">{rentals.map((rental) => <article className="my-plot-card" key={rental.ma_hop_dong}><div className="my-plot-image" style={rental.hinh_anh_o_dat ? { backgroundImage: `url(${rental.hinh_anh_o_dat})` } : undefined}><span>{rental.so_hieu_o}</span></div><div className="my-plot-body"><p className="plot-status">{rental.trang_thai_hop_dong === 'hieu_luc' ? 'Đang thuê' : rental.trang_thai_hop_dong}</p><h3>{rental.ten_o_dat}</h3><p>{rental.ten_cay_trong || 'Chưa chọn cây trồng'} · Farmer: {rental.ten_nong_dan || 'Đang chờ phân công'}</p><div className="plot-date-row"><span>Kết thúc thuê</span><strong>{formatDate(rental.ngay_ket_thuc)}</strong></div><div className="remaining-days"><b>{daysRemaining(rental.ngay_ket_thuc)}</b><span>ngày còn lại</span></div><button className="outline-button" onClick={() => setActiveTab('journal')}>Xem nhật ký canh tác →</button></div></article>)}</div></section></>)
+
+  if (activeTab === 'journal') return workspace(<section className="dashboard-panel timeline-panel"><div className="panel-heading"><div><p className="eyebrow">DIARY TIMELINE</p><h2>Nhật ký canh tác</h2></div><span className="result-count">{journals.length} cập nhật</span></div>{journals.length === 0 ? <p className="empty-state">Chưa có nhật ký từ nông dân cho các ô đất của bạn.</p> : <div className="diary-timeline">{journals.map((item) => { const images = journalImages(item); return <article className="diary-card" key={item.ma_nhat_ky}><div className="timeline-dot" /><div className="diary-date">{formatDate(item.ngay_ghi_nhat_ky || item.ngay_tao)}</div><div className="diary-content"><div><p className="plot-status">{item.so_hieu_o || 'Khu vườn của bạn'} · {item.giai_doan_sinh_truong || 'Canh tác'}</p><h3>{item.tieu_de || item.cong_viec_da_lam}</h3><p className="diary-meta">{item.ten_nong_dan || 'Nông dân phụ trách'} · {item.thoi_tiet || 'Đang cập nhật thời tiết'}</p><p>{item.noi_dung || item.ghi_chu_chi_tiet || 'Chưa có ghi chú chi tiết.'}</p>{item.loai_phan_bon_da_dung && <small>Phân bón: {item.loai_phan_bon_da_dung}</small>}</div>{images[0] && <img src={images[0]} alt={`Nhật ký ${item.tieu_de || ''}`} />}</div></article> })}</div>}</section>)
+
+  if (activeTab === 'support') return workspace(<section className="dashboard-panel support-history-panel"><div className="support-intro"><p className="eyebrow">YÊU CẦU CHĂM SÓC</p><h2>Gửi yêu cầu và theo dõi xử lý</h2><p>Yêu cầu được chuyển trực tiếp đến nông dân phụ trách ô đất của bạn.</p></div>{!supportSent && <form className="care-form" onSubmit={submitSupport}><select name="rentalId" value={selectedCareRental} onChange={(event) => setSelectedCareRental(event.target.value)} required><option value="">Chọn ô đất</option>{rentals.map((rental) => <option key={rental.ma_hop_dong} value={rental.ma_hop_dong}>{rental.so_hieu_o} · {rental.ten_o_dat}</option>)}</select><select name="serviceType" required><option value="">Chọn loại hỗ trợ</option>{serviceTypes.map((service) => <option key={service.ma_loai_dich_vu} value={service.ma_loai_dich_vu}>{service.ten_dich_vu}</option>)}</select><input name="schedule" required placeholder="Thời gian mong muốn" /><textarea name="note" required placeholder="Mô tả tình trạng hoặc ghi chú cho nông dân" /><button className="primary-button">Gửi yêu cầu <span>→</span></button></form>}<div className="service-history"><div className="panel-heading"><div><p className="eyebrow">SERVICE REQUEST HISTORY</p><h2>Lịch sử yêu cầu dịch vụ</h2></div></div>{serviceRequests.length === 0 ? <p className="empty-state">Bạn chưa gửi yêu cầu chăm sóc nào.</p> : serviceRequests.map((request) => <article className={`service-history-card status-${request.trang_thai_xu_ly}`} key={request.ma_yeu_cau}><div className="request-heading"><div><strong>{request.so_hieu_o} · {request.ten_dich_vu}</strong><p>{formatDate(request.ngay_gui_yeu_cau)} · Nông dân: {request.ten_nong_dan_xu_ly || 'Chưa có'}</p></div><span>{requestStatus[request.trang_thai_xu_ly] || request.trang_thai_xu_ly}</span></div>{request.ghi_chu_cua_khach && <p>{request.ghi_chu_cua_khach}</p>}{request.phan_hoi_cua_nha_vuon && <div className="farmer-reply"><b>Phản hồi từ nông dân</b><p>{request.phan_hoi_cua_nha_vuon}</p></div>}{request.hinh_anh_nghiem_thu && <img className="service-reply-image" src={request.hinh_anh_nghiem_thu} alt="Ảnh phản hồi yêu cầu" />}</article>)}</div></section>)
 
   return <main className="dashboard-page user-dashboard"><header className="dashboard-header"><a className="brand" href="/"><span className="brand-mark">PF</span><span>plot<span>farm</span></span></a><nav className="workspace-nav" aria-label="Điều hướng khách hàng">{tabs.map(([id, label]) => <button key={id} className={activeTab === id ? 'active' : ''} onClick={() => setActiveTab(id)}>{label}</button>)}</nav><AccountMenu user={user} roleLabel="Khách hàng PlotFarm" onProfile={() => setActiveTab('profile')} onLogout={onLogout} /></header><section className="dashboard-shell"><p className="eyebrow">KHU VƯỜN CỦA BẠN</p><h1>Chào mừng, <em>{user.name.split(' ').pop()}.</em></h1><p className="dashboard-lead">Quản lý mùa vụ, chăm sóc và nông sản của bạn trong một nơi.</p><nav className="user-tabs" aria-label="Điều hướng tài khoản">{tabs.map(([id, label]) => <button key={id} className={activeTab === id ? 'active' : ''} onClick={() => setActiveTab(id)}>{label}</button>)}</nav>{notice && <p className="dashboard-notice" role="status">{notice}</p>}
     {activeTab === 'gardens' && <><div className="user-summary"><div><span>Hợp đồng của tôi</span><strong>{rentals.length}</strong></div><div><span>Đang canh tác</span><strong>{rentals.length ? '01' : '00'}</strong></div><div><span>Email tài khoản</span><strong className="user-email">{user.email}</strong></div></div><section className="dashboard-panel rental-panel"><div className="panel-heading"><div><p className="eyebrow">MY GARDENS</p><h2>Những ô đất đang thuê</h2></div><button className="dashboard-link-button" onClick={() => setActiveTab('find')}>Khám phá ô đất <span>→</span></button></div>{loading && <p className="loading-state" role="status">Đang tải khu vườn...</p>}{error && <p className="dashboard-error" role="alert">{error}</p>}{!loading && !error && rentals.length === 0 && <p className="empty-state">Bạn chưa có hợp đồng nào. Hãy chọn một ô đất cho mùa vụ đầu tiên.</p>}{rentals.length > 0 && <div className="rental-list">{rentals.map((rental) => <article className="rental-item" key={rental.ma_hop_dong}><div><strong>{rental.so_hieu_o}</strong><span>{rental.ten_o_dat}</span></div><div><small>Thời hạn</small><span>{formatDate(rental.ngay_bat_dau)} - {formatDate(rental.ngay_ket_thuc)}</span></div><div><small>Trạng thái</small><b>{rental.trang_thai_hop_dong}</b></div><div><small>Thao tác</small><button onClick={() => setActiveTab('live')}>Xem vườn →</button></div></article>)}</div>}</section></>}
