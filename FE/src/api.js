@@ -91,6 +91,10 @@ export async function updateJournal(id, payload, token) {
   return apiRequest(`/journals/${id}`, { method: 'PATCH', body: JSON.stringify(payload), token })
 }
 
+export async function deleteJournal(id, token) {
+  return apiRequest(`/journals/${id}`, { method: 'DELETE', token })
+}
+
 export async function getAssignments(token) {
   const result = await apiRequest('/rentals/assignments/mine', { token })
   return result.data

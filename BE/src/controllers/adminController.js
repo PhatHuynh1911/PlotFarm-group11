@@ -8,8 +8,10 @@ const dashboard = async (req, res) => {
                 SELECT
                     (SELECT COUNT(*) FROM NguoiDung) AS totalUsers,
                     (SELECT COUNT(*) FROM NguoiDung WHERE trang_thai = 'hoat_dong') AS activeUsers,
+                    (SELECT COUNT(*) FROM NguoiDung WHERE vai_tro = 'nong_dan' AND trang_thai = 'hoat_dong') AS totalFarmers,
                     (SELECT COUNT(*) FROM ODAT WHERE trang_thai = 'trong') AS availablePlots,
                     (SELECT COUNT(*) FROM ODAT WHERE trang_thai = 'da_thue') AS rentedPlots,
+                    (SELECT COUNT(*) FROM HopDongThue WHERE ngay_tao >= DATEADD(day, -7, SYSDATETIME())) AS newOrders,
                     (SELECT COALESCE(SUM(tong_dien_tich_ha), 0) FROM NongTrai WHERE trang_thai = 'hoat_dong') AS greenAreaHa,
                     (SELECT COUNT(*) FROM HopDongThue WHERE trang_thai_hop_dong = 'hieu_luc') AS activeContracts,
                     (SELECT COALESCE(SUM(tong_tien), 0) FROM HopDongThue WHERE trang_thai_thanh_toan = 'da_thanh_toan') AS revenue,

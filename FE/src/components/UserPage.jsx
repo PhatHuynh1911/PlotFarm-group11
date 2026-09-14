@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { createRental, createServiceRequest, getJournalsByRental, getPlots, getServiceTypes, getUserRentals, getUserServiceRequests } from '../api.js'
 import AccountMenu from './AccountMenu.jsx'
 import ProfilePanel from './ProfilePanel.jsx'
@@ -14,6 +15,7 @@ function journalImages(item) {
 }
 
 function UserPage({ user, token, onLogout }) {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [rentals, setRentals] = useState([])
   const [availablePlots, setAvailablePlots] = useState([])
   const [serviceTypes, setServiceTypes] = useState([])
@@ -21,7 +23,7 @@ function UserPage({ user, token, onLogout }) {
   const [journals, setJournals] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [activeTab, setActiveTab] = useState('gardens')
+  const activeTab = searchParams.get('tab') || 'gardens'
   const [filters, setFilters] = useState({ search: '', soil: 'Tất cả loại đất', maxPrice: 'Tất cả mức giá' })
   const [selectedPlot, setSelectedPlot] = useState(null)
   const [booking, setBooking] = useState({ duration: '3', crop: 'Rau xà lách', payment: 'Chuyển khoản' })
@@ -31,6 +33,17 @@ function UserPage({ user, token, onLogout }) {
   const [supportSent, setSupportSent] = useState(false)
   const [harvestSent, setHarvestSent] = useState(false)
   const [selectedCareRental, setSelectedCareRental] = useState('')
+
+  const selectTab = (tab) => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current)
+      if (tab === 'gardens') next.delete('tab')
+      else next.set('tab', tab)
+      return next
+    })
+  }
+
+  const setActiveTab = selectTab
 
   useEffect(() => {
     Promise.all([getUserRentals(user.id, token), getPlots(), getServiceTypes(), getUserServiceRequests(user.id, token)])
@@ -68,7 +81,7 @@ function UserPage({ user, token, onLogout }) {
       setAvailablePlots((plots) => plots.filter((plot) => plot.id !== selectedPlot.id))
       showNotice(`Đã xác nhận thuê ô ${selectedPlot.code}. Hợp đồng đã được tạo.`)
       closeBooking()
-      setActiveTab('gardens')
+      selectTab('gardens')
     } catch (requestError) { setError(requestError.message) } finally { setBookingSubmitting(false) }
   }
   const submitSupport = async (event) => {
@@ -85,7 +98,7 @@ function UserPage({ user, token, onLogout }) {
     } catch (requestError) { setError(requestError.message) }
   }
 
-  const workspace = (content) => <main className="dashboard-page user-dashboard"><header className="dashboard-header"><a className="brand" href="/"><span className="brand-mark">PF</span><span>plot<span>farm</span></span></a><nav className="workspace-nav" aria-label="Điều hướng khách hàng">{tabs.map(([id, label]) => <button key={id} className={activeTab === id ? 'active' : ''} onClick={() => setActiveTab(id)}>{label}</button>)}</nav><AccountMenu user={user} roleLabel="Khách hàng PlotFarm" onProfile={() => setActiveTab('profile')} onLogout={onLogout} /></header><section className="dashboard-shell"><p className="eyebrow">KHU VƯỜN CỦA BẠN</p><h1>Chào mừng, <em>{user.name.split(' ').pop()}.</em></h1><p className="dashboard-lead">Theo dõi khu vườn và mọi cập nhật từ nông dân trong một nơi.</p><nav className="user-tabs" aria-label="Điều hướng tài khoản">{tabs.map(([id, label]) => <button key={id} className={activeTab === id ? 'active' : ''} onClick={() => setActiveTab(id)}>{label}</button>)}</nav>{notice && <p className="dashboard-notice" role="status">{notice}</p>}{content}</section></main>
+  const workspace = (content) => <main className="dashboard-page user-dashboard"><header className="dashboard-header"><a className="brand" href="/"><span className="brand-mark">PF</span><span>plot<span>farm</span></span></a><nav className="workspace-nav" aria-label="Điều hướng khách hàng">{tabs.map(([id, label]) => <button key={id} className={activeTab === id ? 'active' : ''} onClick={() => selectTab(id)}>{label}</button>)}</nav><AccountMenu user={user} roleLabel="Khách hàng PlotFarm" onProfile={() => selectTab('profile')} onLogout={onLogout} /></header><section className="dashboard-shell"><p className="eyebrow">KHU VƯỜN CỦA BẠN</p><h1>Chào mừng, <em>{user.name.split(' ').pop()}.</em></h1><p className="dashboard-lead">Theo dõi khu vườn và mọi cập nhật từ nông dân trong một nơi.</p><nav className="user-tabs" aria-label="Điều hướng tài khoản">{tabs.map(([id, label]) => <button key={id} className={activeTab === id ? 'active' : ''} onClick={() => selectTab(id)}>{label}</button>)}</nav>{notice && <p className="dashboard-notice" role="status">{notice}</p>}{content}</section></main>
 
   if (activeTab === 'gardens') return workspace(<><div className="user-summary"><div><span>Hợp đồng của tôi</span><strong>{rentals.length}</strong></div><div><span>Đang canh tác</span><strong>{rentals.filter((item) => item.trang_thai_hop_dong === 'hieu_luc').length}</strong></div><div><span>Email tài khoản</span><strong className="user-email">{user.email}</strong></div></div><section className="dashboard-panel rental-panel"><div className="panel-heading"><div><p className="eyebrow">MY PLOTS</p><h2>Những ô đất đang thuê</h2></div><button className="dashboard-link-button" onClick={() => setActiveTab('find')}>Khám phá ô đất <span>→</span></button></div>{loading && <p className="loading-state">Đang tải khu vườn...</p>}{!loading && rentals.length === 0 && <p className="empty-state">Bạn chưa có hợp đồng nào. Hãy chọn một ô đất cho mùa vụ đầu tiên.</p>}<div className="my-plot-grid">{rentals.map((rental) => <article className="my-plot-card" key={rental.ma_hop_dong}><div className="my-plot-image" style={rental.hinh_anh_o_dat ? { backgroundImage: `url(${rental.hinh_anh_o_dat})` } : undefined}><span>{rental.so_hieu_o}</span></div><div className="my-plot-body"><p className="plot-status">{rental.trang_thai_hop_dong === 'hieu_luc' ? 'Đang thuê' : rental.trang_thai_hop_dong}</p><h3>{rental.ten_o_dat}</h3><p>{rental.ten_cay_trong || 'Chưa chọn cây trồng'} · Farmer: {rental.ten_nong_dan || 'Đang chờ phân công'}</p><div className="plot-date-row"><span>Kết thúc thuê</span><strong>{formatDate(rental.ngay_ket_thuc)}</strong></div><div className="remaining-days"><b>{daysRemaining(rental.ngay_ket_thuc)}</b><span>ngày còn lại</span></div><button className="outline-button" onClick={() => setActiveTab('journal')}>Xem nhật ký canh tác →</button></div></article>)}</div></section></>)
 

@@ -169,4 +169,18 @@ const updateJournal = async (req, res) => {
     }
 };
 
-module.exports = { createJournal, getJournalsByRental, updateJournal };
+const deleteJournal = async (req, res) => {
+    try {
+        const pool = await getPool();
+        const result = await pool.request()
+            .input('id', sql.Int, parseInt(req.params.id, 10))
+            .query('DELETE FROM NhatKyCanhTac WHERE ma_nhat_ky = @id');
+        if (!result.rowsAffected[0]) return res.status(404).json({ success: false, message: 'Không tìm thấy nhật ký' });
+        return res.json({ success: true, message: 'Đã xóa nhật ký' });
+    } catch (error) {
+        console.error('Lỗi xóa nhật ký:', error);
+        return res.status(500).json({ success: false, message: 'Lỗi server nội bộ' });
+    }
+};
+
+module.exports = { createJournal, getJournalsByRental, updateJournal, deleteJournal };

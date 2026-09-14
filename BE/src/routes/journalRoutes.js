@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { createJournal, getJournalsByRental, updateJournal } = require('../controllers/journalController');
+const { createJournal, getJournalsByRental, updateJournal, deleteJournal } = require('../controllers/journalController');
 
 // Soft auth: Nếu có Bearer token thì giải mã vào req.user
 const softAuth = (req, res, next) => {
@@ -16,6 +16,7 @@ const softAuth = (req, res, next) => {
 
 router.post('/', softAuth, createJournal);
 router.patch('/:id', softAuth, updateJournal);
+router.delete('/:id', softAuth, deleteJournal);
 router.get('/rental/:rentalId', softAuth, getJournalsByRental);
 
 module.exports = router;
