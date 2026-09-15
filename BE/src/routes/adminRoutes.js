@@ -1,6 +1,7 @@
 const express = require('express');
 const admin = require('../controllers/adminController');
 const { authenticate, authorize } = require('../middleware/authMiddleware');
+const { uploadPlotImage } = require('../middleware/uploadMiddleware');
 const { getFarmers, getAssignments, createAssignment } = require('../controllers/assignmentController');
 
 const router = express.Router();
@@ -10,8 +11,8 @@ router.get('/stats', admin.dashboard);
 router.get('/users', admin.users);
 router.patch('/users/:id', admin.updateUser);
 router.get('/plots', admin.plots);
-router.post('/plots', admin.createPlot);
-router.patch('/plots/:id', admin.updatePlot);
+router.post('/plots', uploadPlotImage.single('image'), admin.createPlot);
+router.patch('/plots/:id', uploadPlotImage.single('image'), admin.updatePlot);
 router.get('/rentals', admin.rentals);
 router.get('/requests', admin.requests);
 router.patch('/requests/:id', admin.updateRequest);

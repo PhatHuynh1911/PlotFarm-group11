@@ -1,6 +1,13 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+const API_ORIGIN = API_URL.replace(/\/api\/?$/, '')
 const getStoredToken = () => {
   try { return JSON.parse(sessionStorage.getItem('plotfarm_auth') || 'null')?.token } catch { return null }
+}
+
+export const resolveImageUrl = (image) => {
+  if (!image) return ''
+  if (/^https?:\/\//i.test(image)) return image
+  return `${API_ORIGIN}${image.startsWith('/') ? image : `/${image}`}`
 }
 
 export async function apiRequest(path, options = {}) {
@@ -25,7 +32,7 @@ export const normalizePlot = (plot) => ({
   price: Number(plot.gia_thue_thang),
   status: plot.trang_thai,
   description: plot.mo_ta_chi_tiet || '',
-  image: plot.hinh_anh_o_dat,
+  image: resolveImageUrl(plot.hinh_anh_o_dat),
 })
 
 export async function getPlots() {
