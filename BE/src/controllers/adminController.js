@@ -59,35 +59,127 @@ const updateUser = async (req, res) => {
     } catch (error) { return res.status(500).json({ success: false, message: 'Không thể cập nhật tài khoản' }); }
 };
 
+const formatAdminPlot = (row) => {
+    const rawImage = row.hinh_anh_o_dat || row.image_url || row.image || null;
+    const posX = row.position_x != null ? Number(row.position_x) : 50.0;
+    const posY = row.position_y != null ? Number(row.position_y) : 50.0;
+    return {
+        id: row.ma_o_dat || row.id,
+        farmId: row.ma_nong_trai || row.farmId,
+        code: row.so_hieu_o || row.code,
+        name: row.ten_o_dat || row.name,
+        area: Number(row.dien_tich_m2 != null ? row.dien_tich_m2 : row.area),
+        price: Number(row.gia_thue_thang != null ? row.gia_thue_thang : row.price),
+        status: row.trang_thai || row.status,
+        image: rawImage,
+        image_url: rawImage,
+        hinh_anh_o_dat: rawImage,
+        position_x: posX,
+        position_y: posY,
+        coord_x: posX,
+        coord_y: posY,
+        description: row.mo_ta_chi_tiet || row.description || ''
+    };
+};
+
 const plots = async (req, res) => {
     try {
         const pool = await getPool();
-        const result = await pool.request().query(`SELECT ma_o_dat AS id, ma_nong_trai AS farmId, so_hieu_o AS code, ten_o_dat AS name, dien_tich_m2 AS area, gia_thue_thang AS price, trang_thai AS status, hinh_anh_o_dat AS image, mo_ta_chi_tiet AS description FROM ODat ORDER BY so_hieu_o`);
-        return res.json({ success: true, data: result.recordset });
-    } catch (error) { return res.status(500).json({ success: false, message: 'Không thể tải danh sách ô đất' }); }
+        const result = await pool.request().query(`
+            SELECT ma_o_dat, ma_nong_trai, so_hieu_o, ten_o_dat, 
+                   dien_tich_m2, gia_thue_thang, trang_thai, 
+                   hinh_anh_o_dat, position_x, position_y, mo_ta_chi_tiet 
+            FROM ODat 
+            ORDER BY so_hieu_o
+        `);
+        const formatted = result.recordset.map(formatAdminPlot);
+        return res.json({ success: true, data: formatted });
+    } catch (error) { 
+        console.error('Lỗi tải danh sách ô đất:', error);
+        return res.status(500).json({ success: false, message: 'Không thể tải danh sách ô đất' }); 
+    }
 };
 
 const createPlot = async (req, res) => {
     try {
-        const { farmId, code, name, area, price, status = 'trong', description = '' } = req.body;
-        if (!farmId || !code || !name || !area || !price) return res.status(400).json({ success: false, message: 'Vui lòng nhập đủ thông tin ô đất' });
+        const { farmId, code, name, area, price, status = 'trong', description = '', position_x, position_y } = req.body;
+        if (!farmId || !code || !name || !area || !price) {
+            return res.status(400).json({ success: false, message: 'Vui lòng nhập đủ thông tin ô đất' });
+        }
         const pool = await getPool();
-        const image = req.file ? `/uploads/${req.file.filename}` : null;
-        await pool.request().input('farmId', sql.Int, Number(farmId)).input('code', sql.VarChar(20), code).input('name', sql.NVarChar(100), name).input('area', sql.Decimal(6, 2), Number(area)).input('price', sql.Decimal(14, 2), Number(price)).input('status', sql.VarChar(20), status).input('image', sql.VarChar(500), image).input('description', sql.NVarChar(sql.MAX), description)
-            .query(`INSERT INTO ODat (ma_nong_trai, so_hieu_o, ten_o_dat, dien_tich_m2, gia_thue_thang, trang_thai, hinh_anh_o_dat, mo_ta_chi_tiet) VALUES (@farmId, @code, @name, @area, @price, @status, @image, @description)`);
-        return res.status(201).json({ success: true, message: 'Đã thêm ô đất' });
-    } catch (error) { return res.status(500).json({ success: false, message: 'Không thể thêm ô đất' }); }
+        const image = req.file ? `/uploads/${req.file.filename}` : (req.body.image || req.body.image_url || req.body.hinh_anh_o_dat || null);
+        const posX = position_x != null ? Number(position_x) : 50.0;
+        const posY = position_y != null ? Number(position_y) : 50.0;
+
+        const result = await pool.request()
+            .input('farmId', sql.Int, Number(farmId))
+            .input('code', sql.VarChar(20), code)
+            .input('name', sql.NVarChar(100), name)
+            .input('area', sql.Decimal(6, 2), Number(area))
+            .input('price', sql.Decimal(14, 2), Number(price))
+            .input('status', sql.VarChar(20), status)
+            .input('image', sql.VarChar(500), image)
+            .input('posX', sql.Decimal(5, 2), posX)
+            .input('posY', sql.Decimal(5, 2), posY)
+            .input('description', sql.NVarChar(sql.MAX), description)
+            .query(`
+                INSERT INTO ODat (ma_nong_trai, so_hieu_o, ten_o_dat, dien_tich_m2, gia_thue_thang, trang_thai, hinh_anh_o_dat, position_x, position_y, mo_ta_chi_tiet)
+                OUTPUT INSERTED.*
+                VALUES (@farmId, @code, @name, @area, @price, @status, @image, @posX, @posY, @description)
+            `);
+
+        const newPlot = formatAdminPlot(result.recordset[0]);
+        return res.status(201).json({ success: true, message: 'Đã thêm ô đất', data: newPlot });
+    } catch (error) { 
+        console.error('Lỗi thêm ô đất:', error);
+        return res.status(500).json({ success: false, message: 'Không thể thêm ô đất' }); 
+    }
 };
 
 const updatePlot = async (req, res) => {
     try {
-        const { code, name, area, price, status, description = '' } = req.body;
+        const { code, name, area, price, status, description = '', position_x, position_y } = req.body;
         const pool = await getPool();
-        const image = req.file ? `/uploads/${req.file.filename}` : null;
-        const request = pool.request().input('id', sql.Int, Number(req.params.id)).input('code', sql.VarChar(20), code).input('name', sql.NVarChar(100), name).input('area', sql.Decimal(6, 2), Number(area)).input('price', sql.Decimal(14, 2), Number(price)).input('status', sql.VarChar(20), status).input('image', sql.VarChar(500), image).input('description', sql.NVarChar(sql.MAX), description);
-        await request.query(`UPDATE ODat SET so_hieu_o = @code, ten_o_dat = @name, dien_tich_m2 = @area, gia_thue_thang = @price, trang_thai = @status, hinh_anh_o_dat = COALESCE(@image, hinh_anh_o_dat), mo_ta_chi_tiet = @description, ngay_cap_nhat = SYSDATETIME() WHERE ma_o_dat = @id`);
-        return res.json({ success: true, message: 'Đã cập nhật ô đất' });
-    } catch (error) { return res.status(500).json({ success: false, message: 'Không thể cập nhật ô đất' }); }
+        const image = req.file ? `/uploads/${req.file.filename}` : (req.body.image || req.body.image_url || req.body.hinh_anh_o_dat || null);
+
+        const request = pool.request()
+            .input('id', sql.Int, Number(req.params.id))
+            .input('code', sql.VarChar(20), code)
+            .input('name', sql.NVarChar(100), name)
+            .input('area', sql.Decimal(6, 2), area != null ? Number(area) : null)
+            .input('price', sql.Decimal(14, 2), price != null ? Number(price) : null)
+            .input('status', sql.VarChar(20), status)
+            .input('image', sql.VarChar(500), image)
+            .input('posX', sql.Decimal(5, 2), position_x != null ? Number(position_x) : null)
+            .input('posY', sql.Decimal(5, 2), position_y != null ? Number(position_y) : null)
+            .input('description', sql.NVarChar(sql.MAX), description);
+
+        const result = await request.query(`
+            UPDATE ODat 
+            SET so_hieu_o = COALESCE(@code, so_hieu_o),
+                ten_o_dat = COALESCE(@name, ten_o_dat),
+                dien_tich_m2 = COALESCE(@area, dien_tich_m2),
+                gia_thue_thang = COALESCE(@price, gia_thue_thang),
+                trang_thai = COALESCE(@status, trang_thai),
+                hinh_anh_o_dat = COALESCE(@image, hinh_anh_o_dat),
+                position_x = COALESCE(@posX, position_x),
+                position_y = COALESCE(@posY, position_y),
+                mo_ta_chi_tiet = COALESCE(@description, mo_ta_chi_tiet),
+                ngay_cap_nhat = SYSDATETIME()
+            OUTPUT INSERTED.*
+            WHERE ma_o_dat = @id
+        `);
+
+        if (result.recordset.length === 0) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy ô đất' });
+        }
+
+        const updatedPlot = formatAdminPlot(result.recordset[0]);
+        return res.json({ success: true, message: 'Đã cập nhật ô đất', data: updatedPlot });
+    } catch (error) { 
+        console.error('Lỗi cập nhật ô đất:', error);
+        return res.status(500).json({ success: false, message: 'Không thể cập nhật ô đất' }); 
+    }
 };
 
 const rentals = async (req, res) => {

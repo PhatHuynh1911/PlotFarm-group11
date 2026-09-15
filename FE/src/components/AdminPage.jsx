@@ -133,6 +133,8 @@ function AdminPage({ user, token, onLogout }) {
       form.set("farmId", Number(form.get("farmId")));
       form.set("area", Number(form.get("area")));
       form.set("price", Number(form.get("price")));
+      if (form.get("position_x")) form.set("position_x", Number(form.get("position_x")));
+      if (form.get("position_y")) form.set("position_y", Number(form.get("position_y")));
       await update(
         editingPlot ? `plots/${editingPlot.id}` : "plots",
         editingPlot ? "PATCH" : "POST",

@@ -1,22 +1,53 @@
 const { sql, getPool } = require('../config/db');
 
-// Lấy danh sách tất cả các ô đất từ bảng ODat
+// Helper chuẩn hóa dữ liệu ô đất
+const formatPlot = (plot) => {
+    const rawImage = plot.hinh_anh_o_dat || plot.image_url || plot.image || null;
+    const posX = plot.position_x != null ? Number(plot.position_x) : 50.0;
+    const posY = plot.position_y != null ? Number(plot.position_y) : 50.0;
+
+    return {
+        ...plot,
+        id: plot.ma_o_dat,
+        farmId: plot.ma_nong_trai,
+        code: plot.so_hieu_o,
+        name: plot.ten_o_dat,
+        area: Number(plot.dien_tich_m2),
+        price: Number(plot.gia_thue_thang),
+        status: plot.trang_thai,
+        soil: plot.loai_dat || 'Đất thịt phù sa giàu mùn',
+        location: plot.ten_nong_trai || 'Vườn PlotFarm',
+        description: plot.mo_ta_chi_tiet || '',
+        position_x: posX,
+        position_y: posY,
+        coord_x: posX,
+        coord_y: posY,
+        hinh_anh_o_dat: rawImage,
+        image: rawImage,
+        image_url: rawImage
+    };
+};
+
+// Lấy danh sách tất cả các ô đất từ bảng ODat kèm tọa độ bản đồ và ảnh
 const getAllPlots = async (req, res) => {
     try {
         const pool = await getPool();
         const result = await pool.request().query(`
             SELECT o.ma_o_dat, o.ma_nong_trai, o.so_hieu_o, o.ten_o_dat, 
-                   o.dien_tich_m2, o.gia_thue_thang, o.trang_thai, o.hinh_anh_o_dat, o.mo_ta_chi_tiet,
+                   o.dien_tich_m2, o.gia_thue_thang, o.trang_thai, o.loai_dat,
+                   o.position_x, o.position_y, o.hinh_anh_o_dat, o.mo_ta_chi_tiet,
                    n.ten_nong_trai, n.dia_chi AS dia_chi_nong_trai
             FROM ODat o
             LEFT JOIN NongTrai n ON n.ma_nong_trai = o.ma_nong_trai
             ORDER BY o.so_hieu_o ASC
         `);
         
+        const formatted = result.recordset.map(formatPlot);
+
         res.status(200).json({
             success: true,
-            count: result.recordset.length,
-            data: result.recordset
+            count: formatted.length,
+            data: formatted
         });
     } catch (error) {
         console.error('Lỗi khi lấy danh sách ô đất:', error);
@@ -55,7 +86,7 @@ const getPlotByIdOrCode = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            data: plot
+            data: formatPlot(plot)
         });
     } catch (error) {
         console.error('Lỗi khi lấy chi tiết ô đất:', error);
@@ -89,4 +120,4 @@ const updatePlotStatus = async (req, res) => {
     }
 };
 
-module.exports = { getAllPlots, getPlotByIdOrCode, updatePlotStatus };
+module.exports = { getAllPlots, getPlotByIdOrCode, updatePlotStatus, formatPlot };

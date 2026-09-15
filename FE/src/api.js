@@ -22,18 +22,40 @@ export async function apiRequest(path, options = {}) {
   return result
 }
 
-export const normalizePlot = (plot) => ({
-  id: plot.ma_o_dat,
-  code: plot.so_hieu_o,
-  name: plot.ten_o_dat,
-  area: Number(plot.dien_tich_m2),
-  soil: plot.loai_dat || 'Đất thịt hữu cơ',
-  location: plot.ten_nong_trai || 'Vườn PlotFarm',
-  price: Number(plot.gia_thue_thang),
-  status: plot.trang_thai,
-  description: plot.mo_ta_chi_tiet || '',
-  image: resolveImageUrl(plot.hinh_anh_o_dat),
-})
+export const normalizePlot = (plot) => {
+  const rawImage = plot.hinh_anh_o_dat || plot.image_url || plot.image || ''
+  const posX = plot.position_x != null ? Number(plot.position_x) : (plot.coord_x != null ? Number(plot.coord_x) : 50.0)
+  const posY = plot.position_y != null ? Number(plot.position_y) : (plot.coord_y != null ? Number(plot.coord_y) : 50.0)
+  const resolved = resolveImageUrl(rawImage)
+
+  return {
+    id: plot.ma_o_dat ?? plot.id,
+    farmId: plot.ma_nong_trai ?? plot.farmId ?? 1,
+    code: plot.so_hieu_o ?? plot.code,
+    name: plot.ten_o_dat ?? plot.name,
+    area: Number(plot.dien_tich_m2 ?? plot.area ?? 0),
+    soil: plot.loai_dat || plot.soil || 'Đất thịt hữu cơ',
+    location: plot.ten_nong_trai || plot.location || 'Vườn PlotFarm',
+    price: Number(plot.gia_thue_thang ?? plot.price ?? 0),
+    status: plot.trang_thai ?? plot.status,
+    description: plot.mo_ta_chi_tiet || plot.description || '',
+    position_x: posX,
+    position_y: posY,
+    coord_x: posX,
+    coord_y: posY,
+    image: resolved,
+    image_url: resolved,
+    hinh_anh_o_dat: resolved,
+  }
+}
+
+export async function getFarmPlots(farmId = 1) {
+  const result = await apiRequest(`/farms/${farmId}/plots`)
+  return {
+    farm: result.farm,
+    plots: (result.data || []).map(normalizePlot),
+  }
+}
 
 export async function getPlots() {
   const result = await apiRequest('/plots')
