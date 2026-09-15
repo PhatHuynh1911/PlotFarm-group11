@@ -6,6 +6,7 @@ function GardenMapView({ plots, occupiedPlots, onSelectPlot, onClose }) {
   const [status, setStatus] = useState('Tất cả trạng thái');
   const [activePlotId, setActivePlotId] = useState(null);
   const listingRefs = useRef({});
+  const markerRefs = useRef({});
   const mapPlots = [...plots, ...occupiedPlots.filter((occupiedPlot) => !plots.some((plot) => plot.id === occupiedPlot.id))];
   const visiblePlots = mapPlots.filter((plot) => {
     const matchesQuery = `${plot.code} ${plot.location} ${plot.soil}`.toLowerCase().includes(query.toLowerCase());
@@ -15,7 +16,15 @@ function GardenMapView({ plots, occupiedPlots, onSelectPlot, onClose }) {
   });
   const focusPlot = (plot) => {
     setActivePlotId(plot.id);
-    window.requestAnimationFrame(() => listingRefs.current[plot.id]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+    window.requestAnimationFrame(() => {
+      listingRefs.current[plot.id]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      markerRefs.current[plot.id]?.focus({ preventScroll: true });
+    });
+  };
+
+  const getPosition = (value) => {
+    const position = Number(value);
+    return Number.isFinite(position) ? Math.min(100, Math.max(0, position)) : 50;
   };
 
   return (
@@ -62,6 +71,10 @@ function GardenMapView({ plots, occupiedPlots, onSelectPlot, onClose }) {
               <option>Giá thấp nhất</option>
             </select>
           </div>
+          <div className="map-legend" aria-label="Chú giải trạng thái ô đất">
+            <span><i className="available" /> Đang trống</span>
+            <span><i className="occupied" /> Đã thuê</span>
+          </div>
           <div className="map-list-grid">
             {visiblePlots.map((plot, index) => {
               const isOccupied = occupiedPlots.some((occupiedPlot) => occupiedPlot.id === plot.id);
@@ -105,21 +118,26 @@ function GardenMapView({ plots, occupiedPlots, onSelectPlot, onClose }) {
             <br />
             <small>ĐÀ NẴNG</small>
           </div>
-          {visiblePlots.map((plot, index) => {
+          <div className="map-grid-labels" aria-hidden="true">
+            <span>01</span><span>02</span><span>03</span><span>04</span><span>05</span>
+          </div>
+          {visiblePlots.map((plot) => {
             const isOccupied = occupiedPlots.some((occupiedPlot) => occupiedPlot.id === plot.id);
-            const posX = plot.position_x != null ? plot.position_x : 50;
-            const posY = plot.position_y != null ? plot.position_y : 50;
+            const posX = getPosition(plot.position_x ?? plot.coord_x);
+            const posY = getPosition(plot.position_y ?? plot.coord_y);
 
             return (
               <button
                 key={plot.id}
                 type="button"
-                className={`map-marker ${isOccupied ? 'occupied' : ''} ${activePlotId === plot.id ? 'is-selected' : ''} marker-${index + 1}`}
+                ref={(node) => { markerRefs.current[plot.id] = node; }}
+                className={`map-marker ${isOccupied ? 'occupied' : ''} ${activePlotId === plot.id ? 'is-selected' : ''}`}
                 style={{
                   top: `${posY}%`,
                   left: `${posX}%`
                 }}
                 onClick={() => focusPlot(plot)}
+                aria-pressed={activePlotId === plot.id}
                 aria-label={`Chọn ô ${plot.code}`}
                 title={`${plot.name} (${plot.code})`}
               >

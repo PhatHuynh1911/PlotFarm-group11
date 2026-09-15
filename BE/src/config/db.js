@@ -48,6 +48,31 @@ const connectDB = async () => {
     try {
         const activePool = await getPool();
         await activePool.request().query(`
+            IF COL_LENGTH('dbo.ODat', 'position_x') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ODat ADD position_x DECIMAL(5, 2) NULL CONSTRAINT DF_ODat_PositionX DEFAULT 50.0;
+            END
+
+            IF COL_LENGTH('dbo.ODat', 'position_y') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ODat ADD position_y DECIMAL(5, 2) NULL CONSTRAINT DF_ODat_PositionY DEFAULT 50.0;
+            END
+
+            UPDATE dbo.ODat
+            SET position_x = CASE so_hieu_o
+                    WHEN 'A-01' THEN 18.0 WHEN 'A-02' THEN 35.0 WHEN 'A-03' THEN 52.0
+                    WHEN 'A-04' THEN 69.0 WHEN 'A-05' THEN 84.0
+                    WHEN 'B-05' THEN 25.0 WHEN 'B-06' THEN 45.0 WHEN 'B-07' THEN 65.0
+                    WHEN 'C-09' THEN 22.0 WHEN 'C-10' THEN 50.0 WHEN 'C-11' THEN 78.0
+                    ELSE 50.0 END,
+                position_y = CASE so_hieu_o
+                    WHEN 'A-01' THEN 22.0 WHEN 'A-02' THEN 22.0 WHEN 'A-03' THEN 22.0
+                    WHEN 'A-04' THEN 22.0 WHEN 'A-05' THEN 22.0
+                    WHEN 'B-05' THEN 50.0 WHEN 'B-06' THEN 50.0 WHEN 'B-07' THEN 50.0
+                    WHEN 'C-09' THEN 78.0 WHEN 'C-10' THEN 78.0 WHEN 'C-11' THEN 78.0
+                    ELSE 50.0 END
+            WHERE position_x IS NULL OR position_y IS NULL;
+
             IF COL_LENGTH('dbo.HopDongThue', 'trang_thai_canh_tac') IS NULL
             BEGIN
                 ALTER TABLE dbo.HopDongThue ADD trang_thai_canh_tac VARCHAR(30) NOT NULL CONSTRAINT DF_HopDongThue_TrangThaiCanhTac DEFAULT 'cho_gieo_trong';

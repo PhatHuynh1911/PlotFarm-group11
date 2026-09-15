@@ -150,6 +150,20 @@ VALUES
     N'Đất vừa được cày xới sâu và phơi ải diệt nấm, sẵn sàng gieo trồng ngay hôm nay.'
 );
 SET IDENTITY_INSERT dbo.ODat OFF;
+
+UPDATE dbo.ODat
+SET position_x = CASE so_hieu_o
+        WHEN 'A-01' THEN 18.0 WHEN 'A-02' THEN 35.0 WHEN 'A-03' THEN 52.0
+        WHEN 'A-04' THEN 69.0 WHEN 'A-05' THEN 84.0
+        WHEN 'B-05' THEN 25.0 WHEN 'B-06' THEN 45.0 WHEN 'B-07' THEN 65.0
+        WHEN 'C-09' THEN 22.0 WHEN 'C-10' THEN 50.0 WHEN 'C-11' THEN 78.0
+        ELSE position_x END,
+    position_y = CASE so_hieu_o
+        WHEN 'A-01' THEN 22.0 WHEN 'A-02' THEN 22.0 WHEN 'A-03' THEN 22.0
+        WHEN 'A-04' THEN 22.0 WHEN 'A-05' THEN 22.0
+        WHEN 'B-05' THEN 50.0 WHEN 'B-06' THEN 50.0 WHEN 'B-07' THEN 50.0
+        WHEN 'C-09' THEN 78.0 WHEN 'C-10' THEN 78.0 WHEN 'C-11' THEN 78.0
+        ELSE position_y END;
 GO
 
 -- ==============================================================================
