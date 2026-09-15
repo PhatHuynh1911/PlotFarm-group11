@@ -8,6 +8,7 @@ import {
   getServiceTypes,
   getUserRentals,
   getUserServiceRequests,
+  PLOT_PLACEHOLDER_IMAGE,
   resolveImageUrl,
 } from "../api.js";
 import AccountMenu from "./AccountMenu.jsx";
@@ -322,11 +323,9 @@ function UserPage({ user, token, onLogout }) {
                 <div
                   className="my-plot-image"
                   style={
-                    rental.hinh_anh_o_dat
-                      ? {
-                          backgroundImage: `url("${resolveImageUrl(rental.hinh_anh_o_dat)}")`,
-                        }
-                      : undefined
+                    {
+                      backgroundImage: `url("${resolveImageUrl(rental.hinh_anh_o_dat || PLOT_PLACEHOLDER_IMAGE)}")`,
+                    }
                   }
                 >
                   <span>{rental.so_hieu_o}</span>
