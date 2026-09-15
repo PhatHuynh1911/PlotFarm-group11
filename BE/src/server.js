@@ -10,6 +10,7 @@ const { setupSwagger } = require('./config/swagger');
 // Khai báo toàn bộ các Routes cho 3 Dashboards
 const authRoutes = require('./routes/authRoutes');
 const plotRoutes = require('./routes/plotRoutes');
+const farmRoutes = require('./routes/farmRoutes');
 const cropRoutes = require('./routes/cropRoutes');
 const rentalRoutes = require('./routes/rentalRoutes');
 const journalRoutes = require('./routes/journalRoutes');
@@ -39,6 +40,7 @@ setupSwagger(app);
 // Đăng ký toàn bộ API Endpoints
 app.use('/api/auth', authRoutes);
 app.use('/api/plots', plotRoutes);
+app.use('/api/farms', farmRoutes);
 app.use('/api/crops', cropRoutes);
 app.use('/api/rentals', rentalRoutes);
 app.use('/api/journals', journalRoutes);

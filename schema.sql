@@ -96,6 +96,8 @@ CREATE TABLE dbo.ODat (
     thoi_han_thue_toi_da_thang INT NOT NULL DEFAULT 12,
     trang_thai VARCHAR(20) NOT NULL DEFAULT 'trong', -- 'trong', 'dang_chon', 'da_thue', 'bao_tri'
     hinh_anh_o_dat VARCHAR(500) NULL,
+    position_x DECIMAL(5, 2) NULL DEFAULT 50.0, -- Tọa độ hiển thị trục X (%) trên bản đồ nông trại
+    position_y DECIMAL(5, 2) NULL DEFAULT 50.0, -- Tọa độ hiển thị trục Y (%) trên bản đồ nông trại
     mo_ta_chi_tiet NVARCHAR(MAX) NULL,
     ngay_tao DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
     ngay_cap_nhat DATETIME2 NOT NULL DEFAULT SYSDATETIME()
