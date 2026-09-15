@@ -1,4 +1,5 @@
 const { sql, getPool } = require('../config/db');
+const { notifyAdmins } = require('./notificationController');
 
 // Tạo hợp đồng thuê đất mới
 const createRental = async (req, res) => {
@@ -35,7 +36,7 @@ const createRental = async (req, res) => {
         // 1. Kiểm tra ô đất còn trống + lấy giá thật từ DB
         const checkResult = await new sql.Request(transaction)
             .input('ma_o_dat', sql.Int, parseInt(ma_o_dat, 10))
-            .query(`SELECT trang_thai, gia_thue_thang FROM ODat WHERE ma_o_dat = @ma_o_dat`);
+            .query(`SELECT so_hieu_o, ten_o_dat, trang_thai, gia_thue_thang FROM ODat WHERE ma_o_dat = @ma_o_dat`);
 
         const oDat = checkResult.recordset[0];
 
@@ -75,6 +76,15 @@ const createRental = async (req, res) => {
             .query(`UPDATE ODat SET trang_thai = 'da_thue', ngay_cap_nhat = SYSDATETIME() WHERE ma_o_dat = @ma_o_dat`);
 
         await transaction.commit();
+
+        // 4. Bắn thông báo tự động cho Admin
+        const plotCode = oDat.so_hieu_o || `Ô #${ma_o_dat}`;
+        notifyAdmins(
+            `Đơn thuê mới: ${plotCode}`,
+            `Hợp đồng ${so_hop_dong} vừa được tạo thành công cho ô đất ${plotCode}. Thời hạn: ${thoi_han_thang} tháng, Tổng tiền: ${Number(tongTien).toLocaleString('vi-VN')} đ.`,
+            'thue_dat',
+            '/admin'
+        ).catch((err) => console.error('Lỗi bắn thông báo admin:', err));
 
         const createdContract = insertResult.recordset[0];
 

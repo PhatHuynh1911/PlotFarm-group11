@@ -39,7 +39,9 @@ const swaggerSpec = {
         { name: '6. Services', description: 'Yêu cầu dịch vụ chăm sóc vườn (tưới nước, bón phân, xử lý sâu bệnh)' },
         { name: '7. Cameras', description: 'Luồng camera trực tuyến IoT giám sát ô đất' },
         { name: '8. Contact', description: 'Biểu mẫu tiếp nhận tư vấn từ khách hàng tiềm năng' },
-        { name: '9. Admin', description: 'Báo cáo thống kê, quản lý người dùng, duyệt hợp đồng & yêu cầu' }
+        { name: '9. Admin', description: 'Báo cáo thống kê, quản lý người dùng, duyệt hợp đồng & yêu cầu' },
+        { name: '10. Notifications', description: 'Hệ thống thông báo đẩy người dùng (đơn thuê, phân công, nhật ký canh tác)' },
+        { name: '11. Upload', description: 'Tải lên hình ảnh/tệp tin qua Multer lưu trữ cục bộ tại máy chủ' }
     ],
     paths: {
         // --- 1. AUTH ---

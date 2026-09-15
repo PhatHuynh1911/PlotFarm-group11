@@ -17,6 +17,8 @@ const serviceRoutes = require('./routes/serviceRoutes');
 const cameraRoutes = require('./routes/cameraRoutes');
 const contactRoutes = require('./routes/contactRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const uploadRoutes = require('./routes/uploadRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -44,6 +46,8 @@ app.use('/api/services', serviceRoutes);
 app.use('/api/camera', cameraRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // Route kiểm tra trạng thái máy chủ
 app.get('/', (req, res) => {
