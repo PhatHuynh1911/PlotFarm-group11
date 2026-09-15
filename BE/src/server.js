@@ -3,6 +3,7 @@ const cors = require('cors');
 const morgan = require('morgan');
 require('dotenv').config();
 
+const path = require('path');
 const { connectDB } = require('./config/db');
 const { setupSwagger } = require('./config/swagger');
 
@@ -16,6 +17,8 @@ const serviceRoutes = require('./routes/serviceRoutes');
 const cameraRoutes = require('./routes/cameraRoutes');
 const contactRoutes = require('./routes/contactRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const uploadRoutes = require('./routes/uploadRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -28,6 +31,7 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Cấu hình Swagger API Documentation
 setupSwagger(app);
@@ -42,6 +46,8 @@ app.use('/api/services', serviceRoutes);
 app.use('/api/camera', cameraRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // Route kiểm tra trạng thái máy chủ
 app.get('/', (req, res) => {

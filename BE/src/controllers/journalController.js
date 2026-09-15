@@ -1,4 +1,5 @@
 const { sql, getPool } = require('../config/db');
+const { createNotification } = require('./notificationController');
 
 // Nông dân thêm bài viết nhật ký canh tác mới
 const createJournal = async (req, res) => {
@@ -82,6 +83,35 @@ const createJournal = async (req, res) => {
             `);
 
         const created = result.recordset[0];
+
+        // Gửi thông báo tự động cho khách hàng đang thuê ô đất này
+        try {
+            const contractInfo = await pool.request()
+                .input('ma_hop_dong', sql.Int, effectiveHopDong)
+                .query(`
+                    SELECT h.ma_nguoi_dung, o.so_hieu_o, o.ten_o_dat, c.ten_cay_trong
+                    FROM HopDongThue h
+                    LEFT JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+                    LEFT JOIN CayTrong c ON c.ma_cay_trong = h.ma_cay_trong
+                    WHERE h.ma_hop_dong = @ma_hop_dong
+                `);
+            if (contractInfo.recordset.length > 0) {
+                const { ma_nguoi_dung, so_hieu_o, ten_o_dat, ten_cay_trong } = contractInfo.recordset[0];
+                if (ma_nguoi_dung) {
+                    const plotCode = so_hieu_o || ten_o_dat || `HĐ #${effectiveHopDong}`;
+                    const cropInfo = ten_cay_trong ? ` (${ten_cay_trong})` : '';
+                    createNotification(
+                        ma_nguoi_dung,
+                        `Nhật ký canh tác mới: Ô đất ${plotCode}`,
+                        `Nông dân vừa cập nhật nhật ký cho ô đất ${plotCode}${cropInfo}: "${task}".`,
+                        'nhat_ky',
+                        `/dashboard?tab=journal&rentalId=${effectiveHopDong}`
+                    ).catch(err => console.error('Lỗi bắn thông báo nhật ký:', err));
+                }
+            }
+        } catch (notifErr) {
+            console.error('Lỗi khi gửi thông báo cập nhật nhật ký:', notifErr);
+        }
 
         res.status(201).json({
             success: true,
