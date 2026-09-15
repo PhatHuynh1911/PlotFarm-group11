@@ -1,9 +1,11 @@
-import { useState } from 'react';
-import { resolveImageUrl } from '../api.js';
+import { useRef, useState } from 'react';
+import { PLOT_PLACEHOLDER_IMAGE, resolveImageUrl } from '../api.js';
 
 function GardenMapView({ plots, occupiedPlots, onSelectPlot, onClose }) {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('Tất cả trạng thái');
+  const [activePlotId, setActivePlotId] = useState(null);
+  const listingRefs = useRef({});
   const mapPlots = [...plots, ...occupiedPlots.filter((occupiedPlot) => !plots.some((plot) => plot.id === occupiedPlot.id))];
   const visiblePlots = mapPlots.filter((plot) => {
     const matchesQuery = `${plot.code} ${plot.location} ${plot.soil}`.toLowerCase().includes(query.toLowerCase());
@@ -11,6 +13,10 @@ function GardenMapView({ plots, occupiedPlots, onSelectPlot, onClose }) {
     const matchesStatus = status === 'Tất cả trạng thái' || (status === 'Đang trống' && !isOccupied) || (status === 'Đã thuê' && isOccupied);
     return matchesQuery && matchesStatus;
   });
+  const focusPlot = (plot) => {
+    setActivePlotId(plot.id);
+    window.requestAnimationFrame(() => listingRefs.current[plot.id]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+  };
 
   return (
     <div
@@ -59,16 +65,15 @@ function GardenMapView({ plots, occupiedPlots, onSelectPlot, onClose }) {
           <div className="map-list-grid">
             {visiblePlots.map((plot, index) => {
               const isOccupied = occupiedPlots.some((occupiedPlot) => occupiedPlot.id === plot.id);
-              const plotImage = plot.image || plot.image_url || plot.hinh_anh_o_dat;
-              const bgStyle = plotImage
-                ? { backgroundImage: `url("${resolveImageUrl(plotImage)}")` }
-                : undefined;
+              const plotImage = resolveImageUrl(plot.image || plot.image_url || plot.hinh_anh_o_dat || PLOT_PLACEHOLDER_IMAGE);
+              const bgStyle = { backgroundImage: `url("${plotImage}")` };
 
               return (
                 <article
-                  className="map-listing"
+                  className={`map-listing ${activePlotId === plot.id ? 'is-selected' : ''}`}
                   key={plot.id}
-                  onClick={() => !isOccupied && onSelectPlot(plot)}
+                  ref={(node) => { listingRefs.current[plot.id] = node; }}
+                  onClick={() => focusPlot(plot)}
                 >
                   <div
                     className={`map-listing-image map-listing-image-${(index % 4) + 1}`}
@@ -87,6 +92,7 @@ function GardenMapView({ plots, occupiedPlots, onSelectPlot, onClose }) {
                     <span>
                       {plot.code} · {plot.area}m² &nbsp; <b>●</b> Có chăm sóc
                     </span>
+                    <button type="button" className="map-listing-action" onClick={(event) => { event.stopPropagation(); onSelectPlot(plot); }}>Xem chi tiết →</button>
                   </div>
                 </article>
               );
@@ -108,12 +114,12 @@ function GardenMapView({ plots, occupiedPlots, onSelectPlot, onClose }) {
               <button
                 key={plot.id}
                 type="button"
-                className={`map-marker ${isOccupied ? 'occupied' : ''} marker-${index + 1}`}
+                className={`map-marker ${isOccupied ? 'occupied' : ''} ${activePlotId === plot.id ? 'is-selected' : ''} marker-${index + 1}`}
                 style={{
                   top: `${posY}%`,
                   left: `${posX}%`
                 }}
-                onClick={() => !isOccupied && onSelectPlot(plot)}
+                onClick={() => focusPlot(plot)}
                 aria-label={`Chọn ô ${plot.code}`}
                 title={`${plot.name} (${plot.code})`}
               >

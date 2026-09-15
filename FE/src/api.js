@@ -1,12 +1,13 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 const API_ORIGIN = API_URL.replace(/\/api\/?$/, '')
+export const PLOT_PLACEHOLDER_IMAGE = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500"><rect width="800" height="500" fill="#dfead9"/><path fill="#b7d2ae" d="M0 330 170 210l105 75 146-155 147 126 105-71 127 110v205H0z"/><path fill="#6c9b62" d="M0 390 190 265l150 99 139-125 143 93 178-69v237H0z"/><circle cx="674" cy="110" r="44" fill="#f5cf75"/><text x="400" y="430" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" fill="#31543b">PLOTFARM · Ô ĐẤT CANH TÁC</text></svg>` )}`
 const getStoredToken = () => {
   try { return JSON.parse(sessionStorage.getItem('plotfarm_auth') || 'null')?.token } catch { return null }
 }
 
 export const resolveImageUrl = (image) => {
   if (!image) return ''
-  if (/^https?:\/\//i.test(image)) return image
+  if (/^(https?:\/\/|data:image\/)/i.test(image)) return image
   return `${API_ORIGIN}${image.startsWith('/') ? image : `/${image}`}`
 }
 
@@ -23,7 +24,7 @@ export async function apiRequest(path, options = {}) {
 }
 
 export const normalizePlot = (plot) => {
-  const rawImage = plot.hinh_anh_o_dat || plot.image_url || plot.image || ''
+  const rawImage = plot.hinh_anh_o_dat || plot.image_url || plot.image || PLOT_PLACEHOLDER_IMAGE
   const posX = plot.position_x != null ? Number(plot.position_x) : (plot.coord_x != null ? Number(plot.coord_x) : 50.0)
   const posY = plot.position_y != null ? Number(plot.position_y) : (plot.coord_y != null ? Number(plot.coord_y) : 50.0)
   const resolved = resolveImageUrl(rawImage)
