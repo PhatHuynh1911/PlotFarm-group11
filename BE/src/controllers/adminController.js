@@ -62,7 +62,7 @@ const updateUser = async (req, res) => {
 const plots = async (req, res) => {
     try {
         const pool = await getPool();
-        const result = await pool.request().query(`SELECT ma_o_dat AS id, ma_nong_trai AS farmId, so_hieu_o AS code, ten_o_dat AS name, dien_tich_m2 AS area, gia_thue_thang AS price, trang_thai AS status, mo_ta_chi_tiet AS description FROM ODat ORDER BY so_hieu_o`);
+        const result = await pool.request().query(`SELECT ma_o_dat AS id, ma_nong_trai AS farmId, so_hieu_o AS code, ten_o_dat AS name, dien_tich_m2 AS area, gia_thue_thang AS price, trang_thai AS status, hinh_anh_o_dat AS image, mo_ta_chi_tiet AS description FROM ODat ORDER BY so_hieu_o`);
         return res.json({ success: true, data: result.recordset });
     } catch (error) { return res.status(500).json({ success: false, message: 'Không thể tải danh sách ô đất' }); }
 };
@@ -72,8 +72,9 @@ const createPlot = async (req, res) => {
         const { farmId, code, name, area, price, status = 'trong', description = '' } = req.body;
         if (!farmId || !code || !name || !area || !price) return res.status(400).json({ success: false, message: 'Vui lòng nhập đủ thông tin ô đất' });
         const pool = await getPool();
-        await pool.request().input('farmId', sql.Int, farmId).input('code', sql.VarChar(20), code).input('name', sql.NVarChar(100), name).input('area', sql.Decimal(6, 2), area).input('price', sql.Decimal(14, 2), price).input('status', sql.VarChar(20), status).input('description', sql.NVarChar(sql.MAX), description)
-            .query(`INSERT INTO ODat (ma_nong_trai, so_hieu_o, ten_o_dat, dien_tich_m2, gia_thue_thang, trang_thai, mo_ta_chi_tiet) VALUES (@farmId, @code, @name, @area, @price, @status, @description)`);
+        const image = req.file ? `/uploads/${req.file.filename}` : null;
+        await pool.request().input('farmId', sql.Int, Number(farmId)).input('code', sql.VarChar(20), code).input('name', sql.NVarChar(100), name).input('area', sql.Decimal(6, 2), Number(area)).input('price', sql.Decimal(14, 2), Number(price)).input('status', sql.VarChar(20), status).input('image', sql.VarChar(500), image).input('description', sql.NVarChar(sql.MAX), description)
+            .query(`INSERT INTO ODat (ma_nong_trai, so_hieu_o, ten_o_dat, dien_tich_m2, gia_thue_thang, trang_thai, hinh_anh_o_dat, mo_ta_chi_tiet) VALUES (@farmId, @code, @name, @area, @price, @status, @image, @description)`);
         return res.status(201).json({ success: true, message: 'Đã thêm ô đất' });
     } catch (error) { return res.status(500).json({ success: false, message: 'Không thể thêm ô đất' }); }
 };
@@ -82,8 +83,9 @@ const updatePlot = async (req, res) => {
     try {
         const { code, name, area, price, status, description = '' } = req.body;
         const pool = await getPool();
-        await pool.request().input('id', sql.Int, Number(req.params.id)).input('code', sql.VarChar(20), code).input('name', sql.NVarChar(100), name).input('area', sql.Decimal(6, 2), area).input('price', sql.Decimal(14, 2), price).input('status', sql.VarChar(20), status).input('description', sql.NVarChar(sql.MAX), description)
-            .query(`UPDATE ODat SET so_hieu_o = @code, ten_o_dat = @name, dien_tich_m2 = @area, gia_thue_thang = @price, trang_thai = @status, mo_ta_chi_tiet = @description, ngay_cap_nhat = SYSDATETIME() WHERE ma_o_dat = @id`);
+        const image = req.file ? `/uploads/${req.file.filename}` : null;
+        const request = pool.request().input('id', sql.Int, Number(req.params.id)).input('code', sql.VarChar(20), code).input('name', sql.NVarChar(100), name).input('area', sql.Decimal(6, 2), Number(area)).input('price', sql.Decimal(14, 2), Number(price)).input('status', sql.VarChar(20), status).input('image', sql.VarChar(500), image).input('description', sql.NVarChar(sql.MAX), description);
+        await request.query(`UPDATE ODat SET so_hieu_o = @code, ten_o_dat = @name, dien_tich_m2 = @area, gia_thue_thang = @price, trang_thai = @status, hinh_anh_o_dat = COALESCE(@image, hinh_anh_o_dat), mo_ta_chi_tiet = @description, ngay_cap_nhat = SYSDATETIME() WHERE ma_o_dat = @id`);
         return res.json({ success: true, message: 'Đã cập nhật ô đất' });
     } catch (error) { return res.status(500).json({ success: false, message: 'Không thể cập nhật ô đất' }); }
 };
