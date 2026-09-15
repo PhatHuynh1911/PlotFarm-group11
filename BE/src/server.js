@@ -4,7 +4,6 @@ const cors = require('cors');
 const morgan = require('morgan');
 require('dotenv').config();
 
-const path = require('path');
 const { connectDB } = require('./config/db');
 const { setupSwagger } = require('./config/swagger');
 
