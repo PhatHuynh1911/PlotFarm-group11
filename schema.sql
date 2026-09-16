@@ -1,4 +1,4 @@
-﻿-- ==============================================================================
+-- ==============================================================================
 -- DỰ ÁN: PLOTFARM - NỀN TẢNG CHO THUÊ Ô ĐẤT CANH TÁC THÔNG MINH
 -- TẬP TIN: schema.sql (Cấu trúc cơ sở dữ liệu Microsoft SQL Server)
 -- ĐỊNH DẠNG: UTF-8 with BOM (Tránh hoàn toàn lỗi font chữ ? trong SSMS)
@@ -17,6 +17,7 @@ GO
 -- 1. XÓA BẢNG CŨ THEO THỨ TỰ RÀNG BUỘC KHÓA NGOẠI
 -- ==============================================================================
 IF OBJECT_ID(N'dbo.LienHeTuVan', N'U') IS NOT NULL DROP TABLE dbo.LienHeTuVan;
+IF OBJECT_ID(N'dbo.ThongBao', N'U') IS NOT NULL DROP TABLE dbo.ThongBao;
 IF OBJECT_ID(N'dbo.PhanCongNongDan', N'U') IS NOT NULL DROP TABLE dbo.PhanCongNongDan;
 IF OBJECT_ID(N'dbo.GiaoHang', N'U') IS NOT NULL DROP TABLE dbo.GiaoHang;
 IF OBJECT_ID(N'dbo.ThuHoach', N'U') IS NOT NULL DROP TABLE dbo.ThuHoach;
@@ -95,6 +96,8 @@ CREATE TABLE dbo.ODat (
     thoi_han_thue_toi_da_thang INT NOT NULL DEFAULT 12,
     trang_thai VARCHAR(20) NOT NULL DEFAULT 'trong', -- 'trong', 'dang_chon', 'da_thue', 'bao_tri'
     hinh_anh_o_dat VARCHAR(500) NULL,
+    position_x DECIMAL(5, 2) NULL DEFAULT 50.0, -- Tọa độ hiển thị trục X (%) trên bản đồ nông trại
+    position_y DECIMAL(5, 2) NULL DEFAULT 50.0, -- Tọa độ hiển thị trục Y (%) trên bản đồ nông trại
     mo_ta_chi_tiet NVARCHAR(MAX) NULL,
     ngay_tao DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
     ngay_cap_nhat DATETIME2 NOT NULL DEFAULT SYSDATETIME()
@@ -297,6 +300,19 @@ CREATE TABLE dbo.LienHeTuVan (
 );
 GO
 
+-- 2.14 Bảng Thông Báo Hệ Thống (ThongBao)
+CREATE TABLE dbo.ThongBao (
+    ma_thong_bao INT IDENTITY(1,1) PRIMARY KEY,
+    ma_nguoi_dung INT NOT NULL FOREIGN KEY REFERENCES dbo.NguoiDung(ma_nguoi_dung) ON DELETE CASCADE,
+    tieu_de NVARCHAR(150) NOT NULL,
+    noi_dung NVARCHAR(500) NOT NULL,
+    loai_thong_bao VARCHAR(50) NOT NULL DEFAULT 'he_thong', -- 'thue_dat', 'phan_cong', 'nhat_ky', 'dich_vu', 'he_thong'
+    lien_ket VARCHAR(255) NULL,
+    da_doc BIT NOT NULL DEFAULT 0,
+    ngay_tao DATETIME2 NOT NULL DEFAULT SYSDATETIME()
+);
+GO
+
 -- ==============================================================================
 -- 3. CÁC CHỈ MỤC (INDEXES) TỐI ƯU HIỆU NĂNG TRUY VẤN
 -- ==============================================================================
@@ -308,6 +324,7 @@ CREATE INDEX IX_NhatKy_HopDong ON dbo.NhatKyCanhTac(ma_hop_dong);
 CREATE INDEX IX_YCDV_HopDong ON dbo.YeuCauDichVu(ma_hop_dong);
 CREATE INDEX IX_CayTrong_DanhMuc ON dbo.CayTrong(ma_danh_muc);
 CREATE INDEX IX_ThuHoach_HopDong ON dbo.ThuHoach(ma_hop_dong);
+CREATE INDEX IX_ThongBao_NguoiDung ON dbo.ThongBao(ma_nguoi_dung, da_doc);
 GO
 
 PRINT N'Tạo cấu trúc bảng PlotFarmDB thành công!';

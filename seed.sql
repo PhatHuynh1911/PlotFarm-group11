@@ -18,6 +18,7 @@ DELETE FROM dbo.ThuHoach;
 DELETE FROM dbo.YeuCauDichVu;
 DELETE FROM dbo.LoaiDichVu;
 DELETE FROM dbo.NhatKyCanhTac;
+DELETE FROM dbo.PhanCongNongDan;
 DELETE FROM dbo.HopDongThue;
 DELETE FROM dbo.CameraODat;
 DELETE FROM dbo.ODat;
@@ -150,6 +151,20 @@ VALUES
     N'Đất vừa được cày xới sâu và phơi ải diệt nấm, sẵn sàng gieo trồng ngay hôm nay.'
 );
 SET IDENTITY_INSERT dbo.ODat OFF;
+
+UPDATE dbo.ODat
+SET position_x = CASE so_hieu_o
+        WHEN 'A-01' THEN 18.0 WHEN 'A-02' THEN 35.0 WHEN 'A-03' THEN 52.0
+        WHEN 'A-04' THEN 69.0 WHEN 'A-05' THEN 84.0
+        WHEN 'B-05' THEN 25.0 WHEN 'B-06' THEN 45.0 WHEN 'B-07' THEN 65.0
+        WHEN 'C-09' THEN 22.0 WHEN 'C-10' THEN 50.0 WHEN 'C-11' THEN 78.0
+        ELSE position_x END,
+    position_y = CASE so_hieu_o
+        WHEN 'A-01' THEN 22.0 WHEN 'A-02' THEN 22.0 WHEN 'A-03' THEN 22.0
+        WHEN 'A-04' THEN 22.0 WHEN 'A-05' THEN 22.0
+        WHEN 'B-05' THEN 50.0 WHEN 'B-06' THEN 50.0 WHEN 'B-07' THEN 50.0
+        WHEN 'C-09' THEN 78.0 WHEN 'C-10' THEN 78.0 WHEN 'C-11' THEN 78.0
+        ELSE position_y END;
 GO
 
 -- ==============================================================================
@@ -285,6 +300,13 @@ VALUES
     N'Nhờ nhà vườn hỗ trợ thu hoạch và đóng gói chuyển về nhà định kỳ.'
 );
 SET IDENTITY_INSERT dbo.HopDongThue OFF;
+GO
+
+-- ==============================================================================
+-- 9.1 PHÂN CÔNG MẪU CHO NÔNG DÂN DEMO (Farmer demo = 2)
+-- ==============================================================================
+INSERT INTO dbo.PhanCongNongDan (ma_hop_dong, ma_nong_dan, ma_quan_tri, trang_thai, ghi_chu, ngay_gui, ngay_phan_hoi)
+VALUES (1, 2, 1, 'da_chap_nhan', N'Phân công mẫu cho nông dân demo', SYSDATETIME(), SYSDATETIME());
 GO
 
 -- ==============================================================================

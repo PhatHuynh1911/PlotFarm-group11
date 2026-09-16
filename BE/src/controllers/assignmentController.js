@@ -1,4 +1,5 @@
 const { sql, getPool } = require('../config/db');
+const { createNotification } = require('./notificationController');
 
 const getFarmers = async (req, res) => {
     try {
@@ -70,6 +71,21 @@ const createAssignment = async (req, res) => {
                     INSERT INTO PhanCongNongDan (ma_hop_dong, ma_nong_dan, ma_quan_tri, ghi_chu)
                     VALUES (@contractId, @farmerId, @adminId, @note);
             `);
+
+        // Bắn thông báo tự động cho Nông dân
+        const plotInfo = await pool.request()
+            .input('contractId', sql.Int, Number(ma_hop_dong))
+            .query(`SELECT o.so_hieu_o, o.ten_o_dat FROM HopDongThue h JOIN ODat o ON o.ma_o_dat = h.ma_o_dat WHERE h.ma_hop_dong = @contractId`);
+        const plotCode = plotInfo.recordset[0]?.so_hieu_o || `Hợp đồng #${ma_hop_dong}`;
+
+        createNotification(
+            ma_nong_dan,
+            `Phân công mới: Ô đất ${plotCode}`,
+            `Quản trị viên đã phân công bạn phụ trách canh tác ô đất ${plotCode}. Ghi chú: ${ghi_chu || 'Chăm sóc theo lịch'}.`,
+            'phan_cong',
+            '/farmer'
+        ).catch((err) => console.error('Lỗi bắn thông báo farmer:', err));
+
         return res.status(201).json({ success: true, message: 'Đã gửi yêu cầu phân công tới nông dân' });
     } catch (error) {
         console.error('Lỗi phân công nông dân:', error);

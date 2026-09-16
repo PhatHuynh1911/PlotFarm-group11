@@ -1,4 +1,5 @@
 const { sql, getPool } = require('../config/db');
+const { createNotification } = require('./notificationController');
 
 // Nông dân thêm bài viết nhật ký canh tác mới
 const createJournal = async (req, res) => {
@@ -29,8 +30,32 @@ const createJournal = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Vui lòng cung cấp mã hợp đồng (ma_hop_dong)' });
         }
 
+        const pool = await getPool();
+
         // Nông dân ghi: lấy từ user token nếu có, hoặc từ body, hoặc mặc định 2 (nông dân mẫu)
         const farmerId = req.user?.sub ? parseInt(req.user.sub, 10) : (ma_nong_dan ? parseInt(ma_nong_dan, 10) : 2);
+
+        if (req.user?.role === 'nong_dan') {
+            const accessCheck = await pool.request()
+                .input('ma_hop_dong', sql.Int, effectiveHopDong)
+                .input('ma_nong_dan', sql.Int, farmerId)
+                .query(`
+                    SELECT TOP 1 1 AS hasAccess
+                    FROM HopDongThue h
+                    INNER JOIN PhanCongNongDan p ON p.ma_hop_dong = h.ma_hop_dong
+                    WHERE h.ma_hop_dong = @ma_hop_dong
+                      AND h.trang_thai_hop_dong = 'hieu_luc'
+                      AND p.ma_nong_dan = @ma_nong_dan
+                      AND p.trang_thai = 'da_chap_nhan'
+                `);
+
+            if (!accessCheck.recordset[0]) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Bạn không có quyền ghi nhật ký cho hợp đồng này hoặc hợp đồng không còn hiệu lực.'
+                });
+            }
+        }
 
         // Công việc đã làm / tiêu đề
         const task = (cong_viec_da_lam || tieu_de || 'Chăm sóc định kỳ cây trồng').trim();
@@ -49,7 +74,6 @@ const createJournal = async (req, res) => {
         const stage = giai_doan_sinh_truong || 'Sinh trưởng';
         const fertilizer = loai_phan_bon_da_dung || loai_phan_bon || null;
 
-        const pool = await getPool();
         const result = await pool.request()
             .input('ma_hop_dong', sql.Int, effectiveHopDong)
             .input('ma_nong_dan', sql.Int, farmerId)
@@ -82,6 +106,35 @@ const createJournal = async (req, res) => {
             `);
 
         const created = result.recordset[0];
+
+        // Gửi thông báo tự động cho khách hàng đang thuê ô đất này
+        try {
+            const contractInfo = await pool.request()
+                .input('ma_hop_dong', sql.Int, effectiveHopDong)
+                .query(`
+                    SELECT h.ma_nguoi_dung, o.so_hieu_o, o.ten_o_dat, c.ten_cay_trong
+                    FROM HopDongThue h
+                    LEFT JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+                    LEFT JOIN CayTrong c ON c.ma_cay_trong = h.ma_cay_trong
+                    WHERE h.ma_hop_dong = @ma_hop_dong
+                `);
+            if (contractInfo.recordset.length > 0) {
+                const { ma_nguoi_dung, so_hieu_o, ten_o_dat, ten_cay_trong } = contractInfo.recordset[0];
+                if (ma_nguoi_dung) {
+                    const plotCode = so_hieu_o || ten_o_dat || `HĐ #${effectiveHopDong}`;
+                    const cropInfo = ten_cay_trong ? ` (${ten_cay_trong})` : '';
+                    createNotification(
+                        ma_nguoi_dung,
+                        `Nhật ký canh tác mới: Ô đất ${plotCode}`,
+                        `Nông dân vừa cập nhật nhật ký cho ô đất ${plotCode}${cropInfo}: "${task}".`,
+                        'nhat_ky',
+                        `/dashboard?tab=journal&rentalId=${effectiveHopDong}`
+                    ).catch(err => console.error('Lỗi bắn thông báo nhật ký:', err));
+                }
+            }
+        } catch (notifErr) {
+            console.error('Lỗi khi gửi thông báo cập nhật nhật ký:', notifErr);
+        }
 
         res.status(201).json({
             success: true,
@@ -142,8 +195,20 @@ const updateJournal = async (req, res) => {
         const { id } = req.params;
         const { giai_doan_sinh_truong, cong_viec_da_lam, loai_phan_bon_da_dung, ghi_chu_chi_tiet, danh_sach_hinh_anh, video_ghi_hinh } = req.body;
         const pool = await getPool();
+
+        const journalId = parseInt(id, 10);
+        const existing = await pool.request()
+            .input('id', sql.Int, journalId)
+            .query(`SELECT ma_hop_dong, ma_nong_dan FROM NhatKyCanhTac WHERE ma_nhat_ky = @id`);
+
+        if (!existing.recordset[0]) return res.status(404).json({ success: false, message: 'Không tìm thấy nhật ký' });
+
+        if (req.user?.role === 'nong_dan' && Number(existing.recordset[0].ma_nong_dan) !== Number(req.user.sub)) {
+            return res.status(403).json({ success: false, message: 'Bạn không có quyền chỉnh sửa nhật ký này' });
+        }
+
         const result = await pool.request()
-            .input('id', sql.Int, parseInt(id, 10))
+            .input('id', sql.Int, journalId)
             .input('stage', sql.NVarChar(50), giai_doan_sinh_truong || null)
             .input('task', sql.NVarChar(150), cong_viec_da_lam || null)
             .input('fertilizer', sql.NVarChar(150), loai_phan_bon_da_dung || null)
@@ -169,4 +234,28 @@ const updateJournal = async (req, res) => {
     }
 };
 
-module.exports = { createJournal, getJournalsByRental, updateJournal };
+const deleteJournal = async (req, res) => {
+    try {
+        const pool = await getPool();
+        const journalId = parseInt(req.params.id, 10);
+        const existing = await pool.request()
+            .input('id', sql.Int, journalId)
+            .query('SELECT ma_nong_dan FROM NhatKyCanhTac WHERE ma_nhat_ky = @id');
+
+        if (!existing.recordset[0]) return res.status(404).json({ success: false, message: 'Không tìm thấy nhật ký' });
+        if (req.user?.role === 'nong_dan' && Number(existing.recordset[0].ma_nong_dan) !== Number(req.user.sub)) {
+            return res.status(403).json({ success: false, message: 'Bạn không có quyền xóa nhật ký này' });
+        }
+
+        const result = await pool.request()
+            .input('id', sql.Int, journalId)
+            .query('DELETE FROM NhatKyCanhTac WHERE ma_nhat_ky = @id');
+        if (!result.rowsAffected[0]) return res.status(404).json({ success: false, message: 'Không tìm thấy nhật ký' });
+        return res.json({ success: true, message: 'Đã xóa nhật ký' });
+    } catch (error) {
+        console.error('Lỗi xóa nhật ký:', error);
+        return res.status(500).json({ success: false, message: 'Lỗi server nội bộ' });
+    }
+};
+
+module.exports = { createJournal, getJournalsByRental, updateJournal, deleteJournal };

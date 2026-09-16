@@ -1,5 +1,5 @@
 const { sql, getPool } = require('../config/db');
-
+ 
 // Lấy danh mục các loại dịch vụ chăm sóc
 const getServiceTypes = async (req, res) => {
     try {
@@ -7,7 +7,7 @@ const getServiceTypes = async (req, res) => {
         const result = await pool.request().query(`
             SELECT * FROM LoaiDichVu WHERE dang_hoat_dong = 1 ORDER BY ma_loai_dich_vu ASC
         `);
-
+ 
         res.status(200).json({
             success: true,
             count: result.recordset.length,
@@ -18,47 +18,77 @@ const getServiceTypes = async (req, res) => {
         res.status(500).json({ success: false, message: 'Lỗi server nội bộ' });
     }
 };
-
-// Khách hàng gửi yêu cầu dịch vụ chăm sóc
+ 
+// Khách hàng HOẶC Nông dân gửi yêu cầu dịch vụ / khiếu nại
+// - Khách hàng: gửi yêu cầu chăm sóc cho hợp đồng thuê của chính mình
+// - Nông dân: gửi khiếu nại/yêu cầu hộ cho hợp đồng mà mình đang được phân công phụ trách
 const createServiceRequest = async (req, res) => {
     try {
         const { ma_hop_dong, ma_loai_dich_vu, ngay_yeu_cau_thuc_hien, ghi_chu_cua_khach } = req.body;
-        const ma_khach_hang = Number(req.user.sub);
-
-        if (!ma_hop_dong || !ma_khach_hang || !ma_loai_dich_vu) {
-            return res.status(400).json({ success: false, message: 'Thiếu thông tin hợp đồng, khách hàng hoặc loại dịch vụ' });
+        const requesterId = Number(req.user.sub);
+        const requesterRole = req.user.role;
+ 
+        if (!ma_hop_dong || !ma_loai_dich_vu) {
+            return res.status(400).json({ success: false, message: 'Thiếu thông tin hợp đồng hoặc loại dịch vụ' });
         }
-
+ 
         const so_phieu = `YCDV-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
         const ngayThucHien = ngay_yeu_cau_thuc_hien || new Date().toISOString().split('T')[0];
-
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(ngayThucHien) || Number.isNaN(Date.parse(`${ngayThucHien}T00:00:00Z`))) {
+            return res.status(400).json({ success: false, message: 'Ngày thực hiện không hợp lệ' });
+        }
+ 
         const pool = await getPool();
-        const ownership = await pool.request()
-            .input('contractId', sql.Int, parseInt(ma_hop_dong, 10))
-            .input('customerId', sql.Int, parseInt(ma_khach_hang, 10))
-            .query(`
-                SELECT p.ma_nong_dan
-                FROM HopDongThue h
-                LEFT JOIN PhanCongNongDan p ON p.ma_hop_dong = h.ma_hop_dong AND p.trang_thai = 'da_chap_nhan'
-                WHERE h.ma_hop_dong = @contractId AND h.ma_nguoi_dung = @customerId AND h.trang_thai_hop_dong = 'hieu_luc'
-            `);
-        const contract = ownership.recordset[0];
-        if (!contract) return res.status(403).json({ success: false, message: 'Hợp đồng không thuộc tài khoản hoặc không còn hiệu lực' });
-        if (!contract.ma_nong_dan) return res.status(400).json({ success: false, message: 'Ô đất này chưa có nông dân nhận phân công' });
+        let ma_khach_hang;
+        let ma_nong_dan_phu_trach;
+ 
+        if (requesterRole === 'nong_dan') {
+            // Nông dân chỉ được gửi yêu cầu cho hợp đồng mình đang phụ trách
+            const ownership = await pool.request()
+                .input('contractId', sql.Int, parseInt(ma_hop_dong, 10))
+                .input('farmerId', sql.Int, requesterId)
+                .query(`
+                    SELECT h.ma_nguoi_dung AS ma_khach_hang
+                    FROM HopDongThue h
+                    JOIN PhanCongNongDan p ON p.ma_hop_dong = h.ma_hop_dong AND p.trang_thai = 'da_chap_nhan'
+                    WHERE h.ma_hop_dong = @contractId AND p.ma_nong_dan = @farmerId AND h.trang_thai_hop_dong = 'hieu_luc'
+                `);
+            const contract = ownership.recordset[0];
+            if (!contract) return res.status(403).json({ success: false, message: 'Bạn không được phân công phụ trách hợp đồng này hoặc hợp đồng không còn hiệu lực' });
+            ma_khach_hang = contract.ma_khach_hang;
+            ma_nong_dan_phu_trach = requesterId;
+        } else {
+            // Khách hàng gửi yêu cầu cho hợp đồng của chính mình
+            const ownership = await pool.request()
+                .input('contractId', sql.Int, parseInt(ma_hop_dong, 10))
+                .input('customerId', sql.Int, requesterId)
+                .query(`
+                    SELECT p.ma_nong_dan
+                    FROM HopDongThue h
+                    LEFT JOIN PhanCongNongDan p ON p.ma_hop_dong = h.ma_hop_dong AND p.trang_thai = 'da_chap_nhan'
+                    WHERE h.ma_hop_dong = @contractId AND h.ma_nguoi_dung = @customerId AND h.trang_thai_hop_dong = 'hieu_luc'
+                `);
+            const contract = ownership.recordset[0];
+            if (!contract) return res.status(403).json({ success: false, message: 'Hợp đồng không thuộc tài khoản hoặc không còn hiệu lực' });
+            if (!contract.ma_nong_dan) return res.status(400).json({ success: false, message: 'Ô đất này chưa có nông dân nhận phân công' });
+            ma_khach_hang = requesterId;
+            ma_nong_dan_phu_trach = contract.ma_nong_dan;
+        }
+ 
         const result = await pool.request()
             .input('so_phieu', sql.VarChar(50), so_phieu)
             .input('ma_hop_dong', sql.Int, parseInt(ma_hop_dong, 10))
-            .input('ma_khach_hang', sql.Int, parseInt(ma_khach_hang, 10))
+            .input('ma_khach_hang', sql.Int, ma_khach_hang)
             .input('ma_loai_dich_vu', sql.Int, parseInt(ma_loai_dich_vu, 10))
             .input('ngay_thuc_hien', sql.Date, ngayThucHien)
             .input('ghi_chu', sql.NVarChar(sql.MAX), ghi_chu_cua_khach || '')
-            .input('farmerId', sql.Int, contract.ma_nong_dan)
+            .input('farmerId', sql.Int, ma_nong_dan_phu_trach)
             .query(`
                 INSERT INTO YeuCauDichVu (so_phieu_yeu_cau, ma_hop_dong, ma_khach_hang, ma_loai_dich_vu, ma_nong_dan_phu_trach, ngay_yeu_cau_thuc_hien, ghi_chu_cua_khach, trang_thai_xu_ly)
                 OUTPUT INSERTED.*
                 VALUES (@so_phieu, @ma_hop_dong, @ma_khach_hang, @ma_loai_dich_vu, @farmerId, @ngay_thuc_hien, @ghi_chu, 'cho_tiep_nhan')
             `);
-
+ 
         res.status(201).json({
             success: true,
             message: 'Đã gửi yêu cầu chăm sóc thành công',
@@ -69,7 +99,7 @@ const createServiceRequest = async (req, res) => {
         res.status(500).json({ success: false, message: 'Lỗi server nội bộ' });
     }
 };
-
+ 
 // Lấy danh sách yêu cầu của khách hàng
 const getRequestsByUser = async (req, res) => {
     try {
@@ -88,7 +118,7 @@ const getRequestsByUser = async (req, res) => {
                 WHERE y.ma_khach_hang = @userId
                 ORDER BY y.ngay_gui_yeu_cau DESC
             `);
-
+ 
         res.status(200).json({
             success: true,
             count: result.recordset.length,
@@ -99,7 +129,7 @@ const getRequestsByUser = async (req, res) => {
         res.status(500).json({ success: false, message: 'Lỗi server nội bộ' });
     }
 };
-
+ 
 // Lấy toàn bộ yêu cầu (cho Nông dân & Admin)
 const getAllRequests = async (req, res) => {
     try {
@@ -124,7 +154,7 @@ const getAllRequests = async (req, res) => {
             WHERE 1 = 1 ${farmerFilter}
             ORDER BY y.ngay_gui_yeu_cau DESC
         `);
-
+ 
         res.status(200).json({
             success: true,
             count: result.recordset.length,
@@ -135,17 +165,17 @@ const getAllRequests = async (req, res) => {
         res.status(500).json({ success: false, message: 'Lỗi server nội bộ' });
     }
 };
-
+ 
 // Nông dân/Admin cập nhật trạng thái yêu cầu
 const updateRequestStatus = async (req, res) => {
     try {
         const { id } = req.params;
         const { status, ma_nong_dan_xu_ly, phan_hoi_cua_nong_dan, phan_hoi_cua_nha_vuon, hinh_anh_nghiem_thu, chi_phi_phat_sinh } = req.body;
-
+ 
         if (!['cho_tiep_nhan', 'da_tiep_nhan', 'dang_thuc_hien', 'hoan_thanh', 'tu_choi'].includes(status)) {
             return res.status(400).json({ success: false, message: 'Trạng thái yêu cầu không hợp lệ' });
         }
-
+ 
         const pool = await getPool();
         const access = await pool.request()
             .input('id', sql.Int, parseInt(id, 10))
@@ -168,7 +198,7 @@ const updateRequestStatus = async (req, res) => {
                     ngay_hoan_thanh = CASE WHEN @status = 'hoan_thanh' THEN SYSDATETIME() ELSE ngay_hoan_thanh END
                 WHERE ma_yeu_cau = @id
             `);
-
+ 
         res.status(200).json({
             success: true,
             message: 'Đã cập nhật trạng thái yêu cầu chăm sóc'
@@ -178,5 +208,6 @@ const updateRequestStatus = async (req, res) => {
         res.status(500).json({ success: false, message: 'Lỗi server nội bộ' });
     }
 };
-
+ 
 module.exports = { getServiceTypes, createServiceRequest, getRequestsByUser, getAllRequests, updateRequestStatus };
+ 
