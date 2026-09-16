@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-
+ 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const tabs = [
   ["overview", "Tổng quan"],
@@ -36,7 +36,7 @@ const labels = {
 const money = (value) => `${Number(value || 0).toLocaleString("vi-VN")} đ`;
 const date = (value) =>
   value ? new Date(value).toLocaleDateString("vi-VN") : "—";
-
+ 
 function AdminPage({ user, token, onLogout }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "overview";
@@ -53,7 +53,7 @@ function AdminPage({ user, token, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
   const [editingPlot, setEditingPlot] = useState(null);
-
+ 
   const selectTab = (tab) => {
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
@@ -62,7 +62,7 @@ function AdminPage({ user, token, onLogout }) {
       return next;
     });
   };
-
+ 
   const load = useCallback(async () => {
     try {
       const endpoints = [
@@ -70,7 +70,7 @@ function AdminPage({ user, token, onLogout }) {
         "users",
         "plots",
         "rentals",
-        "requests",
+        "YeuCauDichVu",
         "farmers",
         "assignments",
       ];
@@ -108,7 +108,7 @@ function AdminPage({ user, token, onLogout }) {
   useEffect(() => {
     load();
   }, [load]);
-
+ 
   const update = async (path, method, body) => {
     const isFormData = body instanceof FormData;
     const response = await fetch(`${API_URL}/admin/${path}`, {
@@ -129,7 +129,7 @@ function AdminPage({ user, token, onLogout }) {
       status: item.status === "hoat_dong" ? "bi_khoa" : "hoat_dong",
     }).catch((e) => setError(e.message));
   const updateRequest = (item, value) =>
-    update(`requests/${item.id}`, "PATCH", { status: value, source: item.source }).catch((e) =>
+    update(`YeuCauDichVu/${item.id}`, "PUT", { status: value, source: item.source }).catch((e) =>
       setError(e.message),
     );
   const savePlot = async (event) => {
@@ -152,7 +152,7 @@ function AdminPage({ user, token, onLogout }) {
       setError(e.message);
     }
   };
-
+ 
   const stats = data.stats || {};
   return (
     <main className="dashboard-page admin-workspace">
@@ -255,7 +255,7 @@ function AdminPage({ user, token, onLogout }) {
     </main>
   );
 }
-
+ 
 function Overview({ stats }) {
   const cards = [
     ["availablePlots", "Ô đất đang trống", "Sẵn sàng cho thuê"],
@@ -317,7 +317,7 @@ function Overview({ stats }) {
     </>
   );
 }
-
+ 
 function UserList({ items, onToggleStatus }) {
   return (
     <section className="admin-card">
@@ -373,7 +373,7 @@ function UserList({ items, onToggleStatus }) {
     </section>
   );
 }
-
+ 
 function UserManagement({ items, onUpdate, onCreate }) {
   return (
     <div className="admin-two-column">
@@ -412,7 +412,7 @@ function UserManagement({ items, onUpdate, onCreate }) {
     </div>
   );
 }
-
+ 
 function Users({ items, onUpdate }) {
   return (
     <section className="admin-card">
@@ -483,7 +483,7 @@ function Users({ items, onUpdate }) {
     </section>
   );
 }
-
+ 
 function Plots({ items, editingPlot, setEditingPlot, onSubmit, onCancel }) {
   return (
     <div className="admin-two-column">
@@ -608,7 +608,7 @@ function Plots({ items, editingPlot, setEditingPlot, onSubmit, onCancel }) {
     </div>
   );
 }
-
+ 
 function AssignmentPanel({ items, farmers, assignments, onAssign }) {
   const activeItems = items.filter((item) => item.status === "hieu_luc");
   const [selectedContract, setSelectedContract] = useState("");
@@ -616,7 +616,7 @@ function AssignmentPanel({ items, farmers, assignments, onAssign }) {
   const currentAssignment = assignments.find(
     (item) => item.ma_hop_dong === Number(selectedContract),
   );
-
+ 
   const submit = (event) => {
     event.preventDefault();
     if (!selectedContract || !selectedFarmer) return;
@@ -627,7 +627,7 @@ function AssignmentPanel({ items, farmers, assignments, onAssign }) {
     setSelectedContract("");
     setSelectedFarmer("");
   };
-
+ 
   return (
     <div className="admin-two-column">
       <section className="admin-card assignment-panel">
@@ -718,7 +718,7 @@ function AssignmentPanel({ items, farmers, assignments, onAssign }) {
     </div>
   );
 }
-
+ 
 function Rentals({ items, assignments }) {
   return (
     <section className="admin-card">
@@ -772,7 +772,7 @@ function Rentals({ items, assignments }) {
     </section>
   );
 }
-
+ 
 function Requests({ items, onUpdate }) {
   return (
     <section className="admin-card">
@@ -811,5 +811,6 @@ function Requests({ items, onUpdate }) {
     </section>
   );
 }
-
+ 
 export default AdminPage;
+ 

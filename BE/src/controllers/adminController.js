@@ -1,5 +1,5 @@
 const { sql, getPool } = require('../config/db');
-
+ 
 const dashboard = async (req, res) => {
     try {
         const pool = await getPool();
@@ -33,7 +33,7 @@ const dashboard = async (req, res) => {
         return res.status(500).json({ success: false, message: 'Không thể tải báo cáo quản trị' });
     }
 };
-
+ 
 const users = async (req, res) => {
     try {
         const pool = await getPool();
@@ -45,7 +45,7 @@ const users = async (req, res) => {
         return res.json({ success: true, data: result.recordset });
     } catch (error) { return res.status(500).json({ success: false, message: 'Không thể tải danh sách người dùng' }); }
 };
-
+ 
 const updateUser = async (req, res) => {
     try {
         const { status } = req.body;
@@ -58,7 +58,7 @@ const updateUser = async (req, res) => {
         return res.json({ success: true, message: 'Đã cập nhật tài khoản' });
     } catch (error) { return res.status(500).json({ success: false, message: 'Không thể cập nhật tài khoản' }); }
 };
-
+ 
 const formatAdminPlot = (row) => {
     const rawImage = row.hinh_anh_o_dat || row.image_url || row.image || null;
     const posX = row.position_x != null ? Number(row.position_x) : 50.0;
@@ -81,7 +81,7 @@ const formatAdminPlot = (row) => {
         description: row.mo_ta_chi_tiet || row.description || ''
     };
 };
-
+ 
 const plots = async (req, res) => {
     try {
         const pool = await getPool();
@@ -99,7 +99,7 @@ const plots = async (req, res) => {
         return res.status(500).json({ success: false, message: 'Không thể tải danh sách ô đất' }); 
     }
 };
-
+ 
 const createPlot = async (req, res) => {
     try {
         const { farmId, code, name, area, price, status = 'trong', description = '', position_x, position_y } = req.body;
@@ -110,7 +110,7 @@ const createPlot = async (req, res) => {
         const image = req.file ? `/uploads/${req.file.filename}` : (req.body.image || req.body.image_url || req.body.hinh_anh_o_dat || null);
         const posX = position_x != null ? Number(position_x) : 50.0;
         const posY = position_y != null ? Number(position_y) : 50.0;
-
+ 
         const result = await pool.request()
             .input('farmId', sql.Int, Number(farmId))
             .input('code', sql.VarChar(20), code)
@@ -127,7 +127,7 @@ const createPlot = async (req, res) => {
                 OUTPUT INSERTED.*
                 VALUES (@farmId, @code, @name, @area, @price, @status, @image, @posX, @posY, @description)
             `);
-
+ 
         const newPlot = formatAdminPlot(result.recordset[0]);
         return res.status(201).json({ success: true, message: 'Đã thêm ô đất', data: newPlot });
     } catch (error) { 
@@ -135,13 +135,13 @@ const createPlot = async (req, res) => {
         return res.status(500).json({ success: false, message: 'Không thể thêm ô đất' }); 
     }
 };
-
+ 
 const updatePlot = async (req, res) => {
     try {
         const { code, name, area, price, status, description = '', position_x, position_y } = req.body;
         const pool = await getPool();
         const image = req.file ? `/uploads/${req.file.filename}` : (req.body.image || req.body.image_url || req.body.hinh_anh_o_dat || null);
-
+ 
         const request = pool.request()
             .input('id', sql.Int, Number(req.params.id))
             .input('code', sql.VarChar(20), code)
@@ -153,7 +153,7 @@ const updatePlot = async (req, res) => {
             .input('posX', sql.Decimal(5, 2), position_x != null ? Number(position_x) : null)
             .input('posY', sql.Decimal(5, 2), position_y != null ? Number(position_y) : null)
             .input('description', sql.NVarChar(sql.MAX), description);
-
+ 
         const result = await request.query(`
             UPDATE ODat 
             SET so_hieu_o = COALESCE(@code, so_hieu_o),
@@ -169,11 +169,11 @@ const updatePlot = async (req, res) => {
             OUTPUT INSERTED.*
             WHERE ma_o_dat = @id
         `);
-
+ 
         if (result.recordset.length === 0) {
             return res.status(404).json({ success: false, message: 'Không tìm thấy ô đất' });
         }
-
+ 
         const updatedPlot = formatAdminPlot(result.recordset[0]);
         return res.json({ success: true, message: 'Đã cập nhật ô đất', data: updatedPlot });
     } catch (error) { 
@@ -181,7 +181,7 @@ const updatePlot = async (req, res) => {
         return res.status(500).json({ success: false, message: 'Không thể cập nhật ô đất' }); 
     }
 };
-
+ 
 const rentals = async (req, res) => {
     try {
         const pool = await getPool();
@@ -195,7 +195,7 @@ const rentals = async (req, res) => {
         return res.json({ success: true, data: result.recordset });
     } catch (error) { return res.status(500).json({ success: false, message: 'Không thể tải đơn thuê' }); }
 };
-
+ 
 const requests = async (req, res) => {
     try {
         const pool = await getPool();
@@ -213,14 +213,14 @@ const requests = async (req, res) => {
                        l.ngay_gui AS createdAt, l.trang_thai_lien_he AS status, l.noi_dung_tu_van AS note,
                        l.ho_va_ten AS customer, N'Tư vấn miễn phí' AS service,
                        COALESCE(o.so_hieu_o, N'Khách vãng lai') AS plot, 'contact' AS source
-                FROM LienHeTuVan l LEFT JOIN ODat o ON o.ma_o_dat = l.ma_o_dat_quan_tam
+                FROM LienHeTuVan l LEFT JOIN ODat o ON o.so_hieu_o = l.so_hieu_o_quan_tam
             `)
         ]);
         const data = [...services.recordset, ...contacts.recordset].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         return res.json({ success: true, data });
     } catch (error) { return res.status(500).json({ success: false, message: 'Không thể tải yêu cầu chăm sóc' }); }
 };
-
+ 
 const updateRequest = async (req, res) => {
     try {
         const { status, source = 'service' } = req.body;
@@ -235,5 +235,5 @@ const updateRequest = async (req, res) => {
         return res.json({ success: true, message: 'Đã cập nhật yêu cầu' });
     } catch (error) { return res.status(500).json({ success: false, message: 'Không thể cập nhật yêu cầu' }); }
 };
-
+ 
 module.exports = { dashboard, users, updateUser, plots, createPlot, updatePlot, rentals, requests, updateRequest };

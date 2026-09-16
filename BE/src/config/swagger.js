@@ -1,5 +1,5 @@
 const swaggerUi = require('swagger-ui-express');
-
+ 
 const swaggerSpec = {
     openapi: '3.0.0',
     info: {
@@ -112,7 +112,7 @@ const swaggerSpec = {
                 }
             }
         },
-
+ 
         // --- 2. PLOTS ---
         '/api/plots': {
             get: {
@@ -162,7 +162,7 @@ const swaggerSpec = {
                 }
             }
         },
-
+ 
         // --- 3. CROPS ---
         '/api/crops': {
             get: {
@@ -185,7 +185,7 @@ const swaggerSpec = {
                 }
             }
         },
-
+ 
         // --- 4. RENTALS ---
         '/api/rentals': {
             get: {
@@ -245,7 +245,7 @@ const swaggerSpec = {
                 }
             }
         },
-
+ 
         // --- 5. JOURNALS ---
         '/api/journals': {
             post: {
@@ -289,7 +289,7 @@ const swaggerSpec = {
                 }
             }
         },
-
+ 
         // --- 6. SERVICES ---
         '/api/services/types': {
             get: {
@@ -376,7 +376,7 @@ const swaggerSpec = {
                 }
             }
         },
-
+ 
         // --- 7. CAMERAS ---
         '/api/camera/stream/{plotId}': {
             get: {
@@ -402,7 +402,7 @@ const swaggerSpec = {
                 }
             }
         },
-
+ 
         // --- 8. CONTACT ---
         '/api/contact': {
             post: {
@@ -419,7 +419,7 @@ const swaggerSpec = {
                                     ho_va_ten: { type: 'string', example: 'Trần Văn Nam' },
                                     so_dien_thoai: { type: 'string', example: '0905123456' },
                                     email: { type: 'string', example: 'namtran@gmail.com' },
-                                    ma_o_dat_quan_tam: { type: 'integer', example: 1 },
+                                    so_hieu_o_quan_tam: { type: 'string', example: 'A-01' },
                                     noi_dung_tu_van: { type: 'string', example: 'Tôi quan tâm ô đất 24m² để trồng dâu tây' }
                                 }
                             }
@@ -440,7 +440,7 @@ const swaggerSpec = {
                 }
             }
         },
-
+ 
         // --- 9. ADMIN ---
         '/api/admin/dashboard': {
             get: {
@@ -606,7 +606,7 @@ const swaggerSpec = {
         }
     }
 };
-
+ 
 const setupSwagger = (app) => {
     app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
         customSiteTitle: 'PlotFarm Group 11 API Docs',
@@ -615,5 +615,6 @@ const setupSwagger = (app) => {
     app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
     console.log('📖 Swagger Documentation đang chạy tại http://localhost:5000/api-docs');
 };
-
+ 
 module.exports = { setupSwagger, swaggerSpec };
+ 
