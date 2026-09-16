@@ -104,6 +104,23 @@ export async function submitContact(payload) {
   return apiRequest('/contact', { method: 'POST', body: JSON.stringify(payload) })
 }
 
+export async function uploadJournalMedia(file, token) {
+  if (!file) throw new Error('Vui lòng chọn tệp để tải lên')
+
+  const formData = new FormData()
+  formData.append('image', file)
+
+  const response = await fetch(`${API_URL}/upload`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  })
+
+  const result = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(result.message || 'Không thể tải lên tệp')
+  return result.data.url
+}
+
 export async function createJournal(payload, token) {
   return apiRequest('/journals', { method: 'POST', body: JSON.stringify(payload), token })
 }

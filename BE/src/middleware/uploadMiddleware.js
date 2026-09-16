@@ -20,19 +20,21 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|webp|gif/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = file.mimetype.startsWith('image/') || allowedTypes.test(file.mimetype);
+    const allowedImageTypes = /jpeg|jpg|png|webp|gif/;
+    const allowedVideoTypes = /mp4|mov|webm|avi|mkv/;
+    const ext = path.extname(file.originalname).toLowerCase();
+    const extname = allowedImageTypes.test(ext) || allowedVideoTypes.test(ext);
+    const mimetype = file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/') || allowedImageTypes.test(file.mimetype) || allowedVideoTypes.test(file.mimetype);
 
     if (extname || mimetype) {
         return cb(null, true);
     }
-    cb(new Error('Chỉ chấp nhận tệp hình ảnh (jpg, jpeg, png, webp, gif)!'));
+    cb(new Error('Chỉ chấp nhận tệp hình ảnh hoặc video!'));
 };
 
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // Tối đa 5MB
+    limits: { fileSize: 10 * 1024 * 1024 }, // Tối đa 10MB
     fileFilter: fileFilter
 });
 

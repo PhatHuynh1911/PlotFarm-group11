@@ -30,13 +30,34 @@ const requestStatus = {
 };
 
 function journalImages(item) {
-  try {
-    return Array.isArray(item.danh_sach_hinh_anh)
-      ? item.danh_sach_hinh_anh
-      : JSON.parse(item.danh_sach_hinh_anh || "[]");
-  } catch {
-    return item.hinh_anh ? [item.hinh_anh] : [];
+  const raw = item?.danh_sach_hinh_anh ?? item?.hinh_anh ?? "[]";
+
+  if (Array.isArray(raw)) return raw.filter(Boolean);
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed.filter(Boolean);
+      if (typeof parsed === "string" && parsed.trim()) return [parsed];
+    } catch {
+      // raw may be a single URL or comma-separated list
+      if (trimmed.startsWith("http") || trimmed.startsWith("/") || trimmed.startsWith("data:")) {
+        return [trimmed];
+      }
+      return trimmed
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean);
+    }
+    return [trimmed];
   }
+
+  if (typeof raw === "object" && raw !== null) {
+    return Object.values(raw).filter(Boolean);
+  }
+
+  return [];
 }
 
 function UserPage({ user, token, onLogout }) {
@@ -94,7 +115,12 @@ function UserPage({ user, token, onLogout }) {
           nextServiceRequests,
         ]) => {
           setRentals(nextRentals);
-          setSelectedCareRental(String(nextRentals[0]?.ma_hop_dong || ""));
+          const assignedRentals = nextRentals.filter(
+            (rental) => rental.trang_thai_phan_cong === "da_chap_nhan",
+          );
+          setSelectedCareRental(
+            String(assignedRentals[0]?.ma_hop_dong || ""),
+          );
           setSelectedJournalRental(String(nextRentals[0]?.ma_hop_dong || ""));
           setAvailablePlots(
             nextPlots.filter((plot) => plot.status === "trong"),
@@ -386,11 +412,16 @@ function UserPage({ user, token, onLogout }) {
               onChange={(event) => setSelectedJournalRental(event.target.value)}
               aria-label="Chọn ô đất xem nhật ký"
             >
-              {rentals.map((rental) => (
+              {rentals
+                .filter(
+                  (rental) =>
+                    rental.trang_thai_phan_cong === "da_chap_nhan",
+                )
+                .map((rental) => (
                 <option key={rental.ma_hop_dong} value={rental.ma_hop_dong}>
                   {rental.so_hieu_o} · {rental.ten_o_dat}
                 </option>
-              ))}
+                ))}
             </select>
             <span className="result-count">
               {selectedJournals.length} cập nhật
@@ -436,7 +467,7 @@ function UserPage({ user, token, onLogout }) {
                     </div>
                     {images[0] && (
                       <img
-                        src={images[0]}
+                        src={resolveImageUrl(images[0])}
                         alt={`Nhật ký ${item.tieu_de || ""}`}
                       />
                     )}
@@ -486,7 +517,13 @@ function UserPage({ user, token, onLogout }) {
                 </option>
               ))}
             </select>
-            <input name="schedule" required placeholder="Thời gian mong muốn" />
+            <input
+              name="schedule"
+              type="date"
+              required
+              min={new Date().toISOString().split("T")[0]}
+              aria-label="Ngày mong muốn thực hiện"
+            />
             <textarea
               name="note"
               required

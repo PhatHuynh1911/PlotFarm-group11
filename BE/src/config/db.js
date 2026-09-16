@@ -92,6 +92,20 @@ const connectDB = async () => {
                     CONSTRAINT UQ_PhanCongNongDan_HopDong_Farmer UNIQUE (ma_hop_dong, ma_nong_dan)
                 );
             END
+
+            IF NOT EXISTS (
+                SELECT 1
+                FROM dbo.PhanCongNongDan p
+                INNER JOIN dbo.HopDongThue h ON h.ma_hop_dong = p.ma_hop_dong
+                WHERE p.ma_nong_dan = 2 AND h.trang_thai_hop_dong = 'hieu_luc'
+            )
+            BEGIN
+                INSERT INTO dbo.PhanCongNongDan (ma_hop_dong, ma_nong_dan, ma_quan_tri, trang_thai, ghi_chu, ngay_gui, ngay_phan_hoi)
+                SELECT TOP 1 h.ma_hop_dong, 2, 1, 'da_chap_nhan', N'Phân công mẫu cho nông dân demo', SYSDATETIME(), SYSDATETIME()
+                FROM dbo.HopDongThue h
+                WHERE h.trang_thai_hop_dong = 'hieu_luc'
+                ORDER BY h.ma_hop_dong;
+            END
         `);
         console.log(`✅ Kết nối SQL Server thành công: [${process.env.DB_NAME || 'PlotFarmDB'}] tại ${serverVal}`);
     } catch (error) {

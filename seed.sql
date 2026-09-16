@@ -18,6 +18,7 @@ DELETE FROM dbo.ThuHoach;
 DELETE FROM dbo.YeuCauDichVu;
 DELETE FROM dbo.LoaiDichVu;
 DELETE FROM dbo.NhatKyCanhTac;
+DELETE FROM dbo.PhanCongNongDan;
 DELETE FROM dbo.HopDongThue;
 DELETE FROM dbo.CameraODat;
 DELETE FROM dbo.ODat;
@@ -299,6 +300,13 @@ VALUES
     N'Nhờ nhà vườn hỗ trợ thu hoạch và đóng gói chuyển về nhà định kỳ.'
 );
 SET IDENTITY_INSERT dbo.HopDongThue OFF;
+GO
+
+-- ==============================================================================
+-- 9.1 PHÂN CÔNG MẪU CHO NÔNG DÂN DEMO (Farmer demo = 2)
+-- ==============================================================================
+INSERT INTO dbo.PhanCongNongDan (ma_hop_dong, ma_nong_dan, ma_quan_tri, trang_thai, ghi_chu, ngay_gui, ngay_phan_hoi)
+VALUES (1, 2, 1, 'da_chap_nhan', N'Phân công mẫu cho nông dân demo', SYSDATETIME(), SYSDATETIME());
 GO
 
 -- ==============================================================================

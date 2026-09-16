@@ -15,6 +15,8 @@ import {
   updateJournal,
   deleteJournal,
   updateCultivationStatus,
+  uploadJournalMedia,
+  resolveImageUrl,
 } from "../api.js";
 
 const requestLabels = {
@@ -209,10 +211,24 @@ function FarmerPage({ user, onLogout }) {
   const submitJournal = async (event) => {
     event.preventDefault();
     if (!journalForm.note.trim()) return;
+    if (!plots.length) {
+      const message = "Bạn chưa được phân công chăm sóc ô đất nào.";
+      setError(message);
+      notify(message, "error");
+      return;
+    }
+
     try {
       const targetPlot =
         plots.find((p) => p.id === journalForm.plot) || plots[0];
-      const rentalId = targetPlot?.rentalId || 1;
+      const rentalId = Number(targetPlot?.rentalId);
+      if (!rentalId) {
+        const message = "Không xác định được hợp đồng canh tác cho ô đất này.";
+        setError(message);
+        notify(message, "error");
+        return;
+      }
+
       const journalPayload = {
         ma_hop_dong: rentalId,
         ma_nong_dan: user.id,
@@ -257,20 +273,32 @@ function FarmerPage({ user, onLogout }) {
     }
   };
 
-  const handlePhoto = (event) => {
+  const handlePhoto = async (event) => {
     const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = () =>
-        setJournalForm((prev) => ({ ...prev, photo: reader.result }));
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    try {
+      const uploadedUrl = await uploadJournalMedia(file, token);
+      setJournalForm((prev) => ({ ...prev, photo: uploadedUrl }));
+      notify("Ảnh đã tải lên và sẵn sàng gửi.");
+    } catch (uploadError) {
+      setError(uploadError.message);
+      notify(uploadError.message, "error");
     }
   };
 
-  const handleVideo = (event) => {
+  const handleVideo = async (event) => {
     const file = event.target.files?.[0];
-    if (file)
-      setJournalForm((prev) => ({ ...prev, video: URL.createObjectURL(file) }));
+    if (!file) return;
+
+    try {
+      const uploadedUrl = await uploadJournalMedia(file, token);
+      setJournalForm((prev) => ({ ...prev, video: uploadedUrl }));
+      notify("Video đã tải lên và sẵn sàng gửi.");
+    } catch (uploadError) {
+      setError(uploadError.message);
+      notify(uploadError.message, "error");
+    }
   };
 
   const confirmPlanting = async (plot) => {
@@ -682,7 +710,10 @@ function FarmerPage({ user, onLogout }) {
                   onChange={handlePhoto}
                 />
                 {journalForm.photo && (
-                  <img src={journalForm.photo} alt="Ảnh xem trước nhật ký" />
+                  <img
+                    src={resolveImageUrl(journalForm.photo)}
+                    alt="Ảnh xem trước nhật ký"
+                  />
                 )}
               </label>
               <label>
@@ -737,7 +768,7 @@ function FarmerPage({ user, onLogout }) {
                     </div>
                     {entry.photo && (
                       <img
-                        src={entry.photo}
+                        src={resolveImageUrl(entry.photo)}
                         alt="Ảnh cây trồng trong nhật ký"
                       />
                     )}
@@ -784,7 +815,7 @@ function FarmerPage({ user, onLogout }) {
                     {request.photo && (
                       <img
                         className="request-proof"
-                        src={request.photo}
+                        src={resolveImageUrl(request.photo)}
                         alt="Ảnh phản hồi yêu cầu"
                       />
                     )}

@@ -31,6 +31,9 @@ const createServiceRequest = async (req, res) => {
 
         const so_phieu = `YCDV-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
         const ngayThucHien = ngay_yeu_cau_thuc_hien || new Date().toISOString().split('T')[0];
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(ngayThucHien) || Number.isNaN(Date.parse(`${ngayThucHien}T00:00:00Z`))) {
+            return res.status(400).json({ success: false, message: 'Ngày thực hiện không hợp lệ' });
+        }
 
         const pool = await getPool();
         const ownership = await pool.request()
