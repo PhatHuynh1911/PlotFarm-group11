@@ -192,4 +192,4 @@ const getAdminDashboard = async (req, res) => {
     }
 };
 
-module.exports = { login, register, getMe, getAdminDashboard };
+module.exports = { login, register, getMe, updateMe, getAdminDashboard };
