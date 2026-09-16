@@ -5,21 +5,25 @@ const createContact = async (req, res) => {
     try {
         const { ho_va_ten, so_dien_thoai, email, ma_o_dat_quan_tam, noi_dung_tu_van } = req.body;
 
-        if (!ho_va_ten || !so_dien_thoai) {
+        const phone = String(so_dien_thoai || '').replace(/[.\s()-]/g, '');
+        if (!ho_va_ten || !phone) {
             return res.status(400).json({ success: false, message: 'Vui lòng cung cấp họ tên và số điện thoại liên hệ' });
+        }
+        if (!/^(?:\+84|0)(?:3|5|7|8|9)\d{8}$/.test(phone)) {
+            return res.status(400).json({ success: false, message: 'Số điện thoại chưa hợp lệ' });
         }
 
         const pool = await getPool();
         const result = await pool.request()
             .input('ho_va_ten', sql.NVarChar(100), ho_va_ten.trim())
-            .input('so_dien_thoai', sql.VarChar(20), so_dien_thoai.trim())
+            .input('so_dien_thoai', sql.VarChar(20), phone)
             .input('email', sql.VarChar(150), email ? email.trim().toLowerCase() : null)
             .input('ma_o_dat', sql.Int, ma_o_dat_quan_tam ? parseInt(ma_o_dat_quan_tam, 10) : null)
             .input('noi_dung', sql.NVarChar(sql.MAX), noi_dung_tu_van || '')
             .query(`
-                INSERT INTO LienHeTuVan (ho_va_ten, so_dien_thoai, email, ma_o_dat_quan_tam, noi_dung_tu_van, trang_thai_xu_ly)
+                INSERT INTO LienHeTuVan (ho_va_ten, so_dien_thoai, email, ma_o_dat_quan_tam, noi_dung_tu_van, trang_thai_lien_he)
                 OUTPUT INSERTED.*
-                VALUES (@ho_va_ten, @so_dien_thoai, @email, @ma_o_dat, @noi_dung, 'chua_lien_he')
+                VALUES (@ho_va_ten, @so_dien_thoai, @email, @ma_o_dat, @noi_dung, 'moi')
             `);
 
         res.status(201).json({

@@ -26,6 +26,12 @@ const labels = {
     hoan_thanh: "Hoàn thành",
     tu_choi: "Từ chối",
   },
+  contactStatus: {
+    moi: "Mới",
+    da_lien_he: "Đã liên hệ",
+    thanh_cong: "Thành công",
+    that_bai: "Không liên hệ được",
+  },
 };
 const money = (value) => `${Number(value || 0).toLocaleString("vi-VN")} đ`;
 const date = (value) =>
@@ -123,7 +129,7 @@ function AdminPage({ user, token, onLogout }) {
       status: item.status === "hoat_dong" ? "bi_khoa" : "hoat_dong",
     }).catch((e) => setError(e.message));
   const updateRequest = (item, value) =>
-    update(`requests/${item.id}`, "PATCH", { status: value }).catch((e) =>
+    update(`requests/${item.id}`, "PATCH", { status: value, source: item.source }).catch((e) =>
       setError(e.message),
     );
   const savePlot = async (event) => {
@@ -793,7 +799,7 @@ function Requests({ items, onUpdate }) {
               value={item.status}
               onChange={(e) => onUpdate(item, e.target.value)}
             >
-              {Object.entries(labels.requestStatus).map(([value, label]) => (
+              {Object.entries(item.source === "contact" ? labels.contactStatus : labels.requestStatus).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
                 </option>

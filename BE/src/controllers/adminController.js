@@ -199,25 +199,39 @@ const rentals = async (req, res) => {
 const requests = async (req, res) => {
     try {
         const pool = await getPool();
-        const result = await pool.request().query(`
-            SELECT y.ma_yeu_cau AS id, y.so_phieu_yeu_cau AS code, y.ngay_yeu_cau_thuc_hien AS scheduledAt,
-                   y.trang_thai_xu_ly AS status, y.ghi_chu_cua_khach AS note, u.ho_va_ten AS customer,
-                   d.ten_dich_vu AS service, o.so_hieu_o AS plot
-            FROM YeuCauDichVu y JOIN NguoiDung u ON u.ma_nguoi_dung = y.ma_khach_hang
-            LEFT JOIN LoaiDichVu d ON d.ma_loai_dich_vu = y.ma_loai_dich_vu
-            JOIN HopDongThue h ON h.ma_hop_dong = y.ma_hop_dong JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
-            ORDER BY y.ngay_gui_yeu_cau DESC
-        `);
-        return res.json({ success: true, data: result.recordset });
+        const [services, contacts] = await Promise.all([
+            pool.request().query(`
+                SELECT y.ma_yeu_cau AS id, y.so_phieu_yeu_cau AS code, y.ngay_yeu_cau_thuc_hien AS scheduledAt,
+                       y.ngay_gui_yeu_cau AS createdAt, y.trang_thai_xu_ly AS status, y.ghi_chu_cua_khach AS note,
+                       u.ho_va_ten AS customer, d.ten_dich_vu AS service, o.so_hieu_o AS plot, 'service' AS source
+                FROM YeuCauDichVu y JOIN NguoiDung u ON u.ma_nguoi_dung = y.ma_khach_hang
+                LEFT JOIN LoaiDichVu d ON d.ma_loai_dich_vu = y.ma_loai_dich_vu
+                JOIN HopDongThue h ON h.ma_hop_dong = y.ma_hop_dong JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+            `),
+            pool.request().query(`
+                SELECT l.ma_lien_he AS id, CONCAT('TV-', l.ma_lien_he) AS code, l.ngay_gui AS scheduledAt,
+                       l.ngay_gui AS createdAt, l.trang_thai_lien_he AS status, l.noi_dung_tu_van AS note,
+                       l.ho_va_ten AS customer, N'Tư vấn miễn phí' AS service,
+                       COALESCE(o.so_hieu_o, N'Khách vãng lai') AS plot, 'contact' AS source
+                FROM LienHeTuVan l LEFT JOIN ODat o ON o.ma_o_dat = l.ma_o_dat_quan_tam
+            `)
+        ]);
+        const data = [...services.recordset, ...contacts.recordset].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        return res.json({ success: true, data });
     } catch (error) { return res.status(500).json({ success: false, message: 'Không thể tải yêu cầu chăm sóc' }); }
 };
 
 const updateRequest = async (req, res) => {
     try {
-        const { status } = req.body;
-        if (!['cho_tiep_nhan', 'da_tiep_nhan', 'dang_thuc_hien', 'hoan_thanh', 'tu_choi'].includes(status)) return res.status(400).json({ success: false, message: 'Trạng thái yêu cầu không hợp lệ' });
+        const { status, source = 'service' } = req.body;
         const pool = await getPool();
-        await pool.request().input('id', sql.Int, Number(req.params.id)).input('status', sql.VarChar(20), status).query(`UPDATE YeuCauDichVu SET trang_thai_xu_ly = @status, ngay_hoan_thanh = CASE WHEN @status = 'hoan_thanh' THEN SYSDATETIME() ELSE ngay_hoan_thanh END WHERE ma_yeu_cau = @id`);
+        if (source === 'contact') {
+            if (!['moi', 'da_lien_he', 'thanh_cong', 'that_bai'].includes(status)) return res.status(400).json({ success: false, message: 'Trạng thái liên hệ không hợp lệ' });
+            await pool.request().input('id', sql.Int, Number(req.params.id)).input('status', sql.VarChar(20), status).query(`UPDATE LienHeTuVan SET trang_thai_lien_he = @status, ngay_cap_nhat = SYSDATETIME() WHERE ma_lien_he = @id`);
+        } else {
+            if (!['cho_tiep_nhan', 'da_tiep_nhan', 'dang_thuc_hien', 'hoan_thanh', 'tu_choi'].includes(status)) return res.status(400).json({ success: false, message: 'Trạng thái yêu cầu không hợp lệ' });
+            await pool.request().input('id', sql.Int, Number(req.params.id)).input('status', sql.VarChar(20), status).query(`UPDATE YeuCauDichVu SET trang_thai_xu_ly = @status, ngay_hoan_thanh = CASE WHEN @status = 'hoan_thanh' THEN SYSDATETIME() ELSE ngay_hoan_thanh END WHERE ma_yeu_cau = @id`);
+        }
         return res.json({ success: true, message: 'Đã cập nhật yêu cầu' });
     } catch (error) { return res.status(500).json({ success: false, message: 'Không thể cập nhật yêu cầu' }); }
 };
