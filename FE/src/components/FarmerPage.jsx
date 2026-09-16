@@ -17,6 +17,7 @@ import {
   updateCultivationStatus,
   uploadJournalMedia,
   resolveImageUrl,
+  updateCurrentUser,
 } from "../api.js";
 
 const requestLabels = {
@@ -333,9 +334,27 @@ function FarmerPage({ user, onLogout }) {
   const activeRequests = requests.filter(
     (request) => request.status !== "hoan_thanh",
   ).length;
-  const saveProfile = (nextUser) => {
-    sessionStorage.setItem("plotfarm_user", JSON.stringify(nextUser));
-    window.location.reload();
+  const saveProfile = async (nextUser) => {
+    try {
+      const currentAuth = JSON.parse(sessionStorage.getItem("plotfarm_auth") || "{}");
+      const updated = await updateCurrentUser(
+        {
+          name: nextUser.name,
+          email: nextUser.email,
+          phone: nextUser.phone,
+        },
+        token,
+      );
+      const mergedUser = { ...currentAuth.user, ...updated.data, ...nextUser };
+      sessionStorage.setItem(
+        "plotfarm_auth",
+        JSON.stringify({ ...currentAuth, user: mergedUser }),
+      );
+      sessionStorage.setItem("plotfarm_user", JSON.stringify(mergedUser));
+      window.location.reload();
+    } catch (saveError) {
+      notify(saveError.message, "error");
+    }
   };
 
   return (

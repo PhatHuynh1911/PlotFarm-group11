@@ -10,6 +10,7 @@ import {
   getUserServiceRequests,
   PLOT_PLACEHOLDER_IMAGE,
   resolveImageUrl,
+  updateCurrentUser,
 } from "../api.js";
 import AccountMenu from "./AccountMenu.jsx";
 import ProfilePanel from "./ProfilePanel.jsx";
@@ -1002,17 +1003,28 @@ function UserPage({ user, token, onLogout }) {
         {activeTab === "profile" && (
           <ProfilePanel
             user={user}
-            onSave={(nextUser) => {
-              sessionStorage.setItem(
-                "plotfarm_auth",
-                JSON.stringify({
-                  ...JSON.parse(
-                    sessionStorage.getItem("plotfarm_auth") || "{}",
-                  ),
-                  user: nextUser,
-                }),
-              );
-              window.location.reload();
+            onSave={async (nextUser) => {
+              try {
+                const currentAuth = JSON.parse(
+                  sessionStorage.getItem("plotfarm_auth") || "{}",
+                );
+                const updated = await updateCurrentUser(
+                  {
+                    name: nextUser.name,
+                    email: nextUser.email,
+                    phone: nextUser.phone,
+                  },
+                  token,
+                );
+                const mergedUser = { ...currentAuth.user, ...updated.data, ...nextUser };
+                sessionStorage.setItem(
+                  "plotfarm_auth",
+                  JSON.stringify({ ...currentAuth, user: mergedUser }),
+                );
+                window.location.reload();
+              } catch (saveError) {
+                notify(saveError.message, "error");
+              }
             }}
           />
         )}

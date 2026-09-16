@@ -155,3 +155,12 @@ export async function getUserServiceRequests(userId, token) {
   const result = await apiRequest(`/services/user/${userId}`, { token })
   return result.data
 }
+
+export async function updateCurrentUser(payload, token) {
+  const result = await apiRequest('/auth/me', {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+    token,
+  })
+  return result
+}

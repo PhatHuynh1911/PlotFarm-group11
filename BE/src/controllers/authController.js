@@ -114,6 +114,67 @@ const getMe = async (req, res) => {
     }
 };
 
+const updateMe = async (req, res) => {
+    try {
+        const userId = req.user?.sub;
+        const { name, email, phone } = req.body || {};
+
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'Phiên đăng nhập không hợp lệ' });
+        }
+
+        const nextName = String(name || '').trim();
+        const nextEmail = String(email || '').trim().toLowerCase();
+        const nextPhone = phone == null || phone === '' ? null : String(phone).trim();
+
+        if (!nextName || !nextEmail) {
+            return res.status(400).json({ success: false, message: 'Họ tên và email không được để trống' });
+        }
+
+        const pool = await getPool();
+        const duplicate = await pool.request()
+            .input('email', sql.VarChar(150), nextEmail)
+            .input('userId', sql.Int, Number(userId))
+            .query(`SELECT ma_nguoi_dung FROM NguoiDung WHERE email = @email AND ma_nguoi_dung <> @userId`);
+
+        if (duplicate.recordset.length > 0) {
+            return res.status(409).json({ success: false, message: 'Email này đã được sử dụng bởi tài khoản khác' });
+        }
+
+        await pool.request()
+            .input('id', sql.Int, Number(userId))
+            .input('name', sql.NVarChar(100), nextName)
+            .input('email', sql.VarChar(150), nextEmail)
+            .input('phone', sql.VarChar(20), nextPhone)
+            .query(`
+                UPDATE NguoiDung
+                SET ho_va_ten = @name,
+                    email = @email,
+                    so_dien_thoai = @phone,
+                    ngay_cap_nhat = SYSDATETIME()
+                WHERE ma_nguoi_dung = @id
+            `);
+
+        const result = await pool.request()
+            .input('userId', sql.Int, Number(userId))
+            .query(`SELECT ma_nguoi_dung, ho_va_ten, email, vai_tro, so_dien_thoai, anh_dai_dien, trang_thai FROM NguoiDung WHERE ma_nguoi_dung = @userId`);
+
+        const user = result.recordset[0];
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy người dùng sau khi cập nhật' });
+        }
+
+        return res.json({
+            success: true,
+            message: 'Cập nhật hồ sơ thành công',
+            data: publicUser(user)
+        });
+    } catch (error) {
+        console.error('Lỗi cập nhật thông tin cá nhân:', error);
+        return res.status(500).json({ success: false, message: 'Không thể cập nhật thông tin cá nhân' });
+    }
+};
+
 const getAdminDashboard = async (req, res) => {
     try {
         const pool = await getPool();
