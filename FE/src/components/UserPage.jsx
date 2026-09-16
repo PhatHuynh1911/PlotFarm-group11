@@ -763,7 +763,14 @@ function UserPage({ user, token, onLogout }) {
             <div className="user-plot-grid">
               {filteredPlots.map((plot) => (
                 <article className="user-plot-card" key={plot.id}>
-                  <div className="plot-card-art">
+                  <div
+                    className="plot-card-art"
+                    style={{
+                      backgroundImage: `url("${resolveImageUrl(
+                        plot.image || plot.image_url || plot.hinh_anh_o_dat || PLOT_PLACEHOLDER_IMAGE,
+                      )}")`,
+                    }}
+                  >
                     <span>TRỐNG</span>
                     <strong>{plot.code}</strong>
                   </div>
