@@ -111,6 +111,23 @@ const connectDB = async () => {
                 WHERE h.trang_thai_hop_dong = 'hieu_luc'
                 ORDER BY h.ma_hop_dong;
             END
+
+            IF OBJECT_ID('dbo.KhieuNai', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.KhieuNai (
+                    ma_khieu_nai INT IDENTITY(1,1) PRIMARY KEY,
+                    ma_hop_dong INT NOT NULL FOREIGN KEY REFERENCES dbo.HopDongThue(ma_hop_dong) ON DELETE CASCADE,
+                    ma_khach_hang INT NOT NULL FOREIGN KEY REFERENCES dbo.NguoiDung(ma_nguoi_dung),
+                    ma_o_dat INT NULL FOREIGN KEY REFERENCES dbo.ODat(ma_o_dat),
+                    tieu_de NVARCHAR(200) NOT NULL,
+                    mo_ta_chi_tiet NVARCHAR(1000) NOT NULL,
+                    trang_thai_khieu_nai VARCHAR(30) NOT NULL DEFAULT 'dang_tiep_nhan',
+                    phan_hoi_admin NVARCHAR(1000) NULL,
+                    ma_admin_xu_ly INT NULL FOREIGN KEY REFERENCES dbo.NguoiDung(ma_nguoi_dung),
+                    ngay_gui DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+                    ngay_cap_nhat DATETIME2 NOT NULL DEFAULT SYSDATETIME()
+                );
+            END
         `);
         console.log(`✅ Kết nối SQL Server thành công: [${process.env.DB_NAME || 'PlotFarmDB'}] tại ${serverVal}`);
     } catch (error) {

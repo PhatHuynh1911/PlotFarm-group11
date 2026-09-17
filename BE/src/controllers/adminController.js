@@ -229,6 +229,55 @@ const requests = async (req, res) => {
     } catch (error) { return res.status(500).json({ success: false, message: 'Không thể tải yêu cầu chăm sóc' }); }
 };
 
+// Các API riêng cho ba tab quản lý yêu cầu ở Admin.
+const serviceRequests = async (req, res) => {
+    try {
+        const pool = await getPool();
+        const result = await pool.request().query(`
+            SELECT y.ma_yeu_cau AS id, y.so_phieu_yeu_cau AS code, y.ngay_yeu_cau_thuc_hien AS scheduledAt,
+                   y.ngay_gui_yeu_cau AS createdAt, y.trang_thai_xu_ly AS status, y.ghi_chu_cua_khach AS note,
+                   u.ho_va_ten AS customer, d.ten_dich_vu AS service, o.so_hieu_o AS plot, 'service' AS source
+            FROM YeuCauDichVu y JOIN NguoiDung u ON u.ma_nguoi_dung = y.ma_khach_hang
+            LEFT JOIN LoaiDichVu d ON d.ma_loai_dich_vu = y.ma_loai_dich_vu
+            JOIN HopDongThue h ON h.ma_hop_dong = y.ma_hop_dong JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+            ORDER BY y.ngay_gui_yeu_cau DESC
+        `);
+        return res.json({ success: true, data: result.recordset });
+    } catch (error) { return res.status(500).json({ success: false, message: 'Không thể tải yêu cầu chăm sóc' }); }
+};
+
+const complaintRequests = async (req, res) => {
+    try {
+        const pool = await getPool();
+        const result = await pool.request().query(`
+            SELECT k.ma_khieu_nai AS id, CONCAT('KN-', k.ma_khieu_nai) AS code, k.ngay_gui AS scheduledAt,
+                   k.ngay_gui AS createdAt, k.trang_thai_khieu_nai AS status, k.mo_ta_chi_tiet AS note,
+                   u.ho_va_ten AS customer, k.tieu_de AS service,
+                   COALESCE(o.so_hieu_o, N'Ô đất đang xem xét') AS plot, 'complaint' AS source
+            FROM KhieuNai k JOIN NguoiDung u ON u.ma_nguoi_dung = k.ma_khach_hang
+            LEFT JOIN ODat o ON o.ma_o_dat = k.ma_o_dat
+            ORDER BY k.ngay_gui DESC
+        `);
+        return res.json({ success: true, data: result.recordset });
+    } catch (error) { return res.status(500).json({ success: false, message: 'Không thể tải khiếu nại và tranh chấp' }); }
+};
+
+const consultationRequests = async (req, res) => {
+    try {
+        const pool = await getPool();
+        const result = await pool.request().query(`
+            SELECT l.ma_lien_he AS id, CONCAT('TV-', l.ma_lien_he) AS code, l.ngay_gui AS scheduledAt,
+                   l.ngay_gui AS createdAt, l.trang_thai_lien_he AS status, l.noi_dung_tu_van AS note,
+                   l.ho_va_ten AS customer, l.so_dien_thoai AS phone, l.email,
+                   N'Tư vấn miễn phí' AS service, COALESCE(l.so_hieu_o_quan_tam, N'Khách vãng lai') AS plot,
+                   'contact' AS source
+            FROM LienHeTuVan l
+            ORDER BY l.ngay_gui DESC
+        `);
+        return res.json({ success: true, data: result.recordset });
+    } catch (error) { return res.status(500).json({ success: false, message: 'Không thể tải yêu cầu tư vấn' }); }
+};
+
 const updateRequest = async (req, res) => {
     try {
         const { status, source = 'service' } = req.body;
@@ -247,4 +296,4 @@ const updateRequest = async (req, res) => {
     } catch (error) { return res.status(500).json({ success: false, message: 'Không thể cập nhật yêu cầu' }); }
 };
 
-module.exports = { dashboard, users, updateUser, plots, createPlot, updatePlot, rentals, requests, updateRequest };
+module.exports = { dashboard, users, updateUser, plots, createPlot, updatePlot, rentals, requests, serviceRequests, complaintRequests, consultationRequests, updateRequest };
