@@ -212,8 +212,8 @@ const requests = async (req, res) => {
                 SELECT l.ma_lien_he AS id, CONCAT('TV-', l.ma_lien_he) AS code, l.ngay_gui AS scheduledAt,
                        l.ngay_gui AS createdAt, l.trang_thai_lien_he AS status, l.noi_dung_tu_van AS note,
                        l.ho_va_ten AS customer, N'Tư vấn miễn phí' AS service,
-                       COALESCE(o.so_hieu_o, N'Khách vãng lai') AS plot, 'contact' AS source
-                FROM LienHeTuVan l LEFT JOIN ODat o ON o.ma_o_dat = l.ma_o_dat_quan_tam
+                       COALESCE(l.so_hieu_o_quan_tam, N'Khách vãng lai') AS plot, 'contact' AS source
+                FROM LienHeTuVan l
             `)
         ]);
         const data = [...services.recordset, ...contacts.recordset].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
