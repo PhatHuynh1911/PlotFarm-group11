@@ -2,6 +2,7 @@ const sql = require('mssql');
 require('dotenv').config();
 
 const serverVal = process.env.DB_SERVER || 'localhost';
+const configuredPort = process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : null;
 let dbConfig;
 
 if (serverVal.includes('\\')) {
@@ -26,13 +27,14 @@ if (serverVal.includes('\\')) {
         options: {
             encrypt: false,
             trustServerCertificate: true,
-            instanceName: process.env.DB_INSTANCE || undefined
+            // Khi dùng TCP port cố định, không để instance từ biến môi trường cũ ghi đè.
+            instanceName: configuredPort ? undefined : (process.env.DB_INSTANCE || undefined)
         }
     };
 }
 
-if (process.env.DB_PORT) {
-    dbConfig.port = parseInt(process.env.DB_PORT, 10);
+if (configuredPort) {
+    dbConfig.port = configuredPort;
 }
 
 let pool = null;
@@ -57,7 +59,10 @@ const connectDB = async () => {
             BEGIN
                 ALTER TABLE dbo.ODat ADD position_y DECIMAL(5, 2) NULL CONSTRAINT DF_ODat_PositionY DEFAULT 50.0;
             END
+        `);
 
+        // Chạy ở batch mới: SQL Server chỉ nhận diện cột vừa ALTER sau khi batch trước hoàn tất.
+        await activePool.request().query(`
             UPDATE dbo.ODat
             SET position_x = CASE so_hieu_o
                     WHEN 'A-01' THEN 18.0 WHEN 'A-02' THEN 35.0 WHEN 'A-03' THEN 52.0
