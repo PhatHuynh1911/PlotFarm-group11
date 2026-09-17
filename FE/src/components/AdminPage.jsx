@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { getComplaintTagByTitle } from "../data/complaintCategories.js";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const tabs = [
@@ -820,6 +821,17 @@ function Requests({ groups, onUpdate }) {
               <strong>
                 {item.service || "Yêu cầu chăm sóc"} · {item.plot}
               </strong>
+              {activeRequestTab === "complaint" && (() => {
+                const tag = getComplaintTagByTitle(item.service);
+                return (
+                  <span
+                    className="status-pill"
+                    style={{ background: tag.background, color: tag.color, marginLeft: 8 }}
+                  >
+                    {tag.text}
+                  </span>
+                );
+              })()}
               <span>
                 {item.customer}{item.phone ? ` · ${item.phone}` : ""} · {activeRequestTab === "contact" ? "đăng ký" : "lịch"} {date(item.scheduledAt)}
               </span>

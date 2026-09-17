@@ -17,6 +17,7 @@ import {
 import AccountMenu from "./AccountMenu.jsx";
 import ProfilePanel from "./ProfilePanel.jsx";
 import { notify } from "./ToastProvider.jsx";
+import { COMPLAINT_CATEGORIES, OTHER_COMPLAINT_OPTION } from "../data/complaintCategories.js";
 
 const formatMoney = (value) =>
   `${new Intl.NumberFormat("vi-VN").format(value)}đ`;
@@ -95,6 +96,7 @@ function UserPage({ user, token, onLogout }) {
   const [complaintForm, setComplaintForm] = useState({
     ma_hop_dong: "",
     ma_o_dat: "",
+    category: "",
     tieu_de: "",
     mo_ta_chi_tiet: "",
   });
@@ -277,6 +279,7 @@ function UserPage({ user, token, onLogout }) {
       setComplaintForm({
         ma_hop_dong: "",
         ma_o_dat: "",
+        category: "",
         tieu_de: "",
         mo_ta_chi_tiet: "",
       });
@@ -654,13 +657,42 @@ function UserPage({ user, token, onLogout }) {
                 </option>
               ))}
             </select>
-            <input
-              type="text"
-              value={complaintForm.tieu_de}
-              onChange={(event) => setComplaintForm((current) => ({ ...current, tieu_de: event.target.value }))}
-              placeholder="Tiêu đề khiếu nại"
+            <select
+              value={complaintForm.category}
+              onChange={(event) => {
+                const selected = event.target.value;
+                const matched = COMPLAINT_CATEGORIES
+                  .flatMap((group) => group.options)
+                  .find((option) => option.value === selected);
+                setComplaintForm((current) => ({
+                  ...current,
+                  category: selected,
+                  tieu_de: matched ? matched.label : "",
+                }));
+              }}
               required
-            />
+            >
+              <option value="">Chọn loại vấn đề cần khiếu nại</option>
+              {COMPLAINT_CATEGORIES.map((group) => (
+                <optgroup key={group.groupLabel} label={group.groupLabel}>
+                  {group.options.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+              <option value={OTHER_COMPLAINT_OPTION.value}>{OTHER_COMPLAINT_OPTION.label}</option>
+            </select>
+            {complaintForm.category === OTHER_COMPLAINT_OPTION.value && (
+              <input
+                type="text"
+                value={complaintForm.tieu_de}
+                onChange={(event) => setComplaintForm((current) => ({ ...current, tieu_de: event.target.value }))}
+                placeholder="Nhập tiêu đề khiếu nại của bạn"
+                required
+              />
+            )}
             <textarea
               value={complaintForm.mo_ta_chi_tiet}
               onChange={(event) => setComplaintForm((current) => ({ ...current, mo_ta_chi_tiet: event.target.value }))}
