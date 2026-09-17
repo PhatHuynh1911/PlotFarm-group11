@@ -12,6 +12,7 @@ GO
 -- ==============================================================================
 -- 1. DỌN SẠCH DỮ LIỆU CŨ THEO ĐÚNG THỨ TỰ KHÓA NGOẠI
 -- ==============================================================================
+DELETE FROM dbo.KhieuNai;
 DELETE FROM dbo.LienHeTuVan;
 DELETE FROM dbo.GiaoHang;
 DELETE FROM dbo.ThuHoach;
@@ -426,6 +427,24 @@ VALUES
     'moi'
 );
 SET IDENTITY_INSERT dbo.LienHeTuVan OFF;
+GO
+
+SET IDENTITY_INSERT dbo.KhieuNai ON;
+INSERT INTO dbo.KhieuNai (ma_khieu_nai, ma_hop_dong, ma_khach_hang, ma_o_dat, tieu_de, mo_ta_chi_tiet, trang_thai_khieu_nai)
+VALUES 
+(
+    1, 1, 3, 3,
+    N'Camera giám sát không hoạt động',
+    N'Hệ thống camera ở ô A-03 mất kết nối từ sáng nay và tôi không thể theo dõi vườn. Nông dân phụ trách chưa phản hồi, cần admin xử lý ngay.',
+    'dang_tiep_nhan'
+),
+(
+    2, 2, 3, 7,
+    N'Tranh chấp về thời gian chăm sóc',
+    N'Tôi đã yêu cầu tưới thêm và bón phân cho ô C-09 nhưng lịch chăm sóc không được thực hiện đúng theo thỏa thuận. Xin admin xem xét và giải quyết.',
+    'dang_tiep_nhan'
+);
+SET IDENTITY_INSERT dbo.KhieuNai OFF;
 GO
 
 PRINT N'Nạp toàn bộ dữ liệu mẫu (seed.sql) đồng bộ thành công!';

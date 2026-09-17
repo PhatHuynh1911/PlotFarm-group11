@@ -8,6 +8,8 @@ import {
   getServiceTypes,
   getUserRentals,
   getUserServiceRequests,
+  getUserComplaints,
+  submitComplaint,
   PLOT_PLACEHOLDER_IMAGE,
   resolveImageUrl,
   updateCurrentUser,
@@ -67,6 +69,7 @@ function UserPage({ user, token, onLogout }) {
   const [availablePlots, setAvailablePlots] = useState([]);
   const [serviceTypes, setServiceTypes] = useState([]);
   const [serviceRequests, setServiceRequests] = useState([]);
+  const [complaints, setComplaints] = useState([]);
   const [journals, setJournals] = useState([]);
   const [selectedJournalRental, setSelectedJournalRental] = useState("");
   const [loading, setLoading] = useState(true);
@@ -89,6 +92,12 @@ function UserPage({ user, token, onLogout }) {
   const [supportSent, setSupportSent] = useState(false);
   const [harvestSent, setHarvestSent] = useState(false);
   const [selectedCareRental, setSelectedCareRental] = useState("");
+  const [complaintForm, setComplaintForm] = useState({
+    ma_hop_dong: "",
+    ma_o_dat: "",
+    tieu_de: "",
+    mo_ta_chi_tiet: "",
+  });
 
   const selectTab = (tab) => {
     setSearchParams((current) => {
@@ -107,6 +116,7 @@ function UserPage({ user, token, onLogout }) {
       getPlots(),
       getServiceTypes(),
       getUserServiceRequests(user.id, token),
+      getUserComplaints(user.id, token),
     ])
       .then(
         async ([
@@ -114,6 +124,7 @@ function UserPage({ user, token, onLogout }) {
           nextPlots,
           nextServiceTypes,
           nextServiceRequests,
+          nextComplaints,
         ]) => {
           setRentals(nextRentals);
           const assignedRentals = nextRentals.filter(
@@ -128,6 +139,7 @@ function UserPage({ user, token, onLogout }) {
           );
           setServiceTypes(nextServiceTypes);
           setServiceRequests(nextServiceRequests);
+          setComplaints(nextComplaints);
           const grouped = await Promise.all(
             nextRentals.map((rental) =>
               getJournalsByRental(rental.ma_hop_dong, token).catch(() => []),
@@ -241,6 +253,34 @@ function UserPage({ user, token, onLogout }) {
       setServiceRequests(await getUserServiceRequests(user.id, token));
       setSupportSent(true);
       showNotice("Đã gửi yêu cầu chăm sóc tới đội ngũ PlotFarm.");
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  };
+
+  const handleComplaintSubmit = async (event) => {
+    event.preventDefault();
+    setError("");
+    try {
+      if (!complaintForm.ma_hop_dong || !complaintForm.tieu_de || !complaintForm.mo_ta_chi_tiet) {
+        throw new Error("Vui lòng điền đầy đủ thông tin khiếu nại");
+      }
+
+      await submitComplaint({
+        ma_hop_dong: Number(complaintForm.ma_hop_dong),
+        ma_o_dat: complaintForm.ma_o_dat ? Number(complaintForm.ma_o_dat) : null,
+        tieu_de: complaintForm.tieu_de,
+        mo_ta_chi_tiet: complaintForm.mo_ta_chi_tiet,
+      }, token);
+
+      setComplaints(await getUserComplaints(user.id, token));
+      setComplaintForm({
+        ma_hop_dong: "",
+        ma_o_dat: "",
+        tieu_de: "",
+        mo_ta_chi_tiet: "",
+      });
+      showNotice("Đã gửi khiếu nại tới Admin. Chúng tôi sẽ xử lý sớm.");
     } catch (requestError) {
       setError(requestError.message);
     }
@@ -484,108 +524,193 @@ function UserPage({ user, token, onLogout }) {
 
   if (activeTab === "support")
     return workspace(
-      <section className="dashboard-panel support-history-panel">
-        <div className="support-intro">
-          <p className="eyebrow">YÊU CẦU CHĂM SÓC</p>
-          <h2>Gửi yêu cầu và theo dõi xử lý</h2>
-          <p>
-            Yêu cầu được chuyển trực tiếp đến nông dân phụ trách ô đất của bạn.
-          </p>
-        </div>
-        {!supportSent && (
-          <form className="care-form" onSubmit={submitSupport}>
+      <div className="support-two-column">
+        <section className="dashboard-panel support-history-panel">
+          <div className="support-intro">
+            <p className="eyebrow">YÊU CẦU CHĂM SÓC</p>
+            <h2>Gửi yêu cầu và theo dõi xử lý</h2>
+            <p>
+              Yêu cầu được chuyển trực tiếp đến nông dân phụ trách ô đất của bạn.
+            </p>
+          </div>
+          {!supportSent && (
+            <form className="care-form" onSubmit={submitSupport}>
+              <select
+                name="rentalId"
+                value={selectedCareRental}
+                onChange={(event) => setSelectedCareRental(event.target.value)}
+                required
+              >
+                <option value="">Chọn ô đất</option>
+                {rentals.map((rental) => (
+                  <option key={rental.ma_hop_dong} value={rental.ma_hop_dong}>
+                    {rental.so_hieu_o} · {rental.ten_o_dat}
+                  </option>
+                ))}
+              </select>
+              <select name="serviceType" required>
+                <option value="">Chọn loại hỗ trợ</option>
+                {serviceTypes.map((service) => (
+                  <option
+                    key={service.ma_loai_dich_vu}
+                    value={service.ma_loai_dich_vu}
+                  >
+                    {service.ten_dich_vu}
+                  </option>
+                ))}
+              </select>
+              <input
+                name="schedule"
+                type="date"
+                required
+                min={new Date().toISOString().split("T")[0]}
+                aria-label="Ngày mong muốn thực hiện"
+              />
+              <textarea
+                name="note"
+                required
+                placeholder="Mô tả tình trạng hoặc ghi chú cho nông dân"
+              />
+              <button className="primary-button" type="submit">
+                Gửi yêu cầu <span>→</span>
+              </button>
+            </form>
+          )}
+          <div className="service-history">
+            <div className="panel-heading">
+              <div>
+                <p className="eyebrow">SERVICE REQUEST HISTORY</p>
+                <h2>Lịch sử yêu cầu dịch vụ</h2>
+              </div>
+            </div>
+            {serviceRequests.length === 0 ? (
+              <p className="empty-state">Bạn chưa gửi yêu cầu chăm sóc nào.</p>
+            ) : (
+              serviceRequests.map((request) => (
+                <article
+                  className={`service-history-card status-${request.trang_thai_xu_ly}`}
+                  key={request.ma_yeu_cau}
+                >
+                  <div className="request-heading">
+                    <div>
+                      <strong>
+                        {request.so_hieu_o} · {request.ten_dich_vu}
+                      </strong>
+                      <p>
+                        {formatDate(request.ngay_gui_yeu_cau)} · Nông dân:{" "}
+                        {request.ten_nong_dan_xu_ly || "Chưa có"}
+                      </p>
+                    </div>
+                    <span>
+                      {requestStatus[request.trang_thai_xu_ly] || request.trang_thai_xu_ly}
+                    </span>
+                  </div>
+                  {request.ghi_chu_cua_khach && <p>{request.ghi_chu_cua_khach}</p>}
+                  {request.phan_hoi_cua_nha_vuon && (
+                    <div className="farmer-reply">
+                      <b>Phản hồi từ nông dân</b>
+                      <p>{request.phan_hoi_cua_nha_vuon}</p>
+                    </div>
+                  )}
+                  {request.hinh_anh_nghiem_thu && (
+                    <img
+                      className="service-reply-image"
+                      src={resolveImageUrl(request.hinh_anh_nghiem_thu)}
+                      alt="Ảnh phản hồi yêu cầu"
+                    />
+                  )}
+                </article>
+              ))
+            )}
+          </div>
+        </section>
+
+        <section className="dashboard-panel complaint-panel">
+          <div className="support-intro">
+            <p className="eyebrow">KHIẾU NẠI / TRÁNH CHẤP</p>
+            <h2>Gửi vấn đề cần Admin can thiệp</h2>
+            <p>
+              Dùng khi có sự cố nghiêm trọng như camera mất kết nối, cây chết, hoặc tranh chấp hợp đồng.
+            </p>
+          </div>
+          <form className="care-form" onSubmit={handleComplaintSubmit}>
             <select
-              name="rentalId"
-              value={selectedCareRental}
-              onChange={(event) => setSelectedCareRental(event.target.value)}
+              value={complaintForm.ma_hop_dong}
+              onChange={(event) => {
+                const selected = event.target.value;
+                const rental = rentals.find((item) => String(item.ma_hop_dong) === String(selected));
+                setComplaintForm((current) => ({
+                  ...current,
+                  ma_hop_dong: selected,
+                  ma_o_dat: rental ? String(rental.ma_o_dat ?? '') : '',
+                }));
+              }}
               required
             >
-              <option value="">Chọn ô đất</option>
+              <option value="">Chọn hợp đồng liên quan</option>
               {rentals.map((rental) => (
                 <option key={rental.ma_hop_dong} value={rental.ma_hop_dong}>
                   {rental.so_hieu_o} · {rental.ten_o_dat}
                 </option>
               ))}
             </select>
-            <select name="serviceType" required>
-              <option value="">Chọn loại hỗ trợ</option>
-              {serviceTypes.map((service) => (
-                <option
-                  key={service.ma_loai_dich_vu}
-                  value={service.ma_loai_dich_vu}
-                >
-                  {service.ten_dich_vu}
-                </option>
-              ))}
-            </select>
             <input
-              name="schedule"
-              type="date"
+              type="text"
+              value={complaintForm.tieu_de}
+              onChange={(event) => setComplaintForm((current) => ({ ...current, tieu_de: event.target.value }))}
+              placeholder="Tiêu đề khiếu nại"
               required
-              min={new Date().toISOString().split("T")[0]}
-              aria-label="Ngày mong muốn thực hiện"
             />
             <textarea
-              name="note"
+              value={complaintForm.mo_ta_chi_tiet}
+              onChange={(event) => setComplaintForm((current) => ({ ...current, mo_ta_chi_tiet: event.target.value }))}
+              placeholder="Mô tả chi tiết vấn đề cần Admin xử lý"
+              rows="5"
               required
-              placeholder="Mô tả tình trạng hoặc ghi chú cho nông dân"
             />
-            <button className="primary-button">
-              Gửi yêu cầu <span>→</span>
+            <button className="primary-button" type="submit">
+              Gửi khiếu nại <span>→</span>
             </button>
           </form>
-        )}
-        <div className="service-history">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">SERVICE REQUEST HISTORY</p>
-              <h2>Lịch sử yêu cầu dịch vụ</h2>
+
+          <div className="service-history">
+            <div className="panel-heading">
+              <div>
+                <p className="eyebrow">COMPLAINT HISTORY</p>
+                <h2>Lịch sử khiếu nại</h2>
+              </div>
             </div>
+            {complaints.length === 0 ? (
+              <p className="empty-state">Bạn chưa gửi khiếu nại nào.</p>
+            ) : (
+              complaints.map((item) => (
+                <article key={item.ma_khieu_nai} className="service-history-card status-pending">
+                  <div className="request-heading">
+                    <div>
+                      <strong>{item.tieu_de}</strong>
+                      <p>{formatDate(item.ngay_gui)} · {item.so_hieu_o || 'Ô đất liên quan'}</p>
+                    </div>
+                    <span>
+                      {item.trang_thai_khieu_nai === 'dang_tiep_nhan'
+                        ? 'Đang tiếp nhận'
+                        : item.trang_thai_khieu_nai === 'da_giai_quyet'
+                          ? 'Đã giải quyết'
+                          : 'Từ chối'}
+                    </span>
+                  </div>
+                  <p>{item.mo_ta_chi_tiet}</p>
+                  {item.phan_hoi_admin && (
+                    <div className="farmer-reply">
+                      <b>Phản hồi Admin</b>
+                      <p>{item.phan_hoi_admin}</p>
+                    </div>
+                  )}
+                </article>
+              ))
+            )}
           </div>
-          {serviceRequests.length === 0 ? (
-            <p className="empty-state">Bạn chưa gửi yêu cầu chăm sóc nào.</p>
-          ) : (
-            serviceRequests.map((request) => (
-              <article
-                className={`service-history-card status-${request.trang_thai_xu_ly}`}
-                key={request.ma_yeu_cau}
-              >
-                <div className="request-heading">
-                  <div>
-                    <strong>
-                      {request.so_hieu_o} · {request.ten_dich_vu}
-                    </strong>
-                    <p>
-                      {formatDate(request.ngay_gui_yeu_cau)} · Nông dân:{" "}
-                      {request.ten_nong_dan_xu_ly || "Chưa có"}
-                    </p>
-                  </div>
-                  <span>
-                    {requestStatus[request.trang_thai_xu_ly] ||
-                      request.trang_thai_xu_ly}
-                  </span>
-                </div>
-                {request.ghi_chu_cua_khach && (
-                  <p>{request.ghi_chu_cua_khach}</p>
-                )}
-                {request.phan_hoi_cua_nha_vuon && (
-                  <div className="farmer-reply">
-                    <b>Phản hồi từ nông dân</b>
-                    <p>{request.phan_hoi_cua_nha_vuon}</p>
-                  </div>
-                )}
-                {request.hinh_anh_nghiem_thu && (
-                  <img
-                    className="service-reply-image"
-                    src={request.hinh_anh_nghiem_thu}
-                    alt="Ảnh phản hồi yêu cầu"
-                  />
-                )}
-              </article>
-            ))
-          )}
-        </div>
-      </section>,
+        </section>
+      </div>,
     );
 
   return (

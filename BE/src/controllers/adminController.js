@@ -199,7 +199,7 @@ const rentals = async (req, res) => {
 const requests = async (req, res) => {
     try {
         const pool = await getPool();
-        const [services, contacts] = await Promise.all([
+        const [services, contacts, complaints] = await Promise.all([
             pool.request().query(`
                 SELECT y.ma_yeu_cau AS id, y.so_phieu_yeu_cau AS code, y.ngay_yeu_cau_thuc_hien AS scheduledAt,
                        y.ngay_gui_yeu_cau AS createdAt, y.trang_thai_xu_ly AS status, y.ghi_chu_cua_khach AS note,
@@ -213,10 +213,18 @@ const requests = async (req, res) => {
                        l.ngay_gui AS createdAt, l.trang_thai_lien_he AS status, l.noi_dung_tu_van AS note,
                        l.ho_va_ten AS customer, N'Tư vấn miễn phí' AS service,
                        COALESCE(o.so_hieu_o, N'Khách vãng lai') AS plot, 'contact' AS source
-                FROM LienHeTuVan l LEFT JOIN ODat o ON o.ma_o_dat = l.ma_o_dat_quan_tam
+                FROM LienHeTuVan l LEFT JOIN ODat o ON o.so_hieu_o = l.so_hieu_o_quan_tam
+            `),
+            pool.request().query(`
+                SELECT k.ma_khieu_nai AS id, CONCAT('KN-', k.ma_khieu_nai) AS code, k.ngay_gui AS scheduledAt,
+                       k.ngay_gui AS createdAt, k.trang_thai_khieu_nai AS status, k.mo_ta_chi_tiet AS note,
+                       u.ho_va_ten AS customer, N'Khiếu nại / tranh chấp' AS service,
+                       COALESCE(o.so_hieu_o, N'Ô đất đang xem xét') AS plot, 'complaint' AS source
+                FROM KhieuNai k JOIN NguoiDung u ON u.ma_nguoi_dung = k.ma_khach_hang
+                LEFT JOIN ODat o ON o.ma_o_dat = k.ma_o_dat
             `)
         ]);
-        const data = [...services.recordset, ...contacts.recordset].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        const data = [...services.recordset, ...contacts.recordset, ...complaints.recordset].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         return res.json({ success: true, data });
     } catch (error) { return res.status(500).json({ success: false, message: 'Không thể tải yêu cầu chăm sóc' }); }
 };
@@ -228,6 +236,9 @@ const updateRequest = async (req, res) => {
         if (source === 'contact') {
             if (!['moi', 'da_lien_he', 'thanh_cong', 'that_bai'].includes(status)) return res.status(400).json({ success: false, message: 'Trạng thái liên hệ không hợp lệ' });
             await pool.request().input('id', sql.Int, Number(req.params.id)).input('status', sql.VarChar(20), status).query(`UPDATE LienHeTuVan SET trang_thai_lien_he = @status, ngay_cap_nhat = SYSDATETIME() WHERE ma_lien_he = @id`);
+        } else if (source === 'complaint') {
+            if (!['dang_tiep_nhan', 'da_giai_quyet', 'tu_choi'].includes(status)) return res.status(400).json({ success: false, message: 'Trạng thái khiếu nại không hợp lệ' });
+            await pool.request().input('id', sql.Int, Number(req.params.id)).input('status', sql.VarChar(30), status).query(`UPDATE KhieuNai SET trang_thai_khieu_nai = @status, ngay_cap_nhat = SYSDATETIME() WHERE ma_khieu_nai = @id`);
         } else {
             if (!['cho_tiep_nhan', 'da_tiep_nhan', 'dang_thuc_hien', 'hoan_thanh', 'tu_choi'].includes(status)) return res.status(400).json({ success: false, message: 'Trạng thái yêu cầu không hợp lệ' });
             await pool.request().input('id', sql.Int, Number(req.params.id)).input('status', sql.VarChar(20), status).query(`UPDATE YeuCauDichVu SET trang_thai_xu_ly = @status, ngay_hoan_thanh = CASE WHEN @status = 'hoan_thanh' THEN SYSDATETIME() ELSE ngay_hoan_thanh END WHERE ma_yeu_cau = @id`);

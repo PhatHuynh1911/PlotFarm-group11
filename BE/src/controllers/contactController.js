@@ -3,7 +3,7 @@ const { sql, getPool } = require('../config/db');
 // Tiếp nhận form liên hệ tư vấn từ Landing page
 const createContact = async (req, res) => {
     try {
-        const { ho_va_ten, so_dien_thoai, email, ma_o_dat_quan_tam, noi_dung_tu_van } = req.body;
+        const { ho_va_ten, so_dien_thoai, email, so_hieu_o_quan_tam, ma_o_dat_quan_tam, noi_dung_tu_van } = req.body;
 
         const phone = String(so_dien_thoai || '').replace(/[.\s()-]/g, '');
         if (!ho_va_ten || !phone) {
@@ -18,12 +18,12 @@ const createContact = async (req, res) => {
             .input('ho_va_ten', sql.NVarChar(100), ho_va_ten.trim())
             .input('so_dien_thoai', sql.VarChar(20), phone)
             .input('email', sql.VarChar(150), email ? email.trim().toLowerCase() : null)
-            .input('ma_o_dat', sql.Int, ma_o_dat_quan_tam ? parseInt(ma_o_dat_quan_tam, 10) : null)
+            .input('so_hieu_o_quan_tam', sql.VarChar(20), so_hieu_o_quan_tam || null)
             .input('noi_dung', sql.NVarChar(sql.MAX), noi_dung_tu_van || '')
             .query(`
-                INSERT INTO LienHeTuVan (ho_va_ten, so_dien_thoai, email, ma_o_dat_quan_tam, noi_dung_tu_van, trang_thai_lien_he)
+                INSERT INTO LienHeTuVan (ho_va_ten, so_dien_thoai, email, so_hieu_o_quan_tam, noi_dung_tu_van, trang_thai_lien_he)
                 OUTPUT INSERTED.*
-                VALUES (@ho_va_ten, @so_dien_thoai, @email, @ma_o_dat, @noi_dung, 'moi')
+                VALUES (@ho_va_ten, @so_dien_thoai, @email, @so_hieu_o_quan_tam, @noi_dung, 'moi')
             `);
 
         res.status(201).json({
@@ -44,7 +44,7 @@ const getAllContacts = async (req, res) => {
         const result = await pool.request().query(`
             SELECT l.*, o.so_hieu_o, o.ten_o_dat
             FROM LienHeTuVan l
-            LEFT JOIN ODat o ON o.ma_o_dat = l.ma_o_dat_quan_tam
+            LEFT JOIN ODat o ON o.so_hieu_o = l.so_hieu_o_quan_tam
             ORDER BY l.ngay_gui DESC
         `);
 

@@ -877,19 +877,25 @@ function FarmerPage({ user, onLogout }) {
                         <input
                           type="file"
                           accept="image/*"
-                          onChange={(event) => {
+                          onChange={async (event) => {
                             const file = event.target.files?.[0];
-                            if (file)
+                            if (!file) return;
+                            try {
+                              const uploadedUrl = await uploadJournalMedia(
+                                file,
+                                token,
+                              );
                               setRequests((items) =>
                                 items.map((item) =>
                                   item.id === request.id
-                                    ? {
-                                        ...item,
-                                        photo: URL.createObjectURL(file),
-                                      }
+                                    ? { ...item, photo: uploadedUrl }
                                     : item,
                                 ),
                               );
+                              notify("Ảnh đã tải lên và sẵn sàng gửi.");
+                            } catch (uploadError) {
+                              notify(uploadError.message, "error");
+                            }
                           }}
                         />
                         <button

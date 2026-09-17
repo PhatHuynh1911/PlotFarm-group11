@@ -104,6 +104,19 @@ export async function submitContact(payload) {
   return apiRequest('/contact', { method: 'POST', body: JSON.stringify(payload) })
 }
 
+export async function submitComplaint(payload, token) {
+  return apiRequest('/complaints', { method: 'POST', body: JSON.stringify(payload), token })
+}
+
+export async function getUserComplaints(userId, token) {
+  const result = await apiRequest(`/complaints/user/${userId}`, { token })
+  return result.data
+}
+
+export async function updateComplaintStatus(id, payload, token) {
+  return apiRequest(`/complaints/${id}/status`, { method: 'PATCH', body: JSON.stringify(payload), token })
+}
+
 export async function uploadJournalMedia(file, token) {
   if (!file) throw new Error('Vui lòng chọn tệp để tải lên')
 

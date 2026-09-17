@@ -32,6 +32,11 @@ const labels = {
     thanh_cong: "Thành công",
     that_bai: "Không liên hệ được",
   },
+  complaintStatus: {
+    dang_tiep_nhan: "Đang tiếp nhận",
+    da_giai_quyet: "Đã giải quyết",
+    tu_choi: "Từ chối",
+  },
 };
 const money = (value) => `${Number(value || 0).toLocaleString("vi-VN")} đ`;
 const date = (value) =>
@@ -134,7 +139,8 @@ function AdminPage({ user, token, onLogout }) {
     );
   const savePlot = async (event) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formEl = event.currentTarget;
+    const form = new FormData(formEl);
     try {
       form.set("farmId", Number(form.get("farmId")));
       form.set("area", Number(form.get("area")));
@@ -147,7 +153,7 @@ function AdminPage({ user, token, onLogout }) {
         form,
       );
       setEditingPlot(null);
-      event.currentTarget.reset();
+      formEl.reset();
     } catch (e) {
       setError(e.message);
     }
@@ -785,7 +791,7 @@ function Requests({ items, onUpdate }) {
       </div>
       <div className="admin-request-list">
         {items.map((item) => (
-          <article key={item.id}>
+          <article key={`${item.source}-${item.id}`}>
             <div>
               <strong>
                 {item.service || "Yêu cầu chăm sóc"} · {item.plot}
@@ -799,7 +805,13 @@ function Requests({ items, onUpdate }) {
               value={item.status}
               onChange={(e) => onUpdate(item, e.target.value)}
             >
-              {Object.entries(item.source === "contact" ? labels.contactStatus : labels.requestStatus).map(([value, label]) => (
+              {Object.entries(
+                item.source === "contact"
+                  ? labels.contactStatus
+                  : item.source === "complaint"
+                    ? labels.complaintStatus
+                    : labels.requestStatus,
+              ).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
                 </option>

@@ -10,7 +10,8 @@ function ContactSection() {
   const [error, setError] = useState('')
   const submit = async (event) => {
     event.preventDefault()
-    const form = new FormData(event.currentTarget)
+    const formEl = event.currentTarget
+    const form = new FormData(formEl)
     const name = String(form.get('name') || '').trim()
     const phone = String(form.get('phone') || '').trim()
     if (!name || !phone) return setError('Vui lòng nhập họ tên và số điện thoại.')
@@ -19,7 +20,7 @@ function ContactSection() {
     setError('')
     try {
       await submitContact({ ho_va_ten: name, so_dien_thoai: normalizePhone(phone) })
-      event.currentTarget.reset()
+      formEl.reset()
       notify('Đăng ký thành công! Đội ngũ sẽ gọi lại trong 24h.')
     } catch (requestError) {
       setError(requestError.message)

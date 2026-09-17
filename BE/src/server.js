@@ -17,6 +17,7 @@ const journalRoutes = require('./routes/journalRoutes');
 const serviceRoutes = require('./routes/serviceRoutes');
 const cameraRoutes = require('./routes/cameraRoutes');
 const contactRoutes = require('./routes/contactRoutes');
+const complaintRoutes = require('./routes/complaintRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
@@ -47,6 +48,7 @@ app.use('/api/journals', journalRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/camera', cameraRoutes);
 app.use('/api/contact', contactRoutes);
+app.use('/api/complaints', complaintRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/upload', uploadRoutes);
@@ -66,6 +68,7 @@ app.get('/', (req, res) => {
             services: '/api/services',
             camera: '/api/camera',
             contact: '/api/contact',
+            complaints: '/api/complaints',
             admin: '/api/admin'
         }
     });

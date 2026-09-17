@@ -300,7 +300,23 @@ CREATE TABLE dbo.LienHeTuVan (
 );
 GO
 
--- 2.14 Bảng Thông Báo Hệ Thống (ThongBao)
+-- 2.14 Bảng Khiếu Nại / Tranh Chấp (KhieuNai)
+CREATE TABLE dbo.KhieuNai (
+    ma_khieu_nai INT IDENTITY(1,1) PRIMARY KEY,
+    ma_hop_dong INT NOT NULL FOREIGN KEY REFERENCES dbo.HopDongThue(ma_hop_dong) ON DELETE CASCADE,
+    ma_khach_hang INT NOT NULL FOREIGN KEY REFERENCES dbo.NguoiDung(ma_nguoi_dung),
+    ma_o_dat INT NULL FOREIGN KEY REFERENCES dbo.ODat(ma_o_dat),
+    tieu_de NVARCHAR(200) NOT NULL,
+    mo_ta_chi_tiet NVARCHAR(1000) NOT NULL,
+    trang_thai_khieu_nai VARCHAR(30) NOT NULL DEFAULT 'dang_tiep_nhan', -- 'dang_tiep_nhan', 'da_giai_quyet', 'tu_choi'
+    phan_hoi_admin NVARCHAR(1000) NULL,
+    ma_admin_xu_ly INT NULL FOREIGN KEY REFERENCES dbo.NguoiDung(ma_nguoi_dung),
+    ngay_gui DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    ngay_cap_nhat DATETIME2 NOT NULL DEFAULT SYSDATETIME()
+);
+GO
+
+-- 2.15 Bảng Thông Báo Hệ Thống (ThongBao)
 CREATE TABLE dbo.ThongBao (
     ma_thong_bao INT IDENTITY(1,1) PRIMARY KEY,
     ma_nguoi_dung INT NOT NULL FOREIGN KEY REFERENCES dbo.NguoiDung(ma_nguoi_dung) ON DELETE CASCADE,
@@ -322,6 +338,8 @@ CREATE INDEX IX_HopDong_NguoiDung ON dbo.HopDongThue(ma_nguoi_dung);
 CREATE INDEX IX_HopDong_ODat ON dbo.HopDongThue(ma_o_dat);
 CREATE INDEX IX_NhatKy_HopDong ON dbo.NhatKyCanhTac(ma_hop_dong);
 CREATE INDEX IX_YCDV_HopDong ON dbo.YeuCauDichVu(ma_hop_dong);
+CREATE INDEX IX_KhieuNai_HopDong ON dbo.KhieuNai(ma_hop_dong);
+CREATE INDEX IX_KhieuNai_KhachHang ON dbo.KhieuNai(ma_khach_hang);
 CREATE INDEX IX_CayTrong_DanhMuc ON dbo.CayTrong(ma_danh_muc);
 CREATE INDEX IX_ThuHoach_HopDong ON dbo.ThuHoach(ma_hop_dong);
 CREATE INDEX IX_ThongBao_NguoiDung ON dbo.ThongBao(ma_nguoi_dung, da_doc);
