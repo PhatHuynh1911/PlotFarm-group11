@@ -117,6 +117,21 @@ export async function updateComplaintStatus(id, payload, token) {
   return apiRequest(`/complaints/${id}/status`, { method: 'PATCH', body: JSON.stringify(payload), token })
 }
 
+export async function getAdminServiceRequests(token) {
+  const result = await apiRequest('/admin/requests/services', { token })
+  return result.data
+}
+
+export async function getAdminComplaintRequests(token) {
+  const result = await apiRequest('/admin/requests/complaints', { token })
+  return result.data
+}
+
+export async function getAdminConsultationRequests(token) {
+  const result = await apiRequest('/admin/requests/consultations', { token })
+  return result.data
+}
+
 export async function uploadJournalMedia(file, token) {
   if (!file) throw new Error('Vui lòng chọn tệp để tải lên')
 

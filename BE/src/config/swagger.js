@@ -42,7 +42,8 @@ const swaggerSpec = {
         { name: '9. Admin', description: 'Báo cáo thống kê, quản lý người dùng, duyệt hợp đồng & yêu cầu' },
         { name: '10. Notifications', description: 'Hệ thống thông báo đẩy người dùng (đơn thuê, phân công, nhật ký canh tác)' },
         { name: '11. Upload', description: 'Tải lên hình ảnh/tệp tin qua Multer lưu trữ cục bộ tại máy chủ' },
-        { name: '12. Farms & Interactive Map', description: 'Bản đồ nông trại tương tác, danh sách ô đất theo khu vườn kèm tọa độ position_x, position_y' }
+        { name: '12. Farms & Interactive Map', description: 'Bản đồ nông trại tương tác, danh sách ô đất theo khu vườn kèm tọa độ position_x, position_y' },
+        { name: '13. Complaints', description: 'Gửi và tiếp nhận khiếu nại, tranh chấp liên quan đến ô đất và hợp đồng' }
     ],
     paths: {
         // --- 1. AUTH ---
@@ -573,16 +574,43 @@ const swaggerSpec = {
         '/api/admin/requests': {
             get: {
                 tags: ['9. Admin'],
-                summary: 'Lấy danh sách các yêu cầu chăm sóc & khiếu nại',
+                summary: 'Lấy danh sách các yêu cầu chăm sóc & khiếu nại (tổng hợp hoặc lọc theo ?type= hoặc ?category=)',
                 responses: {
                     200: { description: 'Danh sách yêu cầu' }
+                }
+            }
+        },
+        '/api/admin/requests/services': {
+            get: {
+                tags: ['9. Admin'],
+                summary: '1. API Yêu cầu chăm sóc: Lấy danh sách từ YeuCauDichVu (loại chăm sóc cây trồng, canh tác)',
+                responses: {
+                    200: { description: 'Danh sách yêu cầu chăm sóc cây trồng' }
+                }
+            }
+        },
+        '/api/admin/requests/complaints': {
+            get: {
+                tags: ['9. Admin'],
+                summary: '2. API Khiếu nại / Tranh chấp: Lấy danh sách khiếu nại từ bảng KhieuNai & phân loại',
+                responses: {
+                    200: { description: 'Danh sách khiếu nại và tranh chấp' }
+                }
+            }
+        },
+        '/api/admin/requests/consultations': {
+            get: {
+                tags: ['9. Admin'],
+                summary: '3. API Yêu cầu tư vấn: Lấy độc lập danh sách từ LienHeTuVan (khách vãng lai từ Homepage)',
+                responses: {
+                    200: { description: 'Danh sách yêu cầu tư vấn khách hàng' }
                 }
             }
         },
         '/api/admin/requests/{id}': {
             patch: {
                 tags: ['9. Admin'],
-                summary: 'Quản trị viên cập nhật trạng thái yêu cầu dịch vụ',
+                summary: 'Quản trị viên cập nhật trạng thái yêu cầu (chăm sóc, khiếu nại hoặc tư vấn)',
                 parameters: [
                     { name: 'id', in: 'path', required: true, schema: { type: 'integer', example: 1 } }
                 ],
@@ -593,7 +621,9 @@ const swaggerSpec = {
                             schema: {
                                 type: 'object',
                                 properties: {
-                                    status: { type: 'string', enum: ['cho_tiep_nhan', 'da_tiep_nhan', 'dang_thuc_hien', 'hoan_thanh', 'tu_choi'], example: 'hoan_thanh' }
+                                    status: { type: 'string', example: 'hoan_thanh' },
+                                    source: { type: 'string', enum: ['service', 'complaint', 'contact'], example: 'service' },
+                                    phan_hoi_admin: { type: 'string', example: 'Đã xử lý xong yêu cầu' }
                                 }
                             }
                         }
@@ -601,6 +631,92 @@ const swaggerSpec = {
                 },
                 responses: {
                     200: { description: 'Cập nhật trạng thái thành công' }
+                }
+            }
+        },
+
+        // --- 13. COMPLAINTS ---
+        '/api/complaints': {
+            post: {
+                tags: ['13. Complaints'],
+                summary: 'Khách hàng gửi khiếu nại hoặc phản ánh tranh chấp',
+                requestBody: {
+                    required: true,
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                required: ['ma_hop_dong', 'tieu_de', 'mo_ta_chi_tiet'],
+                                properties: {
+                                    ma_hop_dong: { type: 'integer', example: 1 },
+                                    ma_o_dat: { type: 'integer', example: 3 },
+                                    tieu_de: { type: 'string', example: 'Camera giám sát bị gián đoạn' },
+                                    mo_ta_chi_tiet: { type: 'string', example: 'Camera tại ô đất không phát trực tiếp được từ sáng nay.' }
+                                }
+                            }
+                        }
+                    }
+                },
+                responses: {
+                    201: { description: 'Gửi khiếu nại thành công' }
+                }
+            }
+        },
+        '/api/complaints/all': {
+            get: {
+                tags: ['13. Complaints'],
+                summary: 'Quản trị viên xem tất cả danh sách khiếu nại',
+                responses: {
+                    200: { description: 'Danh sách khiếu nại' }
+                }
+            }
+        },
+        '/api/complaints/user/{userId}': {
+            get: {
+                tags: ['13. Complaints'],
+                summary: 'Khách hàng xem các khiếu nại của chính mình',
+                parameters: [
+                    { name: 'userId', in: 'path', required: true, schema: { type: 'integer', example: 3 } }
+                ],
+                responses: {
+                    200: { description: 'Danh sách khiếu nại của khách' }
+                }
+            }
+        },
+        '/api/complaints/{id}/status': {
+            patch: {
+                tags: ['13. Complaints'],
+                summary: 'Admin cập nhật trạng thái khiếu nại và phản hồi',
+                parameters: [
+                    { name: 'id', in: 'path', required: true, schema: { type: 'integer', example: 1 } }
+                ],
+                requestBody: {
+                    required: true,
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                properties: {
+                                    status: { type: 'string', enum: ['dang_tiep_nhan', 'da_giai_quyet', 'tu_choi'], example: 'da_giai_quyet' },
+                                    phan_hoi_admin: { type: 'string', example: 'Đã kiểm tra và khởi động lại camera ô A-03.' }
+                                }
+                            }
+                        }
+                    }
+                },
+                responses: {
+                    200: { description: 'Cập nhật khiếu nại thành công' }
+                }
+            }
+        },
+
+        // --- 8. CONTACT (ALL) ---
+        '/api/contact/all': {
+            get: {
+                tags: ['8. Contact'],
+                summary: 'Quản trị viên xem toàn bộ danh sách khách hàng để lại liên hệ tư vấn từ Homepage',
+                responses: {
+                    200: { description: 'Danh sách tư vấn' }
                 }
             }
         }

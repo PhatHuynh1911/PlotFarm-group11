@@ -81,7 +81,8 @@ const getRequestsByUser = async (req, res) => {
         const result = await pool.request()
             .input('userId', sql.Int, parseInt(userId, 10))
             .query(`
-                SELECT y.*, d.ten_dich_vu, d.don_gia, d.don_vi_tinh,
+                SELECT y.*, COALESCE(y.loai_yeu_cau, 'cham_soc') AS category, 'service' AS type, 'service' AS source,
+                       d.ten_dich_vu, d.don_gia, d.don_vi_tinh,
                        o.so_hieu_o, o.ten_o_dat, u.ho_va_ten AS ten_nong_dan_xu_ly
                 FROM YeuCauDichVu y
                 LEFT JOIN LoaiDichVu d ON d.ma_loai_dich_vu = y.ma_loai_dich_vu
@@ -114,7 +115,8 @@ const getAllRequests = async (req, res) => {
             farmerFilter = 'AND y.ma_nong_dan_phu_trach = @farmerId';
         }
         const result = await request.query(`
-            SELECT y.*, d.ten_dich_vu, d.don_gia,
+            SELECT y.*, COALESCE(y.loai_yeu_cau, 'cham_soc') AS category, 'service' AS type, 'service' AS source,
+                   d.ten_dich_vu, d.don_gia,
                    o.so_hieu_o, o.ten_o_dat,
                    k.ho_va_ten AS ten_khach_hang, k.so_dien_thoai AS sdt_khach_hang,
                    n.ho_va_ten AS ten_nong_dan_xu_ly
@@ -124,7 +126,7 @@ const getAllRequests = async (req, res) => {
             JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
             JOIN NguoiDung k ON k.ma_nguoi_dung = y.ma_khach_hang
             LEFT JOIN NguoiDung n ON n.ma_nguoi_dung = y.ma_nong_dan_phu_trach
-            WHERE 1 = 1 ${farmerFilter}
+            WHERE (y.loai_yeu_cau = 'cham_soc' OR y.loai_yeu_cau IS NULL) ${farmerFilter}
             ORDER BY y.ngay_gui_yeu_cau DESC
         `);
 
