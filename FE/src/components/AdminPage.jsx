@@ -37,6 +37,12 @@ const labels = {
     da_giai_quyet: "Đã giải quyết",
     tu_choi: "Từ chối",
   },
+  assignmentStatus: {
+    cho_tiep_nhan: "Chờ tiếp nhận",
+    da_chap_nhan: "Đã chấp nhận",
+    tu_choi: "Đã từ chối",
+    da_huy: "Đã hủy",
+  },
 };
 const money = (value) => `${Number(value || 0).toLocaleString("vi-VN")} đ`;
 const date = (value) =>
@@ -50,7 +56,9 @@ function AdminPage({ user, token, onLogout }) {
     users: [],
     plots: [],
     rentals: [],
-    requests: [],
+    serviceRequests: [],
+    complaintRequests: [],
+    consultationRequests: [],
     farmers: [],
     assignments: [],
   });
@@ -75,7 +83,9 @@ function AdminPage({ user, token, onLogout }) {
         "users",
         "plots",
         "rentals",
-        "requests",
+        "requests/services",
+        "requests/complaints",
+        "requests/consultations",
         "farmers",
         "assignments",
       ];
@@ -99,9 +109,11 @@ function AdminPage({ user, token, onLogout }) {
         users: results[1],
         plots: results[2],
         rentals: results[3],
-        requests: results[4],
-        farmers: results[5],
-        assignments: results[6],
+        serviceRequests: results[4],
+        complaintRequests: results[5],
+        consultationRequests: results[6],
+        farmers: results[7],
+        assignments: results[8],
       });
       setError("");
     } catch (requestError) {
@@ -255,7 +267,7 @@ function AdminPage({ user, token, onLogout }) {
           <Rentals items={data.rentals} assignments={data.assignments} />
         )}
         {activeTab === "requests" && (
-          <Requests items={data.requests} onUpdate={updateRequest} />
+          <Requests groups={{ service: data.serviceRequests, complaint: data.complaintRequests, contact: data.consultationRequests }} onUpdate={updateRequest} />
         )}
       </section>
     </main>
@@ -683,7 +695,7 @@ function AssignmentPanel({ items, farmers, assignments, onAssign }) {
           {currentAssignment && (
             <p className="assignment-current">
               Hiện tại: <strong>{currentAssignment.ten_nong_dan}</strong> ·{" "}
-              {currentAssignment.trang_thai}
+              {labels.assignmentStatus[currentAssignment.trang_thai] || currentAssignment.trang_thai}
             </p>
           )}
           <button
@@ -713,7 +725,7 @@ function AssignmentPanel({ items, farmers, assignments, onAssign }) {
                   </strong>
                   <span>{item.ten_khach_hang}</span>
                 </div>
-                <span className="status-pill">{item.trang_thai}</span>
+                <span className="status-pill">{labels.assignmentStatus[item.trang_thai] || item.trang_thai}</span>
               </article>
             ))}
           </div>
@@ -766,7 +778,7 @@ function Rentals({ items, assignments }) {
                   <td>{assignment?.ten_nong_dan || "Chưa phân công"}</td>
                   <td>
                     <span className="status-pill">
-                      {assignment ? assignment.trang_thai : "Chưa phân công"}
+                      {assignment ? (labels.assignmentStatus[assignment.trang_thai] || assignment.trang_thai) : "Chưa phân công"}
                     </span>
                   </td>
                 </tr>
@@ -779,17 +791,29 @@ function Rentals({ items, assignments }) {
   );
 }
 
-function Requests({ items, onUpdate }) {
+function Requests({ groups, onUpdate }) {
+  const [activeRequestTab, setActiveRequestTab] = useState("service");
+  const requestTabs = [
+    ["service", "Yêu cầu chăm sóc"],
+    ["complaint", "Khiếu nại & tranh chấp"],
+    ["contact", "Yêu cầu tư vấn"],
+  ];
+  const items = groups[activeRequestTab] || [];
+  const currentLabel = requestTabs.find(([id]) => id === activeRequestTab)?.[1] || "Yêu cầu";
   return (
     <section className="admin-card">
       <div className="panel-heading">
         <div>
           <p className="eyebrow">CHẤT LƯỢNG DỊCH VỤ</p>
-          <h2>Yêu cầu chăm sóc & khiếu nại</h2>
+          <h2>{currentLabel}</h2>
         </div>
         <span className="result-count">{items.length} yêu cầu</span>
       </div>
+      <nav className="request-tabs" aria-label="Phân loại yêu cầu">
+        {requestTabs.map(([id, label]) => <button key={id} type="button" className={activeRequestTab === id ? "active" : ""} onClick={() => setActiveRequestTab(id)}>{label}<span>{(groups[id] || []).length}</span></button>)}
+      </nav>
       <div className="admin-request-list">
+        {items.length === 0 && <p className="empty-state">Chưa có {currentLabel.toLowerCase()}.</p>}
         {items.map((item) => (
           <article key={`${item.source}-${item.id}`}>
             <div>
@@ -797,8 +821,9 @@ function Requests({ items, onUpdate }) {
                 {item.service || "Yêu cầu chăm sóc"} · {item.plot}
               </strong>
               <span>
-                {item.customer} · lịch {date(item.scheduledAt)}
+                {item.customer}{item.phone ? ` · ${item.phone}` : ""} · {activeRequestTab === "contact" ? "đăng ký" : "lịch"} {date(item.scheduledAt)}
               </span>
+              {item.email && <span>{item.email}</span>}
               <p>{item.note || "Không có ghi chú"}</p>
             </div>
             <select
