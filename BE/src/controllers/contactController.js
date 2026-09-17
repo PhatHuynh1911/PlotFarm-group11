@@ -42,7 +42,8 @@ const getAllContacts = async (req, res) => {
     try {
         const pool = await getPool();
         const result = await pool.request().query(`
-            SELECT l.*, o.so_hieu_o, o.ten_o_dat
+            SELECT l.*, 'tu_van' AS category, 'contact' AS type, 'contact' AS source,
+                   o.so_hieu_o, o.ten_o_dat
             FROM LienHeTuVan l
             LEFT JOIN ODat o ON o.so_hieu_o = l.so_hieu_o_quan_tam
             ORDER BY l.ngay_gui DESC

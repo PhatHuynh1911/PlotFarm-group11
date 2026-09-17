@@ -198,35 +198,56 @@ const rentals = async (req, res) => {
 
 const requests = async (req, res) => {
     try {
+        const { type, category } = req.query;
+        if (type === 'service' || category === 'cham_soc') {
+            return serviceRequests(req, res);
+        }
+        if (type === 'complaint' || category === 'khieu_nai') {
+            return complaintRequests(req, res);
+        }
+        if (type === 'contact' || category === 'tu_van') {
+            return consultationRequests(req, res);
+        }
+
         const pool = await getPool();
         const [services, contacts, complaints] = await Promise.all([
             pool.request().query(`
                 SELECT y.ma_yeu_cau AS id, y.so_phieu_yeu_cau AS code, y.ngay_yeu_cau_thuc_hien AS scheduledAt,
                        y.ngay_gui_yeu_cau AS createdAt, y.trang_thai_xu_ly AS status, y.ghi_chu_cua_khach AS note,
-                       u.ho_va_ten AS customer, d.ten_dich_vu AS service, o.so_hieu_o AS plot, 'service' AS source
+                       u.ho_va_ten AS customer, u.so_dien_thoai AS phone, u.email,
+                       d.ten_dich_vu AS service, o.so_hieu_o AS plot,
+                       COALESCE(y.loai_yeu_cau, 'cham_soc') AS category, 'service' AS type, 'service' AS source
                 FROM YeuCauDichVu y JOIN NguoiDung u ON u.ma_nguoi_dung = y.ma_khach_hang
                 LEFT JOIN LoaiDichVu d ON d.ma_loai_dich_vu = y.ma_loai_dich_vu
                 JOIN HopDongThue h ON h.ma_hop_dong = y.ma_hop_dong JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+                WHERE y.loai_yeu_cau = 'cham_soc' OR y.loai_yeu_cau IS NULL
             `),
             pool.request().query(`
                 SELECT l.ma_lien_he AS id, CONCAT('TV-', l.ma_lien_he) AS code, l.ngay_gui AS scheduledAt,
                        l.ngay_gui AS createdAt, l.trang_thai_lien_he AS status, l.noi_dung_tu_van AS note,
-                       l.ho_va_ten AS customer, N'Tư vấn miễn phí' AS service,
-                       COALESCE(o.so_hieu_o, N'Khách vãng lai') AS plot, 'contact' AS source
-                FROM LienHeTuVan l LEFT JOIN ODat o ON o.so_hieu_o = l.so_hieu_o_quan_tam
+                       l.ho_va_ten AS customer, l.so_dien_thoai AS phone, l.email,
+                       N'Tư vấn miễn phí' AS service,
+                       COALESCE(l.so_hieu_o_quan_tam, N'Khách vãng lai') AS plot,
+                       'tu_van' AS category, 'contact' AS type, 'contact' AS source
+                FROM LienHeTuVan l
             `),
             pool.request().query(`
                 SELECT k.ma_khieu_nai AS id, CONCAT('KN-', k.ma_khieu_nai) AS code, k.ngay_gui AS scheduledAt,
                        k.ngay_gui AS createdAt, k.trang_thai_khieu_nai AS status, k.mo_ta_chi_tiet AS note,
-                       u.ho_va_ten AS customer, N'Khiếu nại / tranh chấp' AS service,
-                       COALESCE(o.so_hieu_o, N'Ô đất đang xem xét') AS plot, 'complaint' AS source
+                       u.ho_va_ten AS customer, u.so_dien_thoai AS phone, u.email,
+                       k.tieu_de AS service,
+                       COALESCE(o.so_hieu_o, N'Ô đất đang xem xét') AS plot,
+                       'khieu_nai' AS category, 'complaint' AS type, 'complaint' AS source
                 FROM KhieuNai k JOIN NguoiDung u ON u.ma_nguoi_dung = k.ma_khach_hang
                 LEFT JOIN ODat o ON o.ma_o_dat = k.ma_o_dat
             `)
         ]);
         const data = [...services.recordset, ...contacts.recordset, ...complaints.recordset].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        return res.json({ success: true, data });
-    } catch (error) { return res.status(500).json({ success: false, message: 'Không thể tải yêu cầu chăm sóc' }); }
+        return res.json({ success: true, count: data.length, data });
+    } catch (error) { 
+        console.error('Lỗi tải tổng hợp yêu cầu:', error);
+        return res.status(500).json({ success: false, message: 'Không thể tải yêu cầu chăm sóc' }); 
+    }
 };
 
 // Các API riêng cho ba tab quản lý yêu cầu ở Admin.
@@ -236,30 +257,67 @@ const serviceRequests = async (req, res) => {
         const result = await pool.request().query(`
             SELECT y.ma_yeu_cau AS id, y.so_phieu_yeu_cau AS code, y.ngay_yeu_cau_thuc_hien AS scheduledAt,
                    y.ngay_gui_yeu_cau AS createdAt, y.trang_thai_xu_ly AS status, y.ghi_chu_cua_khach AS note,
-                   u.ho_va_ten AS customer, d.ten_dich_vu AS service, o.so_hieu_o AS plot, 'service' AS source
+                   u.ho_va_ten AS customer, u.so_dien_thoai AS phone, u.email,
+                   d.ten_dich_vu AS service, o.so_hieu_o AS plot, o.ten_o_dat AS plotName,
+                   h.so_hop_dong AS contractCode,
+                   COALESCE(y.loai_yeu_cau, 'cham_soc') AS category, 'service' AS type, 'service' AS source
             FROM YeuCauDichVu y JOIN NguoiDung u ON u.ma_nguoi_dung = y.ma_khach_hang
             LEFT JOIN LoaiDichVu d ON d.ma_loai_dich_vu = y.ma_loai_dich_vu
             JOIN HopDongThue h ON h.ma_hop_dong = y.ma_hop_dong JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+            WHERE y.loai_yeu_cau = 'cham_soc' OR y.loai_yeu_cau IS NULL
             ORDER BY y.ngay_gui_yeu_cau DESC
         `);
-        return res.json({ success: true, data: result.recordset });
-    } catch (error) { return res.status(500).json({ success: false, message: 'Không thể tải yêu cầu chăm sóc' }); }
+        return res.json({ success: true, count: result.recordset.length, data: result.recordset });
+    } catch (error) { 
+        console.error('Lỗi tải yêu cầu chăm sóc:', error);
+        return res.status(500).json({ success: false, message: 'Không thể tải yêu cầu chăm sóc' }); 
+    }
 };
 
 const complaintRequests = async (req, res) => {
     try {
         const pool = await getPool();
-        const result = await pool.request().query(`
-            SELECT k.ma_khieu_nai AS id, CONCAT('KN-', k.ma_khieu_nai) AS code, k.ngay_gui AS scheduledAt,
-                   k.ngay_gui AS createdAt, k.trang_thai_khieu_nai AS status, k.mo_ta_chi_tiet AS note,
-                   u.ho_va_ten AS customer, k.tieu_de AS service,
-                   COALESCE(o.so_hieu_o, N'Ô đất đang xem xét') AS plot, 'complaint' AS source
-            FROM KhieuNai k JOIN NguoiDung u ON u.ma_nguoi_dung = k.ma_khach_hang
-            LEFT JOIN ODat o ON o.ma_o_dat = k.ma_o_dat
-            ORDER BY k.ngay_gui DESC
-        `);
-        return res.json({ success: true, data: result.recordset });
-    } catch (error) { return res.status(500).json({ success: false, message: 'Không thể tải khiếu nại và tranh chấp' }); }
+        const [complaintsTable, complaintsFromYCDV] = await Promise.all([
+            pool.request().query(`
+                SELECT k.ma_khieu_nai AS id, CONCAT('KN-', k.ma_khieu_nai) AS code, k.ngay_gui AS scheduledAt,
+                       k.ngay_gui AS createdAt, k.trang_thai_khieu_nai AS status, k.mo_ta_chi_tiet AS note,
+                       k.phan_hoi_admin AS adminResponse,
+                       u.ho_va_ten AS customer, u.so_dien_thoai AS phone, u.email,
+                       k.tieu_de AS service,
+                       COALESCE(o.so_hieu_o, N'Ô đất đang xem xét') AS plot, o.ten_o_dat AS plotName,
+                       h.so_hop_dong AS contractCode,
+                       'khieu_nai' AS category, 'complaint' AS type, 'complaint' AS source
+                FROM KhieuNai k 
+                JOIN NguoiDung u ON u.ma_nguoi_dung = k.ma_khach_hang
+                LEFT JOIN HopDongThue h ON h.ma_hop_dong = k.ma_hop_dong
+                LEFT JOIN ODat o ON o.ma_o_dat = k.ma_o_dat
+            `),
+            pool.request().query(`
+                SELECT y.ma_yeu_cau AS id, y.so_phieu_yeu_cau AS code, y.ngay_yeu_cau_thuc_hien AS scheduledAt,
+                       y.ngay_gui_yeu_cau AS createdAt, y.trang_thai_xu_ly AS status, y.ghi_chu_cua_khach AS note,
+                       y.phan_hoi_cua_nha_vuon AS adminResponse,
+                       u.ho_va_ten AS customer, u.so_dien_thoai AS phone, u.email,
+                       COALESCE(d.ten_dich_vu, N'Khiếu nại dịch vụ') AS service, 
+                       o.so_hieu_o AS plot, o.ten_o_dat AS plotName,
+                       h.so_hop_dong AS contractCode,
+                       'khieu_nai' AS category, 'complaint' AS type, 'service' AS source
+                FROM YeuCauDichVu y 
+                JOIN NguoiDung u ON u.ma_nguoi_dung = y.ma_khach_hang
+                LEFT JOIN LoaiDichVu d ON d.ma_loai_dich_vu = y.ma_loai_dich_vu
+                JOIN HopDongThue h ON h.ma_hop_dong = y.ma_hop_dong 
+                JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+                WHERE y.loai_yeu_cau = 'khieu_nai'
+            `)
+        ]);
+
+        const combined = [...complaintsTable.recordset, ...complaintsFromYCDV.recordset]
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        return res.json({ success: true, count: combined.length, data: combined });
+    } catch (error) { 
+        console.error('Lỗi tải khiếu nại và tranh chấp:', error);
+        return res.status(500).json({ success: false, message: 'Không thể tải khiếu nại và tranh chấp' }); 
+    }
 };
 
 const consultationRequests = async (req, res) => {
@@ -270,30 +328,76 @@ const consultationRequests = async (req, res) => {
                    l.ngay_gui AS createdAt, l.trang_thai_lien_he AS status, l.noi_dung_tu_van AS note,
                    l.ho_va_ten AS customer, l.so_dien_thoai AS phone, l.email,
                    N'Tư vấn miễn phí' AS service, COALESCE(l.so_hieu_o_quan_tam, N'Khách vãng lai') AS plot,
-                   'contact' AS source
+                   'tu_van' AS category, 'contact' AS type, 'contact' AS source
             FROM LienHeTuVan l
             ORDER BY l.ngay_gui DESC
         `);
-        return res.json({ success: true, data: result.recordset });
-    } catch (error) { return res.status(500).json({ success: false, message: 'Không thể tải yêu cầu tư vấn' }); }
+        return res.json({ success: true, count: result.recordset.length, data: result.recordset });
+    } catch (error) { 
+        console.error('Lỗi tải yêu cầu tư vấn:', error);
+        return res.status(500).json({ success: false, message: 'Không thể tải yêu cầu tư vấn' }); 
+    }
 };
 
 const updateRequest = async (req, res) => {
     try {
-        const { status, source = 'service' } = req.body;
+        const { status, source, type, phan_hoi_admin, note } = req.body;
+        const targetType = type || source || 'service';
         const pool = await getPool();
-        if (source === 'contact') {
-            if (!['moi', 'da_lien_he', 'thanh_cong', 'that_bai'].includes(status)) return res.status(400).json({ success: false, message: 'Trạng thái liên hệ không hợp lệ' });
-            await pool.request().input('id', sql.Int, Number(req.params.id)).input('status', sql.VarChar(20), status).query(`UPDATE LienHeTuVan SET trang_thai_lien_he = @status, ngay_cap_nhat = SYSDATETIME() WHERE ma_lien_he = @id`);
-        } else if (source === 'complaint') {
-            if (!['dang_tiep_nhan', 'da_giai_quyet', 'tu_choi'].includes(status)) return res.status(400).json({ success: false, message: 'Trạng thái khiếu nại không hợp lệ' });
-            await pool.request().input('id', sql.Int, Number(req.params.id)).input('status', sql.VarChar(30), status).query(`UPDATE KhieuNai SET trang_thai_khieu_nai = @status, ngay_cap_nhat = SYSDATETIME() WHERE ma_khieu_nai = @id`);
+
+        if (targetType === 'contact' || targetType === 'tu_van') {
+            if (!['moi', 'da_lien_he', 'thanh_cong', 'that_bai'].includes(status)) {
+                return res.status(400).json({ success: false, message: 'Trạng thái liên hệ không hợp lệ' });
+            }
+            await pool.request()
+                .input('id', sql.Int, Number(req.params.id))
+                .input('status', sql.VarChar(20), status)
+                .input('staffId', sql.Int, Number(req.user?.sub) || null)
+                .query(`
+                    UPDATE LienHeTuVan 
+                    SET trang_thai_lien_he = @status, 
+                        ma_nhan_vien_tiep_nhan = COALESCE(@staffId, ma_nhan_vien_tiep_nhan),
+                        ngay_cap_nhat = SYSDATETIME() 
+                    WHERE ma_lien_he = @id
+                `);
+        } else if (targetType === 'complaint' || targetType === 'khieu_nai') {
+            if (!['dang_tiep_nhan', 'da_giai_quyet', 'tu_choi'].includes(status)) {
+                return res.status(400).json({ success: false, message: 'Trạng thái khiếu nại không hợp lệ' });
+            }
+            await pool.request()
+                .input('id', sql.Int, Number(req.params.id))
+                .input('status', sql.VarChar(30), status)
+                .input('adminId', sql.Int, Number(req.user?.sub) || null)
+                .input('phanHoi', sql.NVarChar(sql.MAX), phan_hoi_admin || note || null)
+                .query(`
+                    UPDATE KhieuNai 
+                    SET trang_thai_khieu_nai = @status, 
+                        phan_hoi_admin = COALESCE(@phanHoi, phan_hoi_admin),
+                        ma_admin_xu_ly = COALESCE(@adminId, ma_admin_xu_ly),
+                        ngay_cap_nhat = SYSDATETIME() 
+                    WHERE ma_khieu_nai = @id
+                `);
         } else {
-            if (!['cho_tiep_nhan', 'da_tiep_nhan', 'dang_thuc_hien', 'hoan_thanh', 'tu_choi'].includes(status)) return res.status(400).json({ success: false, message: 'Trạng thái yêu cầu không hợp lệ' });
-            await pool.request().input('id', sql.Int, Number(req.params.id)).input('status', sql.VarChar(20), status).query(`UPDATE YeuCauDichVu SET trang_thai_xu_ly = @status, ngay_hoan_thanh = CASE WHEN @status = 'hoan_thanh' THEN SYSDATETIME() ELSE ngay_hoan_thanh END WHERE ma_yeu_cau = @id`);
+            if (!['cho_tiep_nhan', 'da_tiep_nhan', 'dang_thuc_hien', 'hoan_thanh', 'tu_choi'].includes(status)) {
+                return res.status(400).json({ success: false, message: 'Trạng thái yêu cầu không hợp lệ' });
+            }
+            await pool.request()
+                .input('id', sql.Int, Number(req.params.id))
+                .input('status', sql.VarChar(20), status)
+                .input('phanHoi', sql.NVarChar(sql.MAX), phan_hoi_admin || note || null)
+                .query(`
+                    UPDATE YeuCauDichVu 
+                    SET trang_thai_xu_ly = @status, 
+                        phan_hoi_cua_nha_vuon = COALESCE(@phanHoi, phan_hoi_cua_nha_vuon),
+                        ngay_hoan_thanh = CASE WHEN @status = 'hoan_thanh' THEN SYSDATETIME() ELSE ngay_hoan_thanh END 
+                    WHERE ma_yeu_cau = @id
+                `);
         }
-        return res.json({ success: true, message: 'Đã cập nhật yêu cầu' });
-    } catch (error) { return res.status(500).json({ success: false, message: 'Không thể cập nhật yêu cầu' }); }
+        return res.json({ success: true, message: 'Đã cập nhật yêu cầu thành công' });
+    } catch (error) { 
+        console.error('Lỗi cập nhật yêu cầu:', error);
+        return res.status(500).json({ success: false, message: 'Không thể cập nhật yêu cầu' }); 
+    }
 };
 
 module.exports = { dashboard, users, updateUser, plots, createPlot, updatePlot, rentals, requests, serviceRequests, complaintRequests, consultationRequests, updateRequest };

@@ -237,6 +237,7 @@ CREATE TABLE dbo.YeuCauDichVu (
     ngay_yeu_cau_thuc_hien DATE NOT NULL DEFAULT CAST(SYSDATETIME() AS DATE),
     buoi_thuc_hien VARCHAR(20) NOT NULL DEFAULT 'sang', -- 'sang', 'chieu'
     ghi_chu_cua_khach NVARCHAR(500) NULL,
+    loai_yeu_cau VARCHAR(30) NOT NULL DEFAULT 'cham_soc', -- 'cham_soc', 'khieu_nai', 'khac'
     chi_phi DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
     trang_thai_thanh_toan VARCHAR(20) NOT NULL DEFAULT 'mien_phi_kem_theo',
     trang_thai_xu_ly VARCHAR(20) NOT NULL DEFAULT 'cho_tiep_nhan', -- 'cho_tiep_nhan', 'da_giao_viec', 'dang_xu_ly', 'hoan_thanh', 'da_huy', 'tu_choi'

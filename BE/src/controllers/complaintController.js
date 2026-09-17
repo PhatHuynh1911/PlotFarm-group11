@@ -66,7 +66,8 @@ const getComplaintsByUser = async (req, res) => {
         const result = await pool.request()
             .input('userId', sql.Int, Number(userId))
             .query(`
-                SELECT k.*, h.so_hop_dong, o.so_hieu_o, o.ten_o_dat
+                SELECT k.*, 'khieu_nai' AS category, 'complaint' AS type, 'complaint' AS source,
+                       h.so_hop_dong, o.so_hieu_o, o.ten_o_dat
                 FROM KhieuNai k
                 LEFT JOIN HopDongThue h ON h.ma_hop_dong = k.ma_hop_dong
                 LEFT JOIN ODat o ON o.ma_o_dat = k.ma_o_dat
@@ -89,9 +90,12 @@ const getAllComplaints = async (req, res) => {
     try {
         const pool = await getPool();
         const result = await pool.request().query(`
-            SELECT k.*, u.ho_va_ten AS ten_khach_hang, o.so_hieu_o, o.ten_o_dat
+            SELECT k.*, 'khieu_nai' AS category, 'complaint' AS type, 'complaint' AS source,
+                   u.ho_va_ten AS ten_khach_hang, u.email, u.so_dien_thoai AS sdt_khach_hang,
+                   o.so_hieu_o, o.ten_o_dat, h.so_hop_dong
             FROM KhieuNai k
             JOIN NguoiDung u ON u.ma_nguoi_dung = k.ma_khach_hang
+            LEFT JOIN HopDongThue h ON h.ma_hop_dong = k.ma_hop_dong
             LEFT JOIN ODat o ON o.ma_o_dat = k.ma_o_dat
             ORDER BY k.ngay_gui DESC
         `);
