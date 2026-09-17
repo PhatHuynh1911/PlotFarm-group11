@@ -37,6 +37,12 @@ const labels = {
     da_giai_quyet: "Đã giải quyết",
     tu_choi: "Từ chối",
   },
+  assignmentStatus: {
+    cho_tiep_nhan: "Chờ tiếp nhận",
+    da_chap_nhan: "Đã chấp nhận",
+    tu_choi: "Đã từ chối",
+    da_huy: "Đã hủy",
+  },
 };
 const money = (value) => `${Number(value || 0).toLocaleString("vi-VN")} đ`;
 const date = (value) =>
@@ -689,7 +695,7 @@ function AssignmentPanel({ items, farmers, assignments, onAssign }) {
           {currentAssignment && (
             <p className="assignment-current">
               Hiện tại: <strong>{currentAssignment.ten_nong_dan}</strong> ·{" "}
-              {currentAssignment.trang_thai}
+              {labels.assignmentStatus[currentAssignment.trang_thai] || currentAssignment.trang_thai}
             </p>
           )}
           <button
@@ -719,7 +725,7 @@ function AssignmentPanel({ items, farmers, assignments, onAssign }) {
                   </strong>
                   <span>{item.ten_khach_hang}</span>
                 </div>
-                <span className="status-pill">{item.trang_thai}</span>
+                <span className="status-pill">{labels.assignmentStatus[item.trang_thai] || item.trang_thai}</span>
               </article>
             ))}
           </div>
@@ -772,7 +778,7 @@ function Rentals({ items, assignments }) {
                   <td>{assignment?.ten_nong_dan || "Chưa phân công"}</td>
                   <td>
                     <span className="status-pill">
-                      {assignment ? assignment.trang_thai : "Chưa phân công"}
+                      {assignment ? (labels.assignmentStatus[assignment.trang_thai] || assignment.trang_thai) : "Chưa phân công"}
                     </span>
                   </td>
                 </tr>
