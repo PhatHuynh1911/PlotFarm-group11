@@ -92,6 +92,7 @@ const connectDB = async () => {
                     ma_quan_tri INT NOT NULL FOREIGN KEY REFERENCES dbo.NguoiDung(ma_nguoi_dung),
                     trang_thai VARCHAR(20) NOT NULL DEFAULT 'cho_tiep_nhan',
                     ghi_chu NVARCHAR(500) NULL,
+                    ly_do_tu_choi NVARCHAR(500) NULL,
                     ngay_gui DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
                     ngay_phan_hoi DATETIME2 NULL,
                     CONSTRAINT UQ_PhanCongNongDan_HopDong_Farmer UNIQUE (ma_hop_dong, ma_nong_dan)
@@ -127,6 +128,19 @@ const connectDB = async () => {
                     ngay_gui DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
                     ngay_cap_nhat DATETIME2 NOT NULL DEFAULT SYSDATETIME()
                 );
+            END
+
+            -- Tương thích database cũ đã có bảng PhanCongNongDan.
+            IF COL_LENGTH('dbo.PhanCongNongDan', 'ly_do_tu_choi') IS NULL
+            BEGIN
+                ALTER TABLE dbo.PhanCongNongDan ADD ly_do_tu_choi NVARCHAR(500) NULL;
+            END
+
+            -- Phân loại yêu cầu để tách tab Chăm sóc và Khiếu nại.
+            IF COL_LENGTH('dbo.YeuCauDichVu', 'loai_yeu_cau') IS NULL
+            BEGIN
+                ALTER TABLE dbo.YeuCauDichVu
+                ADD loai_yeu_cau VARCHAR(30) NULL;
             END
         `);
         console.log(`✅ Kết nối SQL Server thành công: [${process.env.DB_NAME || 'PlotFarmDB'}] tại ${serverVal}`);
