@@ -1,5 +1,5 @@
 const { sql, getPool } = require('../config/db');
-const { createNotification } = require('./notificationController');
+const { createNotification, notifyAdmins } = require('./notificationController');
 
 const getFarmers = async (req, res) => {
     try {
@@ -28,7 +28,7 @@ const getAssignments = async (req, res) => {
         }
         const result = await request.query(`
             SELECT p.ma_phan_cong, p.ma_hop_dong, p.ma_nong_dan, p.trang_thai,
-                   p.ghi_chu, p.ngay_gui, p.ngay_phan_hoi,
+                   p.ghi_chu, p.ly_do_tu_choi, p.ngay_gui, p.ngay_phan_hoi,
                    o.so_hieu_o, o.ten_o_dat, k.ho_va_ten AS ten_khach_hang,
                    n.ho_va_ten AS ten_nong_dan, n.email AS email_nong_dan
             FROM PhanCongNongDan p
@@ -65,7 +65,7 @@ const createAssignment = async (req, res) => {
                 IF @contractStatus <> 'hieu_luc' OR @contractStatus IS NULL THROW 50002, 'Hợp đồng không còn hiệu lực', 1;
                 UPDATE PhanCongNongDan
                 SET ma_nong_dan = @farmerId, ma_quan_tri = @adminId, trang_thai = 'cho_tiep_nhan',
-                    ghi_chu = @note, ngay_gui = SYSDATETIME(), ngay_phan_hoi = NULL
+                    ghi_chu = @note, ly_do_tu_choi = NULL, ngay_gui = SYSDATETIME(), ngay_phan_hoi = NULL
                 WHERE ma_hop_dong = @contractId AND trang_thai <> 'da_huy';
                 IF @@ROWCOUNT = 0
                     INSERT INTO PhanCongNongDan (ma_hop_dong, ma_nong_dan, ma_quan_tri, ghi_chu)
@@ -95,21 +95,68 @@ const createAssignment = async (req, res) => {
 
 const respondToAssignment = async (req, res) => {
     try {
-        const { status } = req.body;
+        const { status, reason, ly_do_tu_choi } = req.body;
         if (!['da_chap_nhan', 'tu_choi'].includes(status)) return res.status(400).json({ success: false, message: 'Phản hồi phân công không hợp lệ' });
+
+        const rejectReason = (reason || ly_do_tu_choi || '').trim();
+
         const pool = await getPool();
         const result = await pool.request()
             .input('id', sql.Int, Number(req.params.id))
             .input('farmerId', sql.Int, Number(req.user.sub))
             .input('status', sql.VarChar(20), status)
+            .input('reason', sql.NVarChar(500), status === 'tu_choi' ? (rejectReason || 'Nông dân bận lịch/không nhận phân công này') : null)
             .query(`
                 UPDATE PhanCongNongDan
-                SET trang_thai = @status, ngay_phan_hoi = SYSDATETIME()
-                OUTPUT INSERTED.ma_phan_cong, INSERTED.ma_hop_dong, INSERTED.trang_thai
+                SET trang_thai = @status,
+                    ly_do_tu_choi = @reason,
+                    ngay_phan_hoi = SYSDATETIME()
+                OUTPUT INSERTED.ma_phan_cong, INSERTED.ma_hop_dong, INSERTED.trang_thai, INSERTED.ly_do_tu_choi
                 WHERE ma_phan_cong = @id AND ma_nong_dan = @farmerId AND trang_thai = 'cho_tiep_nhan'
             `);
+
         if (!result.recordset[0]) return res.status(404).json({ success: false, message: 'Không tìm thấy lời mời phân công đang chờ' });
-        return res.json({ success: true, message: status === 'da_chap_nhan' ? 'Đã nhận phân công' : 'Đã từ chối phân công', data: result.recordset[0] });
+
+        const assignment = result.recordset[0];
+
+        // Lấy chi tiết thông tin ô đất, hợp đồng và tên nông dân để gửi thông báo
+        const detailRes = await pool.request()
+            .input('assignmentId', sql.Int, assignment.ma_phan_cong)
+            .query(`
+                SELECT o.so_hieu_o, o.ten_o_dat, h.so_hop_dong, n.ho_va_ten AS ten_nong_dan
+                FROM PhanCongNongDan p
+                JOIN HopDongThue h ON h.ma_hop_dong = p.ma_hop_dong
+                JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+                JOIN NguoiDung n ON n.ma_nguoi_dung = p.ma_nong_dan
+                WHERE p.ma_phan_cong = @assignmentId
+            `);
+        const detail = detailRes.recordset[0];
+        const plotCode = detail?.so_hieu_o || `HĐ #${assignment.ma_hop_dong}`;
+        const farmerName = detail?.ten_nong_dan || 'Nông dân';
+        const contractCode = detail?.so_hop_dong || `#${assignment.ma_hop_dong}`;
+
+        if (status === 'tu_choi') {
+            const finalReason = assignment.ly_do_tu_choi || 'Không nêu lý do';
+            notifyAdmins(
+                `Cảnh báo: Nông dân từ chối nhận ô ${plotCode}`,
+                `Nông dân ${farmerName} đã từ chối nhận phân công ô đất ${plotCode} (HĐ: ${contractCode}). Lý do: "${finalReason}". Vui lòng kiểm tra và phân công lại nông dân khác.`,
+                'phan_cong',
+                '/admin?tab=assignments'
+            ).catch((err) => console.error('Lỗi bắn thông báo từ chối tới admin:', err));
+        } else if (status === 'da_chap_nhan') {
+            notifyAdmins(
+                `Nông dân đã nhận phân công: ${plotCode}`,
+                `Nông dân ${farmerName} đã đồng ý tiếp nhận chăm sóc ô đất ${plotCode} (HĐ: ${contractCode}).`,
+                'phan_cong',
+                '/admin?tab=assignments'
+            ).catch((err) => console.error('Lỗi bắn thông báo chấp nhận tới admin:', err));
+        }
+
+        return res.json({
+            success: true,
+            message: status === 'da_chap_nhan' ? 'Đã tiếp nhận phân công thành công' : 'Đã từ chối phân công và gửi lý do tới quản trị viên',
+            data: assignment
+        });
     } catch (error) {
         console.error('Lỗi phản hồi phân công:', error);
         return res.status(500).json({ success: false, message: 'Không thể phản hồi phân công' });

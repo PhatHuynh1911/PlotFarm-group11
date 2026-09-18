@@ -175,8 +175,21 @@ export async function getAssignments(token) {
   return result.data
 }
 
-export async function respondToAssignment(id, status, token) {
-  return apiRequest(`/rentals/assignments/${id}/respond`, { method: 'PATCH', body: JSON.stringify({ status }), token })
+export async function respondToAssignment(id, status, reason = '', token) {
+  return apiRequest(`/rentals/assignments/${id}/respond`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status, reason, ly_do_tu_choi: reason }),
+    token
+  })
+}
+
+export async function getRentalPaymentInfo(rentalId, token) {
+  const result = await apiRequest(`/rentals/${rentalId}/payment-info`, { token })
+  return result.data
+}
+
+export async function confirmRentalPayment(rentalId, token) {
+  return apiRequest(`/rentals/${rentalId}/confirm-payment`, { method: 'POST', token })
 }
 
 export async function getUserServiceRequests(userId, token) {

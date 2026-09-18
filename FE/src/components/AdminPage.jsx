@@ -44,6 +44,11 @@ const labels = {
     tu_choi: "Đã từ chối",
     da_huy: "Đã hủy",
   },
+  paymentStatus: {
+    cho_thanh_toan: "Chờ thanh toán",
+    da_thanh_toan: "Đã thanh toán",
+    hoan_tien: "Hoàn tiền",
+  },
 };
 const money = (value) => `${Number(value || 0).toLocaleString("vi-VN")} đ`;
 const date = (value) =>
@@ -719,14 +724,48 @@ function AssignmentPanel({ items, farmers, assignments, onAssign }) {
         {assignments.length ? (
           <div className="admin-assignment-list">
             {assignments.map((item) => (
-              <article key={item.ma_phan_cong}>
+              <article
+                key={item.ma_phan_cong}
+                style={
+                  item.trang_thai === "tu_choi"
+                    ? { borderLeft: "4px solid #c94a4a", background: "#fff5f5" }
+                    : {}
+                }
+              >
                 <div>
                   <strong>
                     {item.so_hieu_o} · {item.ten_nong_dan}
                   </strong>
                   <span>{item.ten_khach_hang}</span>
+                  {item.trang_thai === "tu_choi" && (
+                    <div style={{ marginTop: "6px", fontSize: "12px", color: "#c94a4a" }}>
+                      ⚠️ <strong>Lý do từ chối:</strong> {item.ly_do_tu_choi || "Không nêu lý do"}
+                    </div>
+                  )}
                 </div>
-                <span className="status-pill">{labels.assignmentStatus[item.trang_thai] || item.trang_thai}</span>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
+                  <span
+                    className="status-pill"
+                    style={
+                      item.trang_thai === "tu_choi"
+                        ? { background: "#fde8e8", color: "#c94a4a", borderColor: "#f8b4b4" }
+                        : {}
+                    }
+                  >
+                    {labels.assignmentStatus[item.trang_thai] || item.trang_thai}
+                  </span>
+                  {item.trang_thai === "tu_choi" && (
+                    <button
+                      type="button"
+                      className="outline-button"
+                      style={{ padding: "4px 8px", fontSize: "11px", borderColor: "#c94a4a", color: "#c94a4a" }}
+                      onClick={() => setSelectedContract(String(item.ma_hop_dong))}
+                      title="Chọn lại hợp đồng này để gán cho nông dân khác"
+                    >
+                      Gán lại nông dân
+                    </button>
+                  )}
+                </div>
               </article>
             ))}
           </div>
@@ -769,7 +808,13 @@ function Rentals({ items, assignments }) {
                 <tr key={item.id}>
                   <td>
                     <strong>{item.code}</strong>
-                    <small>{item.status}</small>
+                    <small>
+                      {item.paymentStatus === "cho_thanh_toan" ? (
+                        <span style={{ color: "#c98b3c", fontWeight: "600" }}>Chờ thanh toán</span>
+                      ) : (
+                        <span style={{ color: "#2b8a3e" }}>Đã thanh toán</span>
+                      )}
+                    </small>
                   </td>
                   <td>{item.customer}</td>
                   <td>{item.plot}</td>
@@ -778,9 +823,21 @@ function Rentals({ items, assignments }) {
                   </td>
                   <td>{assignment?.ten_nong_dan || "Chưa phân công"}</td>
                   <td>
-                    <span className="status-pill">
+                    <span
+                      className="status-pill"
+                      style={
+                        assignment?.trang_thai === "tu_choi"
+                          ? { background: "#fde8e8", color: "#c94a4a", borderColor: "#f8b4b4" }
+                          : {}
+                      }
+                    >
                       {assignment ? (labels.assignmentStatus[assignment.trang_thai] || assignment.trang_thai) : "Chưa phân công"}
                     </span>
+                    {assignment?.trang_thai === "tu_choi" && assignment.ly_do_tu_choi && (
+                      <div style={{ fontSize: "11px", color: "#c94a4a", marginTop: "3px" }}>
+                        {assignment.ly_do_tu_choi}
+                      </div>
+                    )}
                   </td>
                 </tr>
               );

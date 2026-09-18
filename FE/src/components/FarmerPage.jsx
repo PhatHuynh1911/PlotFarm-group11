@@ -65,6 +65,9 @@ function FarmerPage({ user, onLogout }) {
   });
   const [cameraMessage, setCameraMessage] = useState("");
   const [harvested, setHarvested] = useState([]);
+  const [rejectingAssignment, setRejectingAssignment] = useState(null);
+  const [rejectionReasonType, setRejectionReasonType] = useState("busy");
+  const [rejectionReasonText, setRejectionReasonText] = useState("");
 
   const selectTab = (tab) => {
     setSearchParams((current) => {
@@ -160,19 +163,45 @@ function FarmerPage({ user, onLogout }) {
       .finally(() => setLoading(false));
   }, [token]);
 
-  const respondAssignment = async (assignment, status) => {
+  const respondAssignment = async (assignment, status, reason = "") => {
     try {
-      await respondToAssignment(assignment.ma_phan_cong, status, token);
+      await respondToAssignment(assignment.ma_phan_cong, status, reason, token);
       setAssignments((items) =>
         items.map((item) =>
           item.ma_phan_cong === assignment.ma_phan_cong
-            ? { ...item, trang_thai: status }
+            ? { ...item, trang_thai: status, ly_do_tu_choi: reason }
             : item,
         ),
       );
+      if (status === "da_chap_nhan") {
+        notify("Đã tiếp nhận phân công chăm sóc ô đất thành công!");
+      } else {
+        notify("Đã từ chối phân công và gửi lý do cho Quản trị viên.");
+      }
     } catch (requestError) {
       setError(requestError.message);
+      notify(requestError.message, "error");
     }
+  };
+
+  const confirmRejectAssignment = async (e) => {
+    if (e) e.preventDefault();
+    if (!rejectingAssignment) return;
+    const presets = {
+      busy: "Lịch làm việc đã kín trong tháng này",
+      distance: "Khoảng cách xa khu vực nông trại phụ trách chính",
+      skill: "Chưa có kinh nghiệm chăm sóc loại giống cây trồng này",
+      health: "Lý do cá nhân / sức khỏe tạm thời",
+      other: rejectionReasonText.trim() || "Lý do khác",
+    };
+    let reason = presets[rejectionReasonType] || "Nông dân bận lịch, từ chối nhận phân công";
+    if (rejectionReasonType !== "other" && rejectionReasonText.trim()) {
+      reason += ` - Chi tiết: ${rejectionReasonText.trim()}`;
+    }
+    await respondAssignment(rejectingAssignment, "tu_choi", reason);
+    setRejectingAssignment(null);
+    setRejectionReasonText("");
+    setRejectionReasonType("busy");
   };
 
   const updateRequest = async (id, status, reply = "", photo = "") => {
@@ -468,7 +497,7 @@ function FarmerPage({ user, onLogout }) {
                   <div className="request-actions">
                     <button
                       className="outline-button"
-                      onClick={() => respondAssignment(assignment, "tu_choi")}
+                      onClick={() => setRejectingAssignment(assignment)}
                     >
                       Từ chối
                     </button>
@@ -549,9 +578,7 @@ function FarmerPage({ user, onLogout }) {
                         <>
                           <button
                             className="outline-button"
-                            onClick={() =>
-                              respondAssignment(assignment, "tu_choi")
-                            }
+                            onClick={() => setRejectingAssignment(assignment)}
                           >
                             Từ chối
                           </button>
@@ -568,7 +595,7 @@ function FarmerPage({ user, onLogout }) {
                         <span className="assignment-status">
                           {assignment.trang_thai === "da_chap_nhan"
                             ? "Đã chấp nhận"
-                            : "Đã từ chối"}
+                            : `Đã từ chối${assignment.ly_do_tu_choi ? ` (${assignment.ly_do_tu_choi})` : ""}`}
                         </span>
                       )}
                     </div>
@@ -1017,6 +1044,85 @@ function FarmerPage({ user, onLogout }) {
           <ProfilePanel user={user} onSave={saveProfile} />
         )}
       </section>
+
+      {rejectingAssignment && (
+        <div className="booking-backdrop">
+          <form className="booking-modal" onSubmit={confirmRejectAssignment}>
+            <button
+              type="button"
+              className="modal-close"
+              onClick={() => {
+                setRejectingAssignment(null);
+                setRejectionReasonText("");
+              }}
+            >
+              ×
+            </button>
+            <p className="eyebrow" style={{ color: "#c94a4a" }}>
+              XÁC NHẬN TỪ CHỐI PHÂN CÔNG
+            </p>
+            <h2>Từ chối nhận ô {rejectingAssignment.so_hieu_o}</h2>
+            <p>
+              Vui lòng chọn hoặc nhập lý do bạn không thể nhận phân công chăm sóc ô đất này để Quản trị viên kịp thời điều phối nông dân khác.
+            </p>
+
+            <label>
+              Lý do từ chối chính
+              <select
+                value={rejectionReasonType}
+                onChange={(e) => setRejectionReasonType(e.target.value)}
+              >
+                <option value="busy">Lịch làm việc đã kín trong tháng này</option>
+                <option value="distance">Khoảng cách xa khu vực nông trại phụ trách chính</option>
+                <option value="skill">Chưa có kinh nghiệm chăm sóc loại giống cây trồng này</option>
+                <option value="health">Lý do cá nhân / sức khỏe tạm thời</option>
+                <option value="other">Lý do khác (tự nhập chi tiết)</option>
+              </select>
+            </label>
+
+            <label>
+              Ghi chú thêm chi tiết (nếu có)
+              <textarea
+                rows={3}
+                style={{
+                  width: "100%",
+                  padding: "10px",
+                  border: "1px solid #dfe1da",
+                  borderRadius: "6px",
+                  fontFamily: "inherit",
+                  fontSize: "13px",
+                  boxSizing: "border-box",
+                  resize: "vertical",
+                }}
+                placeholder={rejectionReasonType === "other" ? "Vui lòng nhập lý do cụ thể..." : "Nhập thêm chi tiết nếu cần thiết..."}
+                value={rejectionReasonText}
+                onChange={(e) => setRejectionReasonText(e.target.value)}
+                required={rejectionReasonType === "other"}
+              />
+            </label>
+
+            <div className="booking-actions">
+              <button
+                type="button"
+                className="outline-button"
+                onClick={() => {
+                  setRejectingAssignment(null);
+                  setRejectionReasonText("");
+                }}
+              >
+                Quay lại
+              </button>
+              <button
+                type="submit"
+                className="primary-button"
+                style={{ backgroundColor: "#c94a4a", borderColor: "#c94a4a" }}
+              >
+                Xác nhận từ chối
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </main>
   );
 }

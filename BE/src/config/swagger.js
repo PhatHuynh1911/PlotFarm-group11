@@ -246,6 +246,67 @@ const swaggerSpec = {
                 }
             }
         },
+        '/api/rentals/{id}/payment-info': {
+            get: {
+                tags: ['4. Rentals'],
+                summary: 'Lấy thông tin thanh toán & link mã VietQR chuẩn Napas247',
+                parameters: [
+                    { name: 'id', in: 'path', required: true, schema: { type: 'integer', example: 1 } }
+                ],
+                responses: {
+                    200: { description: 'Chi tiết tài khoản nhận tiền, số tiền, cú pháp và ảnh VietQR code' }
+                }
+            }
+        },
+        '/api/rentals/{id}/confirm-payment': {
+            post: {
+                tags: ['4. Rentals'],
+                summary: 'Xác nhận thanh toán hợp đồng thuê đất (kích hoạt hiệu lực và cập nhật ô đất đã thuê)',
+                parameters: [
+                    { name: 'id', in: 'path', required: true, schema: { type: 'integer', example: 1 } }
+                ],
+                responses: {
+                    200: { description: 'Xác nhận thanh toán thành công, hợp đồng chuyển sang có hiệu lực' }
+                }
+            }
+        },
+        '/api/rentals/assignments/mine': {
+            get: {
+                tags: ['4. Rentals'],
+                summary: 'Nông dân lấy danh sách các lời mời phân công phụ trách ô đất của mình',
+                responses: {
+                    200: { description: 'Danh sách phân công kèm trạng thái và lý do từ chối nếu có' }
+                }
+            }
+        },
+        '/api/rentals/assignments/{id}/respond': {
+            patch: {
+                tags: ['4. Rentals'],
+                summary: 'Nông dân phản hồi lời mời phân công (tiếp nhận hoặc từ chối kèm lý do cụ thể)',
+                parameters: [
+                    { name: 'id', in: 'path', required: true, schema: { type: 'integer', example: 1 } }
+                ],
+                requestBody: {
+                    required: true,
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                required: ['status'],
+                                properties: {
+                                    status: { type: 'string', enum: ['da_chap_nhan', 'tu_choi'], example: 'tu_choi' },
+                                    reason: { type: 'string', example: 'Lịch làm việc đã kín trong tháng này' },
+                                    ly_do_tu_choi: { type: 'string', example: 'Lịch làm việc đã kín trong tháng này' }
+                                }
+                            }
+                        }
+                    }
+                },
+                responses: {
+                    200: { description: 'Cập nhật trạng thái phân công và thông báo tới Admin thành công' }
+                }
+            }
+        },
 
         // --- 5. JOURNALS ---
         '/api/journals': {
@@ -631,6 +692,47 @@ const swaggerSpec = {
                 },
                 responses: {
                     200: { description: 'Cập nhật trạng thái thành công' }
+                }
+            }
+        },
+        '/api/admin/farmers': {
+            get: {
+                tags: ['9. Admin'],
+                summary: 'Lấy danh sách tất cả nông dân đang hoạt động',
+                responses: {
+                    200: { description: 'Danh sách nông dân' }
+                }
+            }
+        },
+        '/api/admin/assignments': {
+            get: {
+                tags: ['9. Admin'],
+                summary: 'Lấy danh sách phân công nông dân kèm trạng thái và lý do từ chối nếu có',
+                responses: {
+                    200: { description: 'Danh sách phân công phụ trách ô đất' }
+                }
+            },
+            post: {
+                tags: ['9. Admin'],
+                summary: 'Giao nông dân phụ trách hợp đồng canh tác ô đất',
+                requestBody: {
+                    required: true,
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                required: ['ma_hop_dong', 'ma_nong_dan'],
+                                properties: {
+                                    ma_hop_dong: { type: 'integer', example: 1 },
+                                    ma_nong_dan: { type: 'integer', example: 2 },
+                                    ghi_chu: { type: 'string', example: 'Chăm sóc theo yêu cầu hữu cơ' }
+                                }
+                            }
+                        }
+                    }
+                },
+                responses: {
+                    201: { description: 'Phân công nông dân thành công' }
                 }
             }
         },

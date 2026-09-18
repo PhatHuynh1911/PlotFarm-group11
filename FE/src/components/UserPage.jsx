@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   createRental,
+  confirmRentalPayment,
+  getRentalPaymentInfo,
   createServiceRequest,
   getJournalsByRental,
   getPlots,
@@ -90,6 +92,8 @@ function UserPage({ user, token, onLogout }) {
   });
   const [bookingStep, setBookingStep] = useState("details");
   const [bookingSubmitting, setBookingSubmitting] = useState(false);
+  const [activePaymentModal, setActivePaymentModal] = useState(null);
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const [notice, setNotice] = useState("");
   const [supportSent, setSupportSent] = useState(false);
   const [harvestSent, setHarvestSent] = useState(false);
@@ -220,7 +224,7 @@ function UserPage({ user, token, onLogout }) {
     setError("");
     setBookingSubmitting(true);
     try {
-      await createRental(
+      const response = await createRental(
         {
           ma_nguoi_dung: user.id,
           ma_o_dat: selectedPlot.id,
@@ -228,19 +232,47 @@ function UserPage({ user, token, onLogout }) {
         },
         token,
       );
+      const createdData = response?.data || response;
       setRentals(await getUserRentals(user.id, token));
       setAvailablePlots((plots) =>
         plots.filter((plot) => plot.id !== selectedPlot.id),
       );
-      showNotice(
-        `Đã xác nhận thuê ô ${selectedPlot.code}. Hợp đồng đã được tạo.`,
-      );
       closeBooking();
-      selectTab("gardens");
+      setActivePaymentModal(createdData);
+      showNotice(
+        `Đã tạo hợp đồng thuê ô ${selectedPlot.code}! Vui lòng quét mã VietQR để hoàn tất thanh toán.`,
+      );
     } catch (requestError) {
       setError(requestError.message);
     } finally {
       setBookingSubmitting(false);
+    }
+  };
+
+  const openRentalPayment = async (rental) => {
+    try {
+      const paymentData = await getRentalPaymentInfo(rental.ma_hop_dong, token);
+      setActivePaymentModal(paymentData);
+    } catch (err) {
+      setError(err.message || "Không thể tải thông tin thanh toán");
+      notify(err.message || "Không thể tải thông tin thanh toán", "error");
+    }
+  };
+
+  const handleConfirmPayment = async (rentalId) => {
+    setPaymentSubmitting(true);
+    try {
+      await confirmRentalPayment(rentalId, token);
+      setRentals(await getUserRentals(user.id, token));
+      setActivePaymentModal(null);
+      showNotice("Thanh toán thành công! Hợp đồng thuê đất đã được kích hoạt hiệu lực.");
+      notify("Thanh toán thành công! Hợp đồng đã có hiệu lực.");
+      selectTab("gardens");
+    } catch (err) {
+      setError(err.message || "Lỗi khi xác nhận thanh toán");
+      notify(err.message || "Lỗi khi xác nhận thanh toán", "error");
+    } finally {
+      setPaymentSubmitting(false);
     }
   };
   const submitSupport = async (event) => {
@@ -413,9 +445,13 @@ function UserPage({ user, token, onLogout }) {
                 </div>
                 <div className="my-plot-body">
                   <p className="plot-status">
-                    {rental.trang_thai_hop_dong === "hieu_luc"
-                      ? "Đang thuê"
-                      : rental.trang_thai_hop_dong}
+                    {rental.trang_thai_thanh_toan === "cho_thanh_toan" ? (
+                      <span style={{ color: "#c98b3c", fontWeight: "700" }}>Chờ thanh toán</span>
+                    ) : rental.trang_thai_hop_dong === "hieu_luc" ? (
+                      "Đang thuê"
+                    ) : (
+                      rental.trang_thai_hop_dong
+                    )}
                   </p>
                   <h3>{rental.ten_o_dat}</h3>
                   <p>
@@ -430,15 +466,25 @@ function UserPage({ user, token, onLogout }) {
                     <b>{daysRemaining(rental.ngay_ket_thuc)}</b>
                     <span>ngày còn lại</span>
                   </div>
-                  <button
-                    className="outline-button"
-                    onClick={() => {
-                      setSelectedJournalRental(String(rental.ma_hop_dong));
-                      setActiveTab("journal");
-                    }}
-                  >
-                    Xem nhật ký canh tác →
-                  </button>
+                  {rental.trang_thai_thanh_toan === "cho_thanh_toan" ? (
+                    <button
+                      className="primary-button"
+                      style={{ marginTop: "10px", width: "100%", backgroundColor: "#c98b3c", borderColor: "#c98b3c" }}
+                      onClick={() => openRentalPayment(rental)}
+                    >
+                      Thanh toán VietQR →
+                    </button>
+                  ) : (
+                    <button
+                      className="outline-button"
+                      onClick={() => {
+                        setSelectedJournalRental(String(rental.ma_hop_dong));
+                        setActiveTab("journal");
+                      }}
+                    >
+                      Xem nhật ký canh tác →
+                    </button>
+                  )}
                 </div>
               </article>
             ))}
@@ -1384,6 +1430,104 @@ function UserPage({ user, token, onLogout }) {
               </>
             )}
           </form>
+        </div>
+      )}
+
+      {activePaymentModal && (
+        <div className="booking-backdrop">
+          <div
+            className="booking-modal"
+            style={{
+              width: "min(100%, 500px)",
+              maxHeight: "90vh",
+              overflowY: "auto",
+              padding: "30px 25px",
+              textAlign: "center",
+            }}
+          >
+            <button
+              type="button"
+              className="modal-close"
+              onClick={() => setActivePaymentModal(null)}
+            >
+              ×
+            </button>
+            <p className="eyebrow" style={{ color: "#2b8a3e", marginBottom: "4px" }}>
+              THANH TOÁN VIETQR NAPAS 24/7
+            </p>
+            <h2 style={{ fontSize: "24px", marginBottom: "6px" }}>Mã QR Thanh Toán Đơn Thuê</h2>
+            <p style={{ margin: "0 0 14px", color: "#526658", fontSize: "13px" }}>
+              Hợp đồng: <strong>{activePaymentModal.so_hop_dong}</strong>
+              {activePaymentModal.so_hieu_o ? ` · Ô đất: ${activePaymentModal.so_hieu_o}` : ""}
+            </p>
+
+            <div style={{ display: "flex", justifyContent: "center", margin: "10px 0 16px" }}>
+              <img
+                src={activePaymentModal.qr_code_url || activePaymentModal.payment_info?.qr_code_url}
+                alt="VietQR Code"
+                style={{
+                  maxWidth: "280px",
+                  width: "100%",
+                  height: "auto",
+                  borderRadius: "12px",
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+                  border: "1px solid #dfe1da",
+                  background: "#fff",
+                }}
+              />
+            </div>
+
+            <div className="booking-summary" style={{ textAlign: "left", marginBottom: "14px" }}>
+              <div>
+                <span>Ngân hàng</span>
+                <strong>{activePaymentModal.bank_info?.bank_name || activePaymentModal.payment_info?.bank_name || "MBBank (Quân Đội)"}</strong>
+              </div>
+              <div>
+                <span>Số tài khoản</span>
+                <strong style={{ color: "#173525", fontSize: "14px", letterSpacing: "1px" }}>
+                  {activePaymentModal.bank_info?.account_no || activePaymentModal.payment_info?.account_no || "0905123456"}
+                </strong>
+              </div>
+              <div>
+                <span>Tên tài khoản</span>
+                <strong>{activePaymentModal.bank_info?.account_name || activePaymentModal.payment_info?.account_name || "PLOTFARM VIETNAM"}</strong>
+              </div>
+              <div>
+                <span>Số tiền thanh toán</span>
+                <strong style={{ color: "#c98b3c", fontSize: "16px" }}>
+                  {formatMoney(activePaymentModal.tong_tien || activePaymentModal.payment_info?.amount || activePaymentModal.tongTien || 0)}
+                </strong>
+              </div>
+              <div>
+                <span>Nội dung chuyển khoản</span>
+                <strong style={{ color: "#173525", background: "#e2e9df", padding: "3px 8px", borderRadius: "4px" }}>
+                  {activePaymentModal.transfer_content || activePaymentModal.payment_info?.transfer_content || `PFTHUE ${activePaymentModal.so_hop_dong}`}
+                </strong>
+              </div>
+            </div>
+
+            <p className="payment-note" style={{ textAlign: "left", marginBottom: "14px" }}>
+              Mở ứng dụng ngân hàng hoặc ví điện tử bất kỳ, chọn <strong>Quét mã QR</strong> để chuyển tiền. Sau khi thanh toán, bấm xác nhận bên dưới để hệ thống kích hoạt hợp đồng ngay lập tức.
+            </p>
+
+            <div className="booking-actions" style={{ marginTop: "10px" }}>
+              <button
+                type="button"
+                className="outline-button"
+                onClick={() => setActivePaymentModal(null)}
+              >
+                Đóng / Để sau
+              </button>
+              <button
+                type="button"
+                className="primary-button booking-submit"
+                disabled={paymentSubmitting}
+                onClick={() => handleConfirmPayment(activePaymentModal.ma_hop_dong || activePaymentModal.id)}
+              >
+                {paymentSubmitting ? "Đang xử lý..." : "Tôi đã chuyển khoản thành công ✓"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </main>
