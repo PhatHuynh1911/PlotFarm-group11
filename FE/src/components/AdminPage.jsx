@@ -728,8 +728,8 @@ function AssignmentPanel({ items, farmers, assignments, onAssign }) {
                 key={item.ma_phan_cong}
                 style={
                   item.trang_thai === "tu_choi"
-                    ? { borderLeft: "4px solid #c94a4a", background: "#fff5f5" }
-                    : {}
+                    ? { alignItems: "flex-start", borderColor: "#f5c6c6", borderLeft: "4px solid #c94a4a", background: "#fff5f5" }
+                    : { alignItems: "flex-start" }
                 }
               >
                 <div>
@@ -738,12 +738,12 @@ function AssignmentPanel({ items, farmers, assignments, onAssign }) {
                   </strong>
                   <span>{item.ten_khach_hang}</span>
                   {item.trang_thai === "tu_choi" && (
-                    <div style={{ marginTop: "6px", fontSize: "12px", color: "#c94a4a" }}>
+                    <div style={{ marginTop: "8px", padding: "8px 10px", borderRadius: "6px", background: "#fde8e8", fontSize: "12px", color: "#a83b3b", lineHeight: 1.5 }}>
                       ⚠️ <strong>Lý do từ chối:</strong> {item.ly_do_tu_choi || "Không nêu lý do"}
                     </div>
                   )}
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "8px", flexShrink: 0 }}>
                   <span
                     className="status-pill"
                     style={
@@ -758,7 +758,7 @@ function AssignmentPanel({ items, farmers, assignments, onAssign }) {
                     <button
                       type="button"
                       className="outline-button"
-                      style={{ padding: "4px 8px", fontSize: "11px", borderColor: "#c94a4a", color: "#c94a4a" }}
+                      style={{ padding: "6px 10px", fontSize: "11px", borderColor: "#c94a4a", color: "#c94a4a", whiteSpace: "nowrap" }}
                       onClick={() => setSelectedContract(String(item.ma_hop_dong))}
                       title="Chọn lại hợp đồng này để gán cho nông dân khác"
                     >
