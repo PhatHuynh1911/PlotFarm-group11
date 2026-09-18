@@ -166,12 +166,9 @@ function FarmerPage({ user, onLogout }) {
   const respondAssignment = async (assignment, status, reason = "") => {
     try {
       await respondToAssignment(assignment.ma_phan_cong, status, reason, token);
-      setAssignments((items) =>
-        items.map((item) =>
-          item.ma_phan_cong === assignment.ma_phan_cong
-            ? { ...item, trang_thai: status, ly_do_tu_choi: reason }
-            : item,
-        ),
+      setAssignments((items) => status === "tu_choi"
+        ? items.filter((item) => item.ma_phan_cong !== assignment.ma_phan_cong)
+        : items.map((item) => item.ma_phan_cong === assignment.ma_phan_cong ? { ...item, trang_thai: status } : item),
       );
       if (status === "da_chap_nhan") {
         notify("Đã tiếp nhận phân công chăm sóc ô đất thành công!");
@@ -188,10 +185,9 @@ function FarmerPage({ user, onLogout }) {
     if (e) e.preventDefault();
     if (!rejectingAssignment) return;
     const presets = {
-      busy: "Lịch làm việc đã kín trong tháng này",
-      distance: "Khoảng cách xa khu vực nông trại phụ trách chính",
-      skill: "Chưa có kinh nghiệm chăm sóc loại giống cây trồng này",
-      health: "Lý do cá nhân / sức khỏe tạm thời",
+      busy: "Đã quá tải số lượng ô đất phụ trách (Không đủ nhân lực chăm sóc thêm).",
+      distance: "Ô đất được phân công nằm ở khu vực/khu vườn quá xa khu vực trực chốt hiện tại.",
+      skill: "Chưa có kinh nghiệm chăm sóc loại cây trồng/giống cây đang được yêu cầu trên ô đất này.",
       other: rejectionReasonText.trim() || "Lý do khác",
     };
     let reason = presets[rejectionReasonType] || "Nông dân bận lịch, từ chối nhận phân công";
@@ -1072,11 +1068,10 @@ function FarmerPage({ user, onLogout }) {
                 value={rejectionReasonType}
                 onChange={(e) => setRejectionReasonType(e.target.value)}
               >
-                <option value="busy">Lịch làm việc đã kín trong tháng này</option>
-                <option value="distance">Khoảng cách xa khu vực nông trại phụ trách chính</option>
-                <option value="skill">Chưa có kinh nghiệm chăm sóc loại giống cây trồng này</option>
-                <option value="health">Lý do cá nhân / sức khỏe tạm thời</option>
-                <option value="other">Lý do khác (tự nhập chi tiết)</option>
+                <option value="busy">Đã quá tải số lượng ô đất phụ trách</option>
+                <option value="distance">Ô đất ở khu vực/khu vườn quá xa</option>
+                <option value="skill">Chưa có kinh nghiệm chăm sóc loại cây/giống cây</option>
+                <option value="other">Khác (Vui lòng nhập chi tiết)</option>
               </select>
             </label>
 
