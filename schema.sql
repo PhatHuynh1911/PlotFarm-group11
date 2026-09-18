@@ -185,6 +185,7 @@ CREATE TABLE dbo.PhanCongNongDan (
     ma_quan_tri INT NOT NULL FOREIGN KEY REFERENCES dbo.NguoiDung(ma_nguoi_dung),
     trang_thai VARCHAR(20) NOT NULL DEFAULT 'cho_tiep_nhan', -- 'cho_tiep_nhan', 'da_chap_nhan', 'tu_choi', 'da_huy'
     ghi_chu NVARCHAR(500) NULL,
+    ly_do_tu_choi NVARCHAR(500) NULL,
     ngay_gui DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
     ngay_phan_hoi DATETIME2 NULL,
     UNIQUE (ma_hop_dong, ma_nong_dan)

@@ -1,5 +1,26 @@
 const { sql, getPool } = require('../config/db');
-const { notifyAdmins } = require('./notificationController');
+const { notifyAdmins, createNotification } = require('./notificationController');
+
+// Hàm hỗ trợ sinh dữ liệu thanh toán VietQR chuẩn Napas247
+const generateVietQR = (soHopDong, amount) => {
+    const bankId = 'MB'; // MBBank - Ngân hàng Quân Đội
+    const bankName = 'MBBank (Ngân hàng TMCP Quân Đội)';
+    const accountNo = '0905123456';
+    const accountName = 'PLOTFARM VIETNAM';
+    const addInfo = `PFTHUE ${soHopDong}`;
+    const roundedAmount = Math.round(Number(amount) || 0);
+    const qrCodeUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-compact2.png?amount=${roundedAmount}&addInfo=${encodeURIComponent(addInfo)}&accountName=${encodeURIComponent(accountName)}`;
+
+    return {
+        bank_id: bankId,
+        bank_name: bankName,
+        account_no: accountNo,
+        account_name: accountName,
+        amount: roundedAmount,
+        transfer_content: addInfo,
+        qr_code_url: qrCodeUrl
+    };
+};
 
 // Tạo hợp đồng thuê đất mới
 const createRental = async (req, res) => {
@@ -53,7 +74,7 @@ const createRental = async (req, res) => {
         const donGiaThang = oDat.gia_thue_thang;
         const tongTien = donGiaThang * thoi_han_thang;
 
-        // 2. Thêm hợp đồng
+        // 2. Thêm hợp đồng với trạng thái chờ thanh toán
         const insertResult = await new sql.Request(transaction)
             .input('so_hop_dong', sql.VarChar(50), so_hop_dong)
             .input('ma_nguoi_dung', sql.Int, parseInt(ma_nguoi_dung, 10))
@@ -67,36 +88,41 @@ const createRental = async (req, res) => {
             .query(`
                 INSERT INTO HopDongThue (so_hop_dong, ma_nguoi_dung, ma_o_dat, ma_cay_trong, ngay_bat_dau, ngay_ket_thuc, thoi_han_thang, don_gia_thang, tong_tien, trang_thai_hop_dong, trang_thai_thanh_toan, trang_thai_canh_tac)
                 OUTPUT INSERTED.*
-                VALUES (@so_hop_dong, @ma_nguoi_dung, @ma_o_dat, @ma_cay_trong, @ngay_bat_dau, @ngay_ket_thuc, @thoi_han_thang, @don_gia_thang, @tong_tien, 'hieu_luc', 'da_thanh_toan', 'cho_gieo_trong')
+                VALUES (@so_hop_dong, @ma_nguoi_dung, @ma_o_dat, @ma_cay_trong, @ngay_bat_dau, @ngay_ket_thuc, @thoi_han_thang, @don_gia_thang, @tong_tien, 'cho_thanh_toan', 'cho_thanh_toan', 'cho_gieo_trong')
             `);
 
-        // 3. Cập nhật trạng thái ô đất thành đã thuê
+        // 3. Cập nhật trạng thái ô đất thành dang_chon (giữ chỗ chờ thanh toán)
         await new sql.Request(transaction)
             .input('ma_o_dat', sql.Int, parseInt(ma_o_dat, 10))
-            .query(`UPDATE ODat SET trang_thai = 'da_thue', ngay_cap_nhat = SYSDATETIME() WHERE ma_o_dat = @ma_o_dat`);
+            .query(`UPDATE ODat SET trang_thai = 'dang_chon', ngay_cap_nhat = SYSDATETIME() WHERE ma_o_dat = @ma_o_dat`);
 
         await transaction.commit();
+
+        const createdContract = insertResult.recordset[0];
+        const paymentInfo = generateVietQR(so_hop_dong, tongTien);
 
         // 4. Bắn thông báo tự động cho Admin
         const plotCode = oDat.so_hieu_o || `Ô #${ma_o_dat}`;
         notifyAdmins(
-            `Đơn thuê mới: ${plotCode}`,
-            `Hợp đồng ${so_hop_dong} vừa được tạo thành công cho ô đất ${plotCode}. Thời hạn: ${thoi_han_thang} tháng, Tổng tiền: ${Number(tongTien).toLocaleString('vi-VN')} đ.`,
+            `Đơn thuê mới chờ thanh toán: ${plotCode}`,
+            `Hợp đồng ${so_hop_dong} vừa được khởi tạo cho ô đất ${plotCode}. Thời hạn: ${thoi_han_thang} tháng, Tổng tiền: ${Number(tongTien).toLocaleString('vi-VN')} đ. Đang chờ thanh toán VietQR.`,
             'thue_dat',
-            '/admin'
+            '/admin?tab=rentals'
         ).catch((err) => console.error('Lỗi bắn thông báo admin:', err));
-
-        const createdContract = insertResult.recordset[0];
 
         res.status(201).json({
             success: true,
-            message: 'Tạo hợp đồng thuê đất thành công và cập nhật trạng thái ô đất!',
+            message: 'Tạo hợp đồng thuê đất thành công! Vui lòng thanh toán qua mã VietQR.',
             data: {
                 ...createdContract,
                 so_hop_dong,
                 donGiaThang,
                 thoi_han_thang,
-                tongTien
+                tongTien,
+                payment_info: paymentInfo,
+                qr_code_url: paymentInfo.qr_code_url,
+                transfer_content: paymentInfo.transfer_content,
+                bank_info: paymentInfo
             }
         });
     } catch (error) {
@@ -247,4 +273,142 @@ const getRentalById = async (req, res) => {
     }
 };
 
-module.exports = { createRental, getAllRentals, getRentalsByUser, getActiveRentals, getRentalById, updateCultivationStatus };
+// Lấy thông tin thanh toán VietQR của hợp đồng
+const getPaymentInfo = async (req, res) => {
+    try {
+        const pool = await getPool();
+        const id = parseInt(req.params.id, 10);
+        const result = await pool.request()
+            .input('id', sql.Int, id)
+            .query(`
+                SELECT h.ma_hop_dong, h.so_hop_dong, h.tong_tien, h.trang_thai_thanh_toan, h.trang_thai_hop_dong,
+                       o.so_hieu_o, o.ten_o_dat, u.ho_va_ten AS ten_khach_hang, u.email AS email_khach_hang
+                FROM HopDongThue h
+                JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+                JOIN NguoiDung u ON u.ma_nguoi_dung = h.ma_nguoi_dung
+                WHERE h.ma_hop_dong = @id
+            `);
+
+        const rental = result.recordset[0];
+        if (!rental) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy hợp đồng' });
+        }
+
+        const paymentInfo = generateVietQR(rental.so_hop_dong, rental.tong_tien);
+
+        return res.json({
+            success: true,
+            data: {
+                ...rental,
+                payment_info: paymentInfo,
+                qr_code_url: paymentInfo.qr_code_url,
+                transfer_content: paymentInfo.transfer_content,
+                bank_info: paymentInfo
+            }
+        });
+    } catch (error) {
+        console.error('Lỗi khi lấy thông tin thanh toán:', error);
+        return res.status(500).json({ success: false, message: 'Lỗi server nội bộ' });
+    }
+};
+
+// Xác nhận thanh toán hợp đồng thuê đất
+const confirmPayment = async (req, res) => {
+    const pool = await getPool();
+    const transaction = new sql.Transaction(pool);
+
+    try {
+        const id = parseInt(req.params.id, 10);
+        await transaction.begin();
+
+        const rentalCheck = await new sql.Request(transaction)
+            .input('id', sql.Int, id)
+            .query(`
+                SELECT h.ma_hop_dong, h.so_hop_dong, h.ma_nguoi_dung, h.ma_o_dat, h.tong_tien,
+                       h.trang_thai_thanh_toan, h.trang_thai_hop_dong, o.so_hieu_o, o.ten_o_dat
+                FROM HopDongThue h
+                JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+                WHERE h.ma_hop_dong = @id
+            `);
+
+        const rental = rentalCheck.recordset[0];
+        if (!rental) {
+            await transaction.rollback();
+            return res.status(404).json({ success: false, message: 'Không tìm thấy hợp đồng' });
+        }
+
+        if (rental.trang_thai_thanh_toan === 'da_thanh_toan') {
+            await transaction.rollback();
+            return res.status(200).json({
+                success: true,
+                message: 'Hợp đồng này đã được thanh toán trước đó',
+                data: rental
+            });
+        }
+
+        // 1. Cập nhật hợp đồng sang da_thanh_toan & hieu_luc
+        const updateContract = await new sql.Request(transaction)
+            .input('id', sql.Int, id)
+            .query(`
+                UPDATE HopDongThue
+                SET trang_thai_thanh_toan = 'da_thanh_toan',
+                    trang_thai_hop_dong = 'hieu_luc',
+                    ngay_cap_nhat = SYSDATETIME()
+                OUTPUT INSERTED.*
+                WHERE ma_hop_dong = @id
+            `);
+
+        // 2. Cập nhật ô đất sang da_thue
+        await new sql.Request(transaction)
+            .input('ma_o_dat', sql.Int, rental.ma_o_dat)
+            .query(`
+                UPDATE ODat
+                SET trang_thai = 'da_thue',
+                    ngay_cap_nhat = SYSDATETIME()
+                WHERE ma_o_dat = @ma_o_dat
+            `);
+
+        await transaction.commit();
+
+        const updatedContract = updateContract.recordset[0];
+
+        // 3. Thông báo cho khách hàng
+        createNotification(
+            rental.ma_nguoi_dung,
+            `Thanh toán thành công: Hợp đồng ${rental.so_hop_dong}`,
+            `Thanh toán số tiền ${Number(rental.tong_tien).toLocaleString('vi-VN')} đ cho ô đất ${rental.so_hieu_o} đã hoàn tất. Hợp đồng của bạn hiện đã có hiệu lực!`,
+            'thanh_toan',
+            '/user?tab=gardens'
+        ).catch((err) => console.error('Lỗi thông báo khách hàng:', err));
+
+        // 4. Thông báo cho Admin
+        notifyAdmins(
+            `Đã thanh toán hợp đồng: ${rental.so_hieu_o}`,
+            `Khách hàng đã thanh toán thành công hợp đồng ${rental.so_hop_dong} (Tổng: ${Number(rental.tong_tien).toLocaleString('vi-VN')} đ). Vui lòng phân công nông dân chăm sóc.`,
+            'thanh_toan',
+            '/admin?tab=assignments'
+        ).catch((err) => console.error('Lỗi thông báo admin:', err));
+
+        return res.json({
+            success: true,
+            message: 'Xác nhận thanh toán thành công! Hợp đồng đã có hiệu lực.',
+            data: updatedContract
+        });
+    } catch (error) {
+        try { await transaction.rollback(); } catch (rbErr) {}
+        console.error('Lỗi khi xác nhận thanh toán:', error);
+        return res.status(500).json({ success: false, message: 'Lỗi server khi xác nhận thanh toán' });
+    }
+};
+
+module.exports = {
+    createRental,
+    getAllRentals,
+    getRentalsByUser,
+    getActiveRentals,
+    getRentalById,
+    updateCultivationStatus,
+    getPaymentInfo,
+    confirmPayment,
+    generateVietQR
+};

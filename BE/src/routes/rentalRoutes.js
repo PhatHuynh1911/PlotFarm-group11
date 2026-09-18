@@ -1,6 +1,15 @@
 const express = require('express');
 const router = express.Router();
-const { createRental, getAllRentals, getRentalsByUser, getActiveRentals, getRentalById, updateCultivationStatus } = require('../controllers/rentalController');
+const {
+    createRental,
+    getAllRentals,
+    getRentalsByUser,
+    getActiveRentals,
+    getRentalById,
+    updateCultivationStatus,
+    getPaymentInfo,
+    confirmPayment
+} = require('../controllers/rentalController');
 const { authenticate, authorize } = require('../middleware/authMiddleware');
 const { getAssignments, respondToAssignment } = require('../controllers/assignmentController');
 
@@ -21,6 +30,9 @@ router.get('/', softAuth, getAllRentals);
 router.get('/active', softAuth, getActiveRentals);
 router.get('/assignments/mine', authenticate, authorize('nong_dan'), getAssignments);
 router.patch('/assignments/:id/respond', authenticate, authorize('nong_dan'), respondToAssignment);
+router.get('/:id/payment-info', softAuth, getPaymentInfo);
+router.post('/:id/confirm-payment', softAuth, confirmPayment);
+router.patch('/:id/payment-status', softAuth, confirmPayment);
 router.patch('/:id/cultivation-status', softAuth, updateCultivationStatus);
 router.get('/user/:userId', softAuth, getRentalsByUser);
 router.get('/:id', softAuth, getRentalById);
