@@ -18,6 +18,7 @@ import AccountMenu from "./AccountMenu.jsx";
 import ProfilePanel from "./ProfilePanel.jsx";
 import { notify } from "./ToastProvider.jsx";
 import { COMPLAINT_CATEGORIES, OTHER_COMPLAINT_OPTION } from "../data/complaintCategories.js";
+import { vietnamProvinces } from "../data/vietnamAddress.js";
 
 const formatMoney = (value) =>
   `${new Intl.NumberFormat("vi-VN").format(value)}đ`;
@@ -93,6 +94,16 @@ function UserPage({ user, token, onLogout }) {
   const [supportSent, setSupportSent] = useState(false);
   const [harvestSent, setHarvestSent] = useState(false);
   const [selectedCareRental, setSelectedCareRental] = useState("");
+  const [selectedHarvestRental, setSelectedHarvestRental] = useState("");
+  const [shippingMethod, setShippingMethod] = useState("");
+  const [harvestProvince, setHarvestProvince] = useState("");
+  const [harvestDistrict, setHarvestDistrict] = useState("");
+  const harvestDistricts = useMemo(
+    () =>
+      vietnamProvinces.find((province) => province.name === harvestProvince)
+        ?.districts || [],
+    [harvestProvince],
+  );
   const [complaintForm, setComplaintForm] = useState({
     ma_hop_dong: "",
     ma_o_dat: "",
@@ -1142,14 +1153,72 @@ function UserPage({ user, token, onLogout }) {
                   setHarvestSent(true);
                 }}
               >
+                <select
+                  value={selectedHarvestRental}
+                  onChange={(event) =>
+                    setSelectedHarvestRental(event.target.value)
+                  }
+                  required
+                >
+                  <option value="">Chọn ô đất</option>
+                  {rentals.map((rental) => (
+                    <option key={rental.ma_hop_dong} value={rental.ma_hop_dong}>
+                      {rental.so_hieu_o} · {rental.ten_o_dat}
+                    </option>
+                  ))}
+                </select>
                 <input required placeholder="Tên người nhận" />
                 <input required placeholder="Số điện thoại" />
-                <input required placeholder="Địa chỉ nhận hàng" />
-                <select required defaultValue="">
+                <select
+                  value={shippingMethod}
+                  onChange={(event) => {
+                    setShippingMethod(event.target.value);
+                    if (event.target.value !== "Giao tận nơi") {
+                      setHarvestProvince("");
+                      setHarvestDistrict("");
+                    }
+                  }}
+                  required
+                >
                   <option value="">Chọn hình thức vận chuyển</option>
                   <option>Giao tận nơi</option>
                   <option>Nhận tại nông trại</option>
                 </select>
+                {shippingMethod === "Giao tận nơi" && (
+                  <>
+                    <select
+                      value={harvestProvince}
+                      onChange={(event) => {
+                        setHarvestProvince(event.target.value);
+                        setHarvestDistrict("");
+                      }}
+                      required
+                    >
+                      <option value="">Chọn tỉnh/thành phố</option>
+                      {vietnamProvinces.map((province) => (
+                        <option key={province.name} value={province.name}>
+                          {province.name}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={harvestDistrict}
+                      onChange={(event) =>
+                        setHarvestDistrict(event.target.value)
+                      }
+                      required
+                      disabled={!harvestProvince}
+                    >
+                      <option value="">Chọn quận/huyện</option>
+                      {harvestDistricts.map((district) => (
+                        <option key={district} value={district}>
+                          {district}
+                        </option>
+                      ))}
+                    </select>
+                    <input required placeholder="Địa chỉ nhận hàng" />
+                  </>
+                )}
                 <button className="primary-button">
                   Đăng ký nhận hàng <span>→</span>
                 </button>
