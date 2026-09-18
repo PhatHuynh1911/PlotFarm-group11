@@ -137,14 +137,14 @@ const respondToAssignment = async (req, res) => {
 
         if (status === 'tu_choi') {
             const finalReason = assignment.ly_do_tu_choi || 'Không nêu lý do';
-            notifyAdmins(
+            await notifyAdmins(
                 `Cảnh báo: Nông dân từ chối nhận ô ${plotCode}`,
                 `Nông dân ${farmerName} đã từ chối nhận phân công ô đất ${plotCode} (HĐ: ${contractCode}). Lý do: "${finalReason}". Vui lòng kiểm tra và phân công lại nông dân khác.`,
                 'phan_cong',
                 '/admin?tab=assignments'
             ).catch((err) => console.error('Lỗi bắn thông báo từ chối tới admin:', err));
         } else if (status === 'da_chap_nhan') {
-            notifyAdmins(
+            await notifyAdmins(
                 `Nông dân đã nhận phân công: ${plotCode}`,
                 `Nông dân ${farmerName} đã đồng ý tiếp nhận chăm sóc ô đất ${plotCode} (HĐ: ${contractCode}).`,
                 'phan_cong',
