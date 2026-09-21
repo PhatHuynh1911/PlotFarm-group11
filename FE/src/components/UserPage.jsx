@@ -99,6 +99,7 @@ function UserPage({ user, token, onLogout }) {
   const [bookingSubmitting, setBookingSubmitting] = useState(false);
   const [activePaymentModal, setActivePaymentModal] = useState(null);
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+  const [rentalDetail, setRentalDetail] = useState(null);
   const [notice, setNotice] = useState("");
   const [supportSent, setSupportSent] = useState(false);
   const [harvestDeliveries, setHarvestDeliveries] = useState([]);
@@ -404,6 +405,216 @@ function UserPage({ user, token, onLogout }) {
     }
   };
 
+  const paymentModal = activePaymentModal && (
+    <div className="booking-backdrop">
+      <div
+        className="booking-modal"
+        style={{
+          width: "min(100%, 500px)",
+          maxHeight: "90vh",
+          overflowY: "auto",
+          padding: "30px 25px",
+          textAlign: "center",
+        }}
+      >
+        <button
+          type="button"
+          className="modal-close"
+          onClick={() => setActivePaymentModal(null)}
+        >
+          ×
+        </button>
+        <p className="eyebrow" style={{ color: "#2b8a3e", marginBottom: "4px" }}>
+          THANH TOÁN VIETQR NAPAS 24/7
+        </p>
+        <h2 style={{ fontSize: "24px", marginBottom: "6px" }}>Mã QR Thanh Toán Đơn Thuê</h2>
+        <p style={{ margin: "0 0 14px", color: "#526658", fontSize: "13px" }}>
+          Hợp đồng: <strong>{activePaymentModal.so_hop_dong}</strong>
+          {activePaymentModal.so_hieu_o ? ` · Ô đất: ${activePaymentModal.so_hieu_o}` : ""}
+        </p>
+
+        <div style={{ display: "flex", justifyContent: "center", margin: "10px 0 16px" }}>
+          <img
+            src={activePaymentModal.qr_code_url || activePaymentModal.payment_info?.qr_code_url}
+            alt="VietQR Code"
+            style={{
+              maxWidth: "280px",
+              width: "100%",
+              height: "auto",
+              borderRadius: "12px",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+              border: "1px solid #dfe1da",
+              background: "#fff",
+            }}
+          />
+        </div>
+
+        <div className="booking-summary" style={{ textAlign: "left", marginBottom: "14px" }}>
+          <div>
+            <span>Ngân hàng</span>
+            <strong>{activePaymentModal.bank_info?.bank_name || activePaymentModal.payment_info?.bank_name || "MBBank (Quân Đội)"}</strong>
+          </div>
+          <div>
+            <span>Số tài khoản</span>
+            <strong style={{ color: "#173525", fontSize: "14px", letterSpacing: "1px" }}>
+              {activePaymentModal.bank_info?.account_no || activePaymentModal.payment_info?.account_no || "0905123456"}
+            </strong>
+          </div>
+          <div>
+            <span>Tên tài khoản</span>
+            <strong>{activePaymentModal.bank_info?.account_name || activePaymentModal.payment_info?.account_name || "PLOTFARM VIETNAM"}</strong>
+          </div>
+          <div>
+            <span>Số tiền thanh toán</span>
+            <strong style={{ color: "#c98b3c", fontSize: "16px" }}>
+              {formatMoney(activePaymentModal.tong_tien || activePaymentModal.payment_info?.amount || activePaymentModal.tongTien || 0)}
+            </strong>
+          </div>
+          <div>
+            <span>Nội dung chuyển khoản</span>
+            <strong style={{ color: "#173525", background: "#e2e9df", padding: "3px 8px", borderRadius: "4px" }}>
+              {activePaymentModal.transfer_content || activePaymentModal.payment_info?.transfer_content || `PFTHUE ${activePaymentModal.so_hop_dong}`}
+            </strong>
+          </div>
+        </div>
+
+        <p className="payment-note" style={{ textAlign: "left", marginBottom: "14px" }}>
+          Mở ứng dụng ngân hàng hoặc ví điện tử bất kỳ, chọn <strong>Quét mã QR</strong> để chuyển tiền. Sau khi thanh toán, bấm xác nhận bên dưới để hệ thống kích hoạt hợp đồng ngay lập tức.
+        </p>
+
+        <div className="booking-actions" style={{ marginTop: "10px" }}>
+          <button
+            type="button"
+            className="outline-button"
+            onClick={() => setActivePaymentModal(null)}
+          >
+            Đóng / Để sau
+          </button>
+          <button
+            type="button"
+            className="primary-button booking-submit"
+            disabled={paymentSubmitting}
+            onClick={() => handleConfirmPayment(activePaymentModal.ma_hop_dong || activePaymentModal.id)}
+          >
+            {paymentSubmitting ? "Đang xử lý..." : "Tôi đã chuyển khoản thành công ✓"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const rentalDetailModal = rentalDetail && (
+    <div className="booking-backdrop" onClick={() => setRentalDetail(null)}>
+      <div
+        className="booking-modal"
+        style={{ width: "min(100%, 640px)", maxHeight: "90vh", overflowY: "auto", padding: "0" }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <button
+          type="button"
+          className="modal-close"
+          onClick={() => setRentalDetail(null)}
+        >
+          ×
+        </button>
+        <div
+          style={{
+            height: "220px",
+            backgroundImage: `linear-gradient(rgba(23,53,37,.15), rgba(23,53,37,.35)), url("${resolveImageUrl(rentalDetail.hinh_anh_o_dat || PLOT_PLACEHOLDER_IMAGE)}")`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
+        <div style={{ padding: "26px 30px 30px" }}>
+          <p className="eyebrow" style={{ color: "#2b8a3e", marginBottom: "4px" }}>
+            {rentalDetail.so_hieu_o}
+            {rentalDetail.trang_thai_hop_dong === "hieu_luc" ? " · ĐANG THUÊ" : ` · ${rentalDetail.trang_thai_hop_dong}`}
+          </p>
+          <h2 style={{ fontSize: "26px", margin: "0 0 6px" }}>{rentalDetail.ten_o_dat}</h2>
+          <p style={{ margin: "0 0 16px", color: "#526658", fontSize: "13px" }}>
+            {rentalDetail.ten_nong_trai}
+            {rentalDetail.quan_huyen ? ` · ${rentalDetail.quan_huyen}, ${rentalDetail.tinh_thanh}` : ""}
+          </p>
+
+          <div className="detail-facts" style={{ margin: "0 0 22px" }}>
+            <div>
+              <small>Diện tích</small>
+              <strong>{rentalDetail.dien_tich_m2}m²</strong>
+            </div>
+            <div>
+              <small>Loại đất</small>
+              <strong>{rentalDetail.loai_dat}</strong>
+            </div>
+            <div>
+              <small>Hệ thống tưới</small>
+              <strong>{rentalDetail.he_thong_tuoi}</strong>
+            </div>
+            <div>
+              <small>Ánh sáng</small>
+              <strong>{rentalDetail.huong_anh_sang}</strong>
+            </div>
+            <div>
+              <small>Giá thuê/tháng</small>
+              <strong>{formatMoney(rentalDetail.gia_thue_thang)}</strong>
+            </div>
+          </div>
+
+          <div className="booking-summary" style={{ marginBottom: "16px" }}>
+            <div>
+              <span>Hợp đồng</span>
+              <strong>{rentalDetail.so_hop_dong}</strong>
+            </div>
+            <div>
+              <span>Cây trồng</span>
+              <strong>{rentalDetail.ten_cay_trong || "Chưa chọn cây trồng"}</strong>
+            </div>
+            <div>
+              <span>Farmer phụ trách</span>
+              <strong>
+                {rentalDetail.ten_nong_dan || "Đang chờ phân công"}
+                {rentalDetail.sdt_nong_dan ? ` · ${rentalDetail.sdt_nong_dan}` : ""}
+              </strong>
+            </div>
+            <div>
+              <span>Bắt đầu thuê</span>
+              <strong>{formatDate(rentalDetail.ngay_bat_dau)}</strong>
+            </div>
+            <div>
+              <span>Kết thúc thuê</span>
+              <strong>{formatDate(rentalDetail.ngay_ket_thuc)}</strong>
+            </div>
+            <div>
+              <span>Tổng tiền</span>
+              <strong>{formatMoney(rentalDetail.tong_tien)}</strong>
+            </div>
+          </div>
+
+          {rentalDetail.mo_ta_chi_tiet && (
+            <div style={{ marginBottom: "16px" }}>
+              <p style={{ margin: "0 0 6px", fontWeight: 700, fontSize: "13px", color: "#173525" }}>
+                Mô tả ô đất
+              </p>
+              <p style={{ margin: 0, color: "#526658", fontSize: "13px", lineHeight: 1.6 }}>
+                {rentalDetail.mo_ta_chi_tiet}
+              </p>
+            </div>
+          )}
+
+          {rentalDetail.yeu_cau_dac_biet && (
+            <div>
+              <p style={{ margin: "0 0 6px", fontWeight: 700, fontSize: "13px", color: "#173525" }}>
+                Yêu cầu đặc biệt
+              </p>
+              <p style={{ margin: 0, color: "#526658", fontSize: "13px", lineHeight: 1.6 }}>
+                {rentalDetail.yeu_cau_dac_biet}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
   const workspace = (content) => (
     <main className="dashboard-page user-dashboard">
       <header className="dashboard-header">
@@ -457,6 +668,8 @@ function UserPage({ user, token, onLogout }) {
         )}
         {content}
       </section>
+      {paymentModal}
+      {rentalDetailModal}
     </main>
   );
 
@@ -538,6 +751,13 @@ function UserPage({ user, token, onLogout }) {
                     <b>{daysRemaining(rental.ngay_ket_thuc)}</b>
                     <span>ngày còn lại</span>
                   </div>
+                  <button
+                    className="outline-button"
+                    style={{ marginTop: "10px" }}
+                    onClick={() => setRentalDetail(rental)}
+                  >
+                    Xem chi tiết ô đất →
+                  </button>
                   {rental.trang_thai_thanh_toan === "cho_thanh_toan" ? (
                     <button
                       className="primary-button"
@@ -1626,103 +1846,8 @@ function UserPage({ user, token, onLogout }) {
         </div>
       )}
 
-      {activePaymentModal && (
-        <div className="booking-backdrop">
-          <div
-            className="booking-modal"
-            style={{
-              width: "min(100%, 500px)",
-              maxHeight: "90vh",
-              overflowY: "auto",
-              padding: "30px 25px",
-              textAlign: "center",
-            }}
-          >
-            <button
-              type="button"
-              className="modal-close"
-              onClick={() => setActivePaymentModal(null)}
-            >
-              ×
-            </button>
-            <p className="eyebrow" style={{ color: "#2b8a3e", marginBottom: "4px" }}>
-              THANH TOÁN VIETQR NAPAS 24/7
-            </p>
-            <h2 style={{ fontSize: "24px", marginBottom: "6px" }}>Mã QR Thanh Toán Đơn Thuê</h2>
-            <p style={{ margin: "0 0 14px", color: "#526658", fontSize: "13px" }}>
-              Hợp đồng: <strong>{activePaymentModal.so_hop_dong}</strong>
-              {activePaymentModal.so_hieu_o ? ` · Ô đất: ${activePaymentModal.so_hieu_o}` : ""}
-            </p>
-
-            <div style={{ display: "flex", justifyContent: "center", margin: "10px 0 16px" }}>
-              <img
-                src={activePaymentModal.qr_code_url || activePaymentModal.payment_info?.qr_code_url}
-                alt="VietQR Code"
-                style={{
-                  maxWidth: "280px",
-                  width: "100%",
-                  height: "auto",
-                  borderRadius: "12px",
-                  boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
-                  border: "1px solid #dfe1da",
-                  background: "#fff",
-                }}
-              />
-            </div>
-
-            <div className="booking-summary" style={{ textAlign: "left", marginBottom: "14px" }}>
-              <div>
-                <span>Ngân hàng</span>
-                <strong>{activePaymentModal.bank_info?.bank_name || activePaymentModal.payment_info?.bank_name || "MBBank (Quân Đội)"}</strong>
-              </div>
-              <div>
-                <span>Số tài khoản</span>
-                <strong style={{ color: "#173525", fontSize: "14px", letterSpacing: "1px" }}>
-                  {activePaymentModal.bank_info?.account_no || activePaymentModal.payment_info?.account_no || "0905123456"}
-                </strong>
-              </div>
-              <div>
-                <span>Tên tài khoản</span>
-                <strong>{activePaymentModal.bank_info?.account_name || activePaymentModal.payment_info?.account_name || "PLOTFARM VIETNAM"}</strong>
-              </div>
-              <div>
-                <span>Số tiền thanh toán</span>
-                <strong style={{ color: "#c98b3c", fontSize: "16px" }}>
-                  {formatMoney(activePaymentModal.tong_tien || activePaymentModal.payment_info?.amount || activePaymentModal.tongTien || 0)}
-                </strong>
-              </div>
-              <div>
-                <span>Nội dung chuyển khoản</span>
-                <strong style={{ color: "#173525", background: "#e2e9df", padding: "3px 8px", borderRadius: "4px" }}>
-                  {activePaymentModal.transfer_content || activePaymentModal.payment_info?.transfer_content || `PFTHUE ${activePaymentModal.so_hop_dong}`}
-                </strong>
-              </div>
-            </div>
-
-            <p className="payment-note" style={{ textAlign: "left", marginBottom: "14px" }}>
-              Mở ứng dụng ngân hàng hoặc ví điện tử bất kỳ, chọn <strong>Quét mã QR</strong> để chuyển tiền. Sau khi thanh toán, bấm xác nhận bên dưới để hệ thống kích hoạt hợp đồng ngay lập tức.
-            </p>
-
-            <div className="booking-actions" style={{ marginTop: "10px" }}>
-              <button
-                type="button"
-                className="outline-button"
-                onClick={() => setActivePaymentModal(null)}
-              >
-                Đóng / Để sau
-              </button>
-              <button
-                type="button"
-                className="primary-button booking-submit"
-                disabled={paymentSubmitting}
-                onClick={() => handleConfirmPayment(activePaymentModal.ma_hop_dong || activePaymentModal.id)}
-              >
-                {paymentSubmitting ? "Đang xử lý..." : "Tôi đã chuyển khoản thành công ✓"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {paymentModal}
+      {rentalDetailModal}
     </main>
   );
 }

@@ -166,12 +166,16 @@ const getRentalsByUser = async (req, res) => {
             .input('ma_nguoi_dung', sql.Int, parseInt(targetUserId, 10))
             .query(`
                 SELECT h.ma_hop_dong, h.so_hop_dong, h.ngay_bat_dau, h.ngay_ket_thuc,
-                       h.tong_tien, h.trang_thai_hop_dong, h.trang_thai_thanh_toan,
-                       o.ma_o_dat, o.so_hieu_o, o.ten_o_dat, o.dien_tich_m2, o.hinh_anh_o_dat,
+                       h.tong_tien, h.trang_thai_hop_dong, h.trang_thai_thanh_toan, h.yeu_cau_dac_biet,
+                       o.ma_o_dat, o.so_hieu_o, o.ten_o_dat, o.dien_tich_m2, o.chieu_dai_m, o.chieu_rong_m,
+                       o.loai_dat, o.he_thong_tuoi, o.huong_anh_sang, o.gia_thue_thang, o.mo_ta_chi_tiet,
+                       o.hinh_anh_o_dat,
                       c.ma_cay_trong, c.ten_cay_trong, c.hinh_anh_cay,
-                      n.ho_va_ten AS ten_nong_dan, p.trang_thai AS trang_thai_phan_cong
+                      nt.ten_nong_trai, nt.dia_chi AS dia_chi_nong_trai, nt.tinh_thanh, nt.quan_huyen,
+                      n.ho_va_ten AS ten_nong_dan, n.so_dien_thoai AS sdt_nong_dan, p.trang_thai AS trang_thai_phan_cong
                 FROM HopDongThue h
                 INNER JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+                INNER JOIN NongTrai nt ON nt.ma_nong_trai = o.ma_nong_trai
                 LEFT JOIN CayTrong c ON c.ma_cay_trong = h.ma_cay_trong
                   LEFT JOIN PhanCongNongDan p ON p.ma_hop_dong = h.ma_hop_dong AND p.trang_thai = 'da_chap_nhan'
                   LEFT JOIN NguoiDung n ON n.ma_nguoi_dung = p.ma_nong_dan
@@ -281,6 +285,11 @@ const markHarvestReady = async (req, res) => {
                 UPDATE GiaoNhanThuHoach SET ma_nong_dan = @farmerId, hinh_thuc_nhan = NULL, ten_nguoi_nhan = NULL,
                 so_dien_thoai_nhan = NULL, dia_chi_nhan = NULL, ghi_chu_khach = NULL, trang_thai = 'cho_khach_chon',
                 ngay_san_sang = SYSDATETIME(), ngay_khach_chon = NULL, ngay_ban_giao = NULL WHERE ma_hop_dong = @contractId
+            `);
+        } else {
+            await new sql.Request(transaction).input('contractId', sql.Int, contractId).input('farmerId', sql.Int, farmerId).query(`
+                INSERT INTO GiaoNhanThuHoach (ma_hop_dong, ma_nong_dan, trang_thai, ngay_san_sang)
+                VALUES (@contractId, @farmerId, 'cho_khach_chon', SYSDATETIME())
             `);
         }
         try {

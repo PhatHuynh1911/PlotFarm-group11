@@ -194,6 +194,36 @@ const updatePlot = async (req, res) => {
     }
 };
 
+const deletePlot = async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const pool = await getPool();
+
+        const activeRental = await pool.request()
+            .input('id', sql.Int, id)
+            .query(`SELECT TOP 1 ma_hop_dong FROM HopDongThue WHERE ma_o_dat = @id AND trang_thai_hop_dong = 'hieu_luc'`);
+        if (activeRental.recordset.length > 0) {
+            return res.status(409).json({ success: false, message: 'Không thể xóa ô đất này vì đang được thuê (hợp đồng còn hiệu lực)' });
+        }
+
+        const result = await pool.request()
+            .input('id', sql.Int, id)
+            .query(`DELETE FROM ODat WHERE ma_o_dat = @id`);
+
+        if (result.rowsAffected[0] === 0) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy ô đất' });
+        }
+
+        return res.json({ success: true, message: 'Đã xóa ô đất' });
+    } catch (error) {
+        console.error('Lỗi xóa ô đất:', error);
+        if (error.number === 547) {
+            return res.status(409).json({ success: false, message: 'Không thể xóa ô đất này vì vẫn còn dữ liệu liên quan (hợp đồng thuê, khiếu nại...)' });
+        }
+        return res.status(500).json({ success: false, message: 'Không thể xóa ô đất' });
+    }
+};
+
 const rentals = async (req, res) => {
     try {
         const pool = await getPool();
@@ -412,4 +442,4 @@ const updateRequest = async (req, res) => {
     }
 };
 
-module.exports = { dashboard, users, updateUser, plots, createPlot, updatePlot, rentals, requests, serviceRequests, complaintRequests, consultationRequests, updateRequest };
+module.exports = { dashboard, users, updateUser, plots, createPlot, updatePlot, deletePlot, rentals, requests, serviceRequests, complaintRequests, consultationRequests, updateRequest };

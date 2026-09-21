@@ -13,6 +13,7 @@ router.patch('/users/:id', admin.updateUser);
 router.get('/plots', admin.plots);
 router.post('/plots', uploadPlotImage.single('image'), admin.createPlot);
 router.patch('/plots/:id', uploadPlotImage.single('image'), admin.updatePlot);
+router.delete('/plots/:id', admin.deletePlot);
 router.get('/rentals', admin.rentals);
 router.get('/requests', admin.requests);
 router.get('/requests/services', admin.serviceRequests);

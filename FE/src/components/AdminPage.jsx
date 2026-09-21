@@ -155,6 +155,11 @@ function AdminPage({ user, token, onLogout }) {
     update(`requests/${item.id}`, "PATCH", { status: value, source: item.source }).catch((e) =>
       setError(e.message),
     );
+  const deletePlot = (item) => {
+    if (!window.confirm(`Xóa ô đất "${item.code}"? Hành động này không thể hoàn tác.`)) return;
+    setError("");
+    update(`plots/${item.id}`, "DELETE").catch((e) => setError(e.message));
+  };
   const savePlot = async (event) => {
     event.preventDefault();
     const formEl = event.currentTarget;
@@ -259,6 +264,7 @@ function AdminPage({ user, token, onLogout }) {
             setEditingPlot={setEditingPlot}
             onSubmit={savePlot}
             onCancel={() => setEditingPlot(null)}
+            onDelete={deletePlot}
           />
         )}
         {activeTab === "assignments" && (
@@ -508,7 +514,7 @@ function Users({ items, onUpdate }) {
   );
 }
 
-function Plots({ items, editingPlot, setEditingPlot, onSubmit, onCancel }) {
+function Plots({ items, editingPlot, setEditingPlot, onSubmit, onCancel, onDelete }) {
   return (
     <div className="admin-two-column">
       <section className="admin-card">
@@ -532,12 +538,20 @@ function Plots({ items, editingPlot, setEditingPlot, onSubmit, onCancel }) {
               <span className="status-pill">
                 {labels.plotStatus[item.status] || item.status}
               </span>
-              <button
-                className="table-action"
-                onClick={() => setEditingPlot(item)}
-              >
-                Sửa
-              </button>
+              <div className="admin-plot-actions">
+                <button
+                  className="table-action"
+                  onClick={() => setEditingPlot(item)}
+                >
+                  Sửa
+                </button>
+                <button
+                  className="table-action is-danger"
+                  onClick={() => onDelete(item)}
+                >
+                  Xóa
+                </button>
+              </div>
             </article>
           ))}
         </div>
