@@ -166,7 +166,7 @@ const getRentalsByUser = async (req, res) => {
             .input('ma_nguoi_dung', sql.Int, parseInt(targetUserId, 10))
             .query(`
                 SELECT h.ma_hop_dong, h.so_hop_dong, h.ngay_bat_dau, h.ngay_ket_thuc,
-                       h.tong_tien, h.trang_thai_hop_dong, h.trang_thai_thanh_toan, h.yeu_cau_dac_biet,
+                       h.tong_tien, h.trang_thai_hop_dong, h.trang_thai_thanh_toan, h.trang_thai_canh_tac, h.yeu_cau_dac_biet,
                        o.ma_o_dat, o.so_hieu_o, o.ten_o_dat, o.dien_tich_m2, o.chieu_dai_m, o.chieu_rong_m,
                        o.loai_dat, o.he_thong_tuoi, o.huong_anh_sang, o.gia_thue_thang, o.mo_ta_chi_tiet,
                        o.hinh_anh_o_dat,

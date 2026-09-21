@@ -101,17 +101,20 @@ function FarmerPage({ user, onLogout }) {
           stageLabel:
             cultivationLabels[rental.trang_thai_canh_tac] ||
             cultivationLabels.cho_gieo_trong,
-          progress: Math.min(
-            Math.max(
-              Math.round(
-                ((rental.so_ngay_da_trong || 0) /
-                  (rental.thoi_gian_sinh_truong_ngay || 90)) *
+          progress:
+            rental.trang_thai_canh_tac === "san_sang_thu_hoach"
+              ? 100
+              : Math.min(
+                  Math.max(
+                    Math.round(
+                      ((rental.so_ngay_da_trong || 0) /
+                        (rental.thoi_gian_sinh_truong_ngay || 90)) *
+                        100,
+                    ),
+                    0,
+                  ),
                   100,
-              ),
-              0,
-            ),
-            100,
-          ),
+                ),
           next:
             rental.trang_thai_canh_tac === "cho_gieo_trong"
               ? "Xác nhận đã nhận giống để bắt đầu"
@@ -709,7 +712,7 @@ function FarmerPage({ user, onLogout }) {
                       Đã nhận giống và tiến hành gieo trồng
                     </button>
                   )}
-                  {plot.stage === "dang_canh_tac" && (
+                  {plot.stage === "dang_canh_tac" && plot.progress >= 100 && (
                     <button
                       className="primary-button"
                       style={{ background: "#2d6a4f", marginTop: "8px" }}
@@ -734,7 +737,6 @@ function FarmerPage({ user, onLogout }) {
                       ✅ Đã sẵn sàng thu hoạch (Chờ khách chọn nhận hàng)
                     </span>
                   )}
-                  <small>Việc tiếp theo: {plot.next}</small>
                 </article>
               ))}
             </div>
@@ -1108,11 +1110,7 @@ function FarmerPage({ user, onLogout }) {
                       </small>
                     </div>
                     <button
-                      className={
-                        plot.stage === "san_sang_thu_hoach" || isDone
-                          ? "harvest-confirmed"
-                          : "primary-button"
-                      }
+                      className={isDone ? "harvest-confirmed" : "primary-button"}
                       disabled={isDone || waitingCustomer}
                       onClick={() => handoverHarvest(delivery)}
                     >
