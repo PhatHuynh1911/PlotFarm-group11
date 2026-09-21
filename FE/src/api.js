@@ -82,6 +82,11 @@ export async function getServiceTypes() {
   return result.data
 }
 
+export async function getCrops() {
+  const result = await apiRequest('/crops')
+  return result.data
+}
+
 export async function createServiceRequest(payload, token) {
   return apiRequest('/services', { method: 'POST', body: JSON.stringify(payload), token })
 }

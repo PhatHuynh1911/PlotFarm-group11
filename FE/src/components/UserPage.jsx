@@ -5,6 +5,7 @@ import {
   confirmRentalPayment,
   getRentalPaymentInfo,
   createServiceRequest,
+  getCrops,
   getJournalsByRental,
   getPlots,
   getServiceTypes,
@@ -71,6 +72,7 @@ function UserPage({ user, token, onLogout }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [rentals, setRentals] = useState([]);
   const [availablePlots, setAvailablePlots] = useState([]);
+  const [crops, setCrops] = useState([]);
   const [serviceTypes, setServiceTypes] = useState([]);
   const [serviceRequests, setServiceRequests] = useState([]);
   const [complaints, setComplaints] = useState([]);
@@ -87,7 +89,7 @@ function UserPage({ user, token, onLogout }) {
   const [selectedPlot, setSelectedPlot] = useState(null);
   const [booking, setBooking] = useState({
     duration: "3",
-    crop: "Rau xà lách",
+    crop: "",
     payment: "Chuyển khoản",
   });
   const [bookingStep, setBookingStep] = useState("details");
@@ -131,6 +133,7 @@ function UserPage({ user, token, onLogout }) {
     Promise.all([
       getUserRentals(user.id, token),
       getPlots(),
+      getCrops(),
       getServiceTypes(),
       getUserServiceRequests(user.id, token),
       getUserComplaints(user.id, token),
@@ -139,6 +142,7 @@ function UserPage({ user, token, onLogout }) {
         async ([
           nextRentals,
           nextPlots,
+          nextCrops,
           nextServiceTypes,
           nextServiceRequests,
           nextComplaints,
@@ -154,6 +158,7 @@ function UserPage({ user, token, onLogout }) {
           setAvailablePlots(
             nextPlots.filter((plot) => plot.status === "trong"),
           );
+          setCrops(nextCrops);
           setServiceTypes(nextServiceTypes);
           setServiceRequests(nextServiceRequests);
           setComplaints(nextComplaints);
@@ -209,7 +214,11 @@ function UserPage({ user, token, onLogout }) {
   const openBooking = (plot) => {
     setSelectedPlot(plot);
     setBookingStep("details");
-    setBooking({ duration: "3", crop: "Rau xà lách", payment: "Chuyển khoản" });
+    setBooking({
+      duration: "3",
+      crop: crops[0] ? String(crops[0].ma_cay_trong) : "",
+      payment: "Chuyển khoản",
+    });
   };
   const closeBooking = () => {
     setSelectedPlot(null);
@@ -228,6 +237,7 @@ function UserPage({ user, token, onLogout }) {
         {
           ma_nguoi_dung: user.id,
           ma_o_dat: selectedPlot.id,
+          ma_cay_trong: booking.crop || null,
           thoi_han_thang: Number(booking.duration),
         },
         token,
@@ -1358,10 +1368,11 @@ function UserPage({ user, token, onLogout }) {
                       setBooking({ ...booking, crop: event.target.value })
                     }
                   >
-                    <option>Rau xà lách</option>
-                    <option>Cà chua bi</option>
-                    <option>Dâu tây</option>
-                    <option>Rau gia vị</option>
+                    {crops.map((crop) => (
+                      <option key={crop.ma_cay_trong} value={crop.ma_cay_trong}>
+                        {crop.ten_cay_trong}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <button className="primary-button booking-submit">
@@ -1382,7 +1393,10 @@ function UserPage({ user, token, onLogout }) {
                   <div>
                     <span>Mùa vụ</span>
                     <strong>
-                      {booking.crop} · {booking.duration} tháng
+                      {crops.find(
+                        (crop) => String(crop.ma_cay_trong) === String(booking.crop),
+                      )?.ten_cay_trong || "Chưa chọn"}{" "}
+                      · {booking.duration} tháng
                     </strong>
                   </div>
                   <div>
