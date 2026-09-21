@@ -132,6 +132,12 @@ const createPlot = async (req, res) => {
         return res.status(201).json({ success: true, message: 'Đã thêm ô đất', data: newPlot });
     } catch (error) { 
         console.error('Lỗi thêm ô đất:', error);
+        if (error.number === 2627 || error.number === 2601) {
+            return res.status(409).json({ success: false, message: 'Mã ô đất này đã tồn tại, vui lòng chọn mã khác' });
+        }
+        if (error.number === 547) {
+            return res.status(400).json({ success: false, message: 'Mã nông trại không hợp lệ' });
+        }
         return res.status(500).json({ success: false, message: 'Không thể thêm ô đất' }); 
     }
 };
@@ -178,6 +184,12 @@ const updatePlot = async (req, res) => {
         return res.json({ success: true, message: 'Đã cập nhật ô đất', data: updatedPlot });
     } catch (error) { 
         console.error('Lỗi cập nhật ô đất:', error);
+        if (error.number === 2627 || error.number === 2601) {
+            return res.status(409).json({ success: false, message: 'Mã ô đất này đã tồn tại, vui lòng chọn mã khác' });
+        }
+        if (error.number === 547) {
+            return res.status(400).json({ success: false, message: 'Mã nông trại không hợp lệ' });
+        }
         return res.status(500).json({ success: false, message: 'Không thể cập nhật ô đất' }); 
     }
 };
