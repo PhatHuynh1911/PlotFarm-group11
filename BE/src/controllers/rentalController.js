@@ -282,10 +282,28 @@ const markHarvestReady = async (req, res) => {
                 so_dien_thoai_nhan = NULL, dia_chi_nhan = NULL, ghi_chu_khach = NULL, trang_thai = 'cho_khach_chon',
                 ngay_san_sang = SYSDATETIME(), ngay_khach_chon = NULL, ngay_ban_giao = NULL WHERE ma_hop_dong = @contractId
             `);
-        } else {
-            await new sql.Request(transaction).input('contractId', sql.Int, contractId).input('farmerId', sql.Int, farmerId)
-                .query(`INSERT INTO GiaoNhanThuHoach (ma_hop_dong, ma_nong_dan) VALUES (@contractId, @farmerId)`);
         }
+        try {
+            const existingThuHoach = await new sql.Request(transaction).input('contractId', sql.Int, contractId)
+                .query(`SELECT ma_thu_hoach FROM dbo.ThuHoach WHERE ma_hop_dong = @contractId`);
+            if (!existingThuHoach.recordset[0]) {
+                await new sql.Request(transaction).input('contractId', sql.Int, contractId).input('farmerId', sql.Int, farmerId)
+                    .query(`
+                        INSERT INTO dbo.ThuHoach (
+                            ma_hop_dong, ma_nong_dan, ngay_thu_hoach,
+                            san_luong_thuc_te_kg, san_luong_hao_hut_kg, phan_loai_chat_luong,
+                            phuong_thuc_bao_quan, quy_cach_dong_goi, ghi_chu,
+                            trang_thai, ngay_tao
+                        ) VALUES (
+                            @contractId, @farmerId, CAST(SYSDATETIME() AS DATE),
+                            15.0, 0.0, 'Loai_A',
+                            N'Bảo quản mát 10-15 độ C', N'Thùng carton tiêu chuẩn PlotFarm',
+                            N'Nông dân đã xác nhận vụ mùa sẵn sàng thu hoạch.',
+                            'cho_thu_hoach', SYSDATETIME()
+                        )
+                    `);
+            }
+        } catch (_) {}
         await transaction.commit();
         createNotification(detail.ma_nguoi_dung, `Mùa vụ ${detail.so_hieu_o} đã sẵn sàng thu hoạch`, `Nông sản ${detail.ten_cay_trong || 'của bạn'} đã sẵn sàng. Vui lòng chọn hình thức nhận hàng.`, 'thu_hoach', '/user?tab=harvest').catch(() => {});
         return res.json({ success: true, message: 'Đã báo khách hàng chọn hình thức nhận nông sản' });

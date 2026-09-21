@@ -15,6 +15,7 @@ import {
   updateJournal,
   deleteJournal,
   updateCultivationStatus,
+  readyToHarvest,
   markHarvestReady,
   getFarmerHarvestDeliveries,
   handoverHarvestDelivery,
@@ -357,30 +358,58 @@ function FarmerPage({ user, onLogout }) {
     setTimeout(() => setCameraMessage(""), 2500);
   };
 
-  const markReadyForHarvest = async (plot) => {
+  const handleReadyToHarvest = async (plot) => {
     try {
-      await markHarvestReady(plot.rentalId, token);
-      setPlots((items) => items.map((item) => item.rentalId === plot.rentalId ? {
-        ...item,
-        stage: "san_sang_thu_hoach",
-        stageLabel: cultivationLabels.san_sang_thu_hoach,
-        next: "Chờ khách hàng chọn hình thức nhận nông sản",
-      } : item));
-      setHarvestDeliveries((items) => [...items.filter((item) => item.ma_hop_dong !== plot.rentalId), {
-        ma_hop_dong: plot.rentalId, so_hieu_o: plot.id, ten_cay_trong: plot.crop,
-        ten_khach_hang: plot.customer, trang_thai: "cho_khach_chon",
-      }]);
-      notify(`Đã báo khách ${plot.customer} chọn hình thức nhận nông sản.`);
-    } catch (harvestError) {
-      setError(harvestError.message);
-      notify(harvestError.message, "error");
+      const rentalId = plot.rentalId;
+      if (!rentalId) {
+        notify("Không tìm thấy mã hợp đồng tương ứng", "error");
+        return;
+      }
+      await readyToHarvest(rentalId, { plotId: plot.id }, token);
+      setPlots((items) =>
+        items.map((item) =>
+          item.rentalId === rentalId
+            ? {
+                ...item,
+                stage: "san_sang_thu_hoach",
+                stageLabel: cultivationLabels.san_sang_thu_hoach,
+                next: "Chờ khách hàng chọn hình thức nhận nông sản",
+                progress: 100,
+              }
+            : item,
+        ),
+      );
+      setHarvestDeliveries((items) => [
+        ...items.filter((item) => item.ma_hop_dong !== rentalId),
+        {
+          ma_hop_dong: rentalId,
+          so_hieu_o: plot.id,
+          ten_cay_trong: plot.crop,
+          ten_khach_hang: plot.customer,
+          trang_thai: "cho_khach_chon",
+        },
+      ]);
+      getFarmerHarvestDeliveries(token).then((data) => {
+        if (data && data.length) setHarvestDeliveries(data);
+      }).catch(() => {});
+      notify(`Ô đất ${plot.id} đã chuyển sang trạng thái sẵn sàng thu hoạch! Hệ thống đã gửi thông báo đến khách hàng.`);
+    } catch (err) {
+      notify(err.message || "Không thể kích hoạt sẵn sàng thu hoạch", "error");
     }
   };
+
+  const markReadyForHarvest = handleReadyToHarvest;
 
   const handoverHarvest = async (delivery) => {
     try {
       await handoverHarvestDelivery(delivery.ma_giao_nhan, token);
-      setHarvestDeliveries((items) => items.map((item) => item.ma_giao_nhan === delivery.ma_giao_nhan ? { ...item, trang_thai: "da_ban_giao_van_chuyen" } : item));
+      setHarvestDeliveries((items) =>
+        items.map((item) =>
+          item.ma_giao_nhan === delivery.ma_giao_nhan
+            ? { ...item, trang_thai: "da_ban_giao_van_chuyen" }
+            : item,
+        ),
+      );
       notify("Đã bàn giao nông sản cho đơn vị vận chuyển.");
     } catch (handoverError) {
       setError(handoverError.message);
@@ -681,9 +710,29 @@ function FarmerPage({ user, onLogout }) {
                     </button>
                   )}
                   {plot.stage === "dang_canh_tac" && (
-                    <button className="outline-button" onClick={() => markReadyForHarvest(plot)}>
-                      Sẵn sàng thu hoạch
+                    <button
+                      className="primary-button"
+                      style={{ background: "#2d6a4f", marginTop: "8px" }}
+                      onClick={() => handleReadyToHarvest(plot)}
+                    >
+                      🌾 Báo sẵn sàng thu hoạch
                     </button>
+                  )}
+                  {plot.stage === "san_sang_thu_hoach" && (
+                    <span
+                      style={{
+                        display: "inline-block",
+                        background: "#e8f5e9",
+                        color: "#2e7d32",
+                        padding: "6px 10px",
+                        borderRadius: "6px",
+                        fontWeight: "600",
+                        fontSize: "12px",
+                        marginTop: "8px",
+                      }}
+                    >
+                      ✅ Đã sẵn sàng thu hoạch (Chờ khách chọn nhận hàng)
+                    </span>
                   )}
                   <small>Việc tiếp theo: {plot.next}</small>
                 </article>
@@ -1060,7 +1109,9 @@ function FarmerPage({ user, onLogout }) {
                     </div>
                     <button
                       className={
-                        isDone ? "harvest-confirmed" : "primary-button"
+                        plot.stage === "san_sang_thu_hoach" || isDone
+                          ? "harvest-confirmed"
+                          : "primary-button"
                       }
                       disabled={isDone || waitingCustomer}
                       onClick={() => handoverHarvest(delivery)}

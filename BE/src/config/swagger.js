@@ -821,6 +821,101 @@ const swaggerSpec = {
                     200: { description: 'Danh sách tư vấn' }
                 }
             }
+        },
+
+        // --- 10. HARVEST (THU HOẠCH & GIAO HÀNG) ---
+        '/api/harvest/ready': {
+            post: {
+                tags: ['10. Harvest'],
+                summary: 'Nông dân bấm nút "Sẵn sàng thu hoạch" cho một ô đất / hợp đồng',
+                description: 'Cập nhật trạng thái hợp đồng sang "san_sang_thu_hoach", tự động khởi tạo bản ghi dbo.ThuHoach, và gửi thông báo cho Khách hàng & Admin.',
+                requestBody: {
+                    required: true,
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                properties: {
+                                    rentalId: { type: 'integer', example: 1, description: 'Mã hợp đồng thuê' },
+                                    plotId: { type: 'string', example: 'A-01', description: 'Mã hoặc số hiệu ô đất (thay thế cho rentalId)' },
+                                    san_luong_du_kien: { type: 'number', example: 18.5, description: 'Sản lượng ước tính (kg)' },
+                                    ghi_chu: { type: 'string', example: 'Rau phát triển chuẩn hữu cơ, sẵn sàng thu hoạch sáng sớm.' }
+                                }
+                            }
+                        }
+                    }
+                },
+                responses: {
+                    200: { description: 'Kích hoạt sẵn sàng thu hoạch thành công' }
+                }
+            }
+        },
+        '/api/rentals/{id}/ready-to-harvest': {
+            post: {
+                tags: ['10. Harvest'],
+                summary: 'Endpoint theo hợp đồng: Báo sẵn sàng thu hoạch',
+                parameters: [
+                    { name: 'id', in: 'path', required: true, schema: { type: 'integer', example: 1 } }
+                ],
+                responses: {
+                    200: { description: 'Thành công' }
+                }
+            }
+        },
+        '/api/plots/{id}/ready-to-harvest': {
+            post: {
+                tags: ['10. Harvest'],
+                summary: 'Endpoint theo ô đất: Báo sẵn sàng thu hoạch',
+                parameters: [
+                    { name: 'id', in: 'path', required: true, schema: { type: 'string', example: 'A-01' } }
+                ],
+                responses: {
+                    200: { description: 'Thành công' }
+                }
+            }
+        },
+        '/api/harvest/delivery': {
+            post: {
+                tags: ['10. Harvest'],
+                summary: 'Khách hàng đăng ký hình thức nhận nông sản (tại vườn hoặc giao tận nơi)',
+                description: 'Ghi nhận thông tin vào dbo.GiaoHang và gửi thông báo đến Ban quản trị & Nông dân phụ trách.',
+                requestBody: {
+                    required: true,
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                required: ['rentalId', 'hinh_thuc_nhan_hang', 'ten_nguoi_nhan', 'so_dien_thoai_nguoi_nhan'],
+                                properties: {
+                                    rentalId: { type: 'integer', example: 1 },
+                                    hinh_thuc_nhan_hang: { type: 'string', enum: ['giao_tan_noi', 'nhan_tai_vuon'], example: 'giao_tan_noi' },
+                                    ten_nguoi_nhan: { type: 'string', example: 'Đào Đại Sơn' },
+                                    so_dien_thoai_nguoi_nhan: { type: 'string', example: '0901234567' },
+                                    dia_chi_giao_hang: { type: 'string', example: 'Số 123 Đường Nguyễn Huệ' },
+                                    tinh_thanh: { type: 'string', example: 'Thành phố Hồ Chí Minh' },
+                                    quan_huyen: { type: 'string', example: 'Quận 1' },
+                                    ghi_chu: { type: 'string', example: 'Giao giờ hành chính giúp mình.' }
+                                }
+                            }
+                        }
+                    }
+                },
+                responses: {
+                    200: { description: 'Đăng ký nhận nông sản thành công' }
+                }
+            }
+        },
+        '/api/harvest/rental/{rentalId}': {
+            get: {
+                tags: ['10. Harvest'],
+                summary: 'Xem chi tiết đợt thu hoạch và thông tin giao hàng theo hợp đồng',
+                parameters: [
+                    { name: 'rentalId', in: 'path', required: true, schema: { type: 'integer', example: 1 } }
+                ],
+                responses: {
+                    200: { description: 'Thông tin đợt thu hoạch' }
+                }
+            }
         }
     }
 };
