@@ -16,6 +16,9 @@ import {
   deleteJournal,
   updateCultivationStatus,
   readyToHarvest,
+  markHarvestReady,
+  getFarmerHarvestDeliveries,
+  handoverHarvestDelivery,
   uploadJournalMedia,
   resolveImageUrl,
   updateCurrentUser,
@@ -65,7 +68,7 @@ function FarmerPage({ user, onLogout }) {
     "C-09": "",
   });
   const [cameraMessage, setCameraMessage] = useState("");
-  const [harvested, setHarvested] = useState([]);
+  const [harvestDeliveries, setHarvestDeliveries] = useState([]);
   const [rejectingAssignment, setRejectingAssignment] = useState(null);
   const [rejectionReasonType, setRejectionReasonType] = useState("busy");
   const [rejectionReasonText, setRejectionReasonText] = useState("");
@@ -84,9 +87,11 @@ function FarmerPage({ user, onLogout }) {
       getActiveRentals(token),
       getServiceRequests(token),
       getAssignments(token),
+      getFarmerHarvestDeliveries(token),
     ])
-      .then(async ([rentals, serviceRequests, nextAssignments]) => {
+      .then(async ([rentals, serviceRequests, nextAssignments, deliveries]) => {
         setAssignments(nextAssignments);
+        setHarvestDeliveries(deliveries);
         const mappedPlots = rentals.map((rental) => ({
           id: rental.so_hieu_o,
           crop: rental.ten_cay_trong || "Chưa chọn cây trồng",
@@ -368,29 +373,47 @@ function FarmerPage({ user, onLogout }) {
                 ...item,
                 stage: "san_sang_thu_hoach",
                 stageLabel: cultivationLabels.san_sang_thu_hoach,
-                next: "Đã sẵn sàng thu hoạch, chờ khách đăng ký nhận hàng",
+                next: "Chờ khách hàng chọn hình thức nhận nông sản",
                 progress: 100,
               }
             : item,
         ),
       );
-      setHarvested((items) =>
-        items.includes(plot.id) ? items : [...items, plot.id],
-      );
+      setHarvestDeliveries((items) => [
+        ...items.filter((item) => item.ma_hop_dong !== rentalId),
+        {
+          ma_hop_dong: rentalId,
+          so_hieu_o: plot.id,
+          ten_cay_trong: plot.crop,
+          ten_khach_hang: plot.customer,
+          trang_thai: "cho_khach_chon",
+        },
+      ]);
+      getFarmerHarvestDeliveries(token).then((data) => {
+        if (data && data.length) setHarvestDeliveries(data);
+      }).catch(() => {});
       notify(`Ô đất ${plot.id} đã chuyển sang trạng thái sẵn sàng thu hoạch! Hệ thống đã gửi thông báo đến khách hàng.`);
     } catch (err) {
       notify(err.message || "Không thể kích hoạt sẵn sàng thu hoạch", "error");
     }
   };
 
-  const confirmHarvest = (plotId) => {
-    const targetPlot = plots.find((p) => p.id === plotId);
-    if (targetPlot) {
-      handleReadyToHarvest(targetPlot);
-    } else {
-      setHarvested((items) =>
-        items.includes(plotId) ? items : [...items, plotId],
+  const markReadyForHarvest = handleReadyToHarvest;
+
+  const handoverHarvest = async (delivery) => {
+    try {
+      await handoverHarvestDelivery(delivery.ma_giao_nhan, token);
+      setHarvestDeliveries((items) =>
+        items.map((item) =>
+          item.ma_giao_nhan === delivery.ma_giao_nhan
+            ? { ...item, trang_thai: "da_ban_giao_van_chuyen" }
+            : item,
+        ),
       );
+      notify("Đã bàn giao nông sản cho đơn vị vận chuyển.");
+    } catch (handoverError) {
+      setError(handoverError.message);
+      notify(handoverError.message, "error");
     }
   };
   const activeRequests = requests.filter(
@@ -496,8 +519,7 @@ function FarmerPage({ user, onLogout }) {
               {
                 plots.filter(
                   (plot) =>
-                    plot.stage === "Sắp thu hoạch" &&
-                    !harvested.includes(plot.id),
+                    plot.stage === "san_sang_thu_hoach",
                 ).length
               }
             </strong>
@@ -709,7 +731,7 @@ function FarmerPage({ user, onLogout }) {
                         marginTop: "8px",
                       }}
                     >
-                      ✅ Đã sẵn sàng thu hoạch (Chờ khách đăng ký nhận hàng)
+                      ✅ Đã sẵn sàng thu hoạch (Chờ khách chọn nhận hàng)
                     </span>
                   )}
                   <small>Việc tiếp theo: {plot.next}</small>
@@ -1063,24 +1085,26 @@ function FarmerPage({ user, onLogout }) {
               </span>
             </div>
             <div className="harvest-list">
-              {plots.map((plot) => {
-                const isDone = harvested.includes(plot.id);
+              {harvestDeliveries.length === 0 && <p className="empty-state">Chưa có mùa vụ nào cần thu hoạch hoặc bàn giao.</p>}
+              {harvestDeliveries.map((delivery) => {
+                const waitingCustomer = delivery.trang_thai === "cho_khach_chon";
+                const isDone = delivery.trang_thai === "da_ban_giao_van_chuyen";
                 return (
                   <article
                     className={`harvest-item ${isDone ? "harvest-done" : ""}`}
-                    key={plot.id}
+                    key={delivery.ma_giao_nhan || delivery.ma_hop_dong}
                   >
                     <div>
                       <strong>
-                        {plot.id} · {plot.crop}
+                        {delivery.so_hieu_o} · {delivery.ten_cay_trong || "Nông sản theo mùa vụ"}
                       </strong>
-                      <p>Khách hàng: {plot.customer}</p>
+                      <p>Khách hàng: {delivery.ten_khach_hang}</p>
+                      <p>Nông sản cần thu hoạch: {delivery.ten_cay_trong || "Nông sản của ô đất"}{delivery.dien_tich_m2 ? ` · ${delivery.dien_tich_m2} m²` : ""}</p>
                       <small>
                         {isDone
-                          ? "Đã chuyển sang khâu đóng gói, vận chuyển."
-                          : plot.stage === "san_sang_thu_hoach"
-                            ? "Đã đến kỳ thu hoạch, cần xác nhận."
-                            : `Tiến độ hiện tại ${plot.progress}%.`}
+                          ? "Đã bàn giao cho vận chuyển."
+                          : waitingCustomer ? "Đang chờ khách hàng chọn hình thức nhận nông sản."
+                            : `${delivery.hinh_thuc_nhan === "giao_tan_noi" ? `Giao đến: ${delivery.dia_chi_nhan}` : "Khách nhận tại nông trại"}${delivery.ghi_chu_khach ? ` · Ghi chú: ${delivery.ghi_chu_khach}` : ""}`}
                       </small>
                     </div>
                     <button
@@ -1089,12 +1113,10 @@ function FarmerPage({ user, onLogout }) {
                           ? "harvest-confirmed"
                           : "primary-button"
                       }
-                      disabled={plot.stage === "san_sang_thu_hoach" || isDone}
-                      onClick={() => handleReadyToHarvest(plot)}
+                      disabled={isDone || waitingCustomer}
+                      onClick={() => handoverHarvest(delivery)}
                     >
-                      {plot.stage === "san_sang_thu_hoach" || isDone
-                        ? "Đã sẵn sàng thu hoạch"
-                        : "Sẵn sàng thu hoạch"}
+                      {isDone ? "Đã bàn giao" : waitingCustomer ? "Chờ khách phản hồi" : "Đã bàn giao cho vận chuyển"}
                     </button>
                   </article>
                 );

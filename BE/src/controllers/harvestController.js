@@ -148,6 +148,19 @@ const readyToHarvest = async (req, res) => {
             harvestRecord = insertHarvest.recordset[0];
         }
 
+        // Đồng bộ thêm vào bảng GiaoNhanThuHoach (nếu bảng tồn tại)
+        try {
+            const checkGNT = await pool.request()
+                .input('rentalId', sql.Int, rentalId)
+                .query(`SELECT ma_giao_nhan FROM GiaoNhanThuHoach WHERE ma_hop_dong = @rentalId`);
+            if (!checkGNT.recordset[0]) {
+                await pool.request()
+                    .input('rentalId', sql.Int, rentalId)
+                    .input('farmerId', sql.Int, farmerId)
+                    .query(`INSERT INTO GiaoNhanThuHoach (ma_hop_dong, ma_nong_dan) VALUES (@rentalId, @farmerId)`);
+            }
+        } catch (_) {}
+
         // Bắn thông báo cho Khách hàng
         await createNotification(
             customerId,

@@ -17,6 +17,8 @@ import {
   PLOT_PLACEHOLDER_IMAGE,
   resolveImageUrl,
   updateCurrentUser,
+  getUserHarvestDeliveries,
+  chooseHarvestDelivery,
 } from "../api.js";
 import AccountMenu from "./AccountMenu.jsx";
 import ProfilePanel from "./ProfilePanel.jsx";
@@ -99,15 +101,18 @@ function UserPage({ user, token, onLogout }) {
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const [notice, setNotice] = useState("");
   const [supportSent, setSupportSent] = useState(false);
-  const [harvestSent, setHarvestSent] = useState(false);
+  const [harvestDeliveries, setHarvestDeliveries] = useState([]);
   const [selectedCareRental, setSelectedCareRental] = useState("");
   const [selectedHarvestRental, setSelectedHarvestRental] = useState("");
   const [shippingMethod, setShippingMethod] = useState("");
   const [harvestProvince, setHarvestProvince] = useState("");
   const [harvestDistrict, setHarvestDistrict] = useState("");
-  const [harvestRecipientName, setHarvestRecipientName] = useState(user?.name || "");
-  const [harvestRecipientPhone, setHarvestRecipientPhone] = useState(user?.phone || "");
-  const [harvestAddress, setHarvestAddress] = useState("");
+  const [harvestForm, setHarvestForm] = useState({
+    name: user?.name || "",
+    phone: user?.phone || "",
+    address: "",
+    note: "",
+  });
   const [harvestSubmitting, setHarvestSubmitting] = useState(false);
   const harvestDistricts = useMemo(
     () =>
@@ -142,6 +147,7 @@ function UserPage({ user, token, onLogout }) {
       getServiceTypes(),
       getUserServiceRequests(user.id, token),
       getUserComplaints(user.id, token),
+      getUserHarvestDeliveries(token),
     ])
       .then(
         async ([
@@ -151,6 +157,7 @@ function UserPage({ user, token, onLogout }) {
           nextServiceTypes,
           nextServiceRequests,
           nextComplaints,
+          nextHarvestDeliveries,
         ]) => {
           setRentals(nextRentals);
           const assignedRentals = nextRentals.filter(
@@ -173,6 +180,17 @@ function UserPage({ user, token, onLogout }) {
           setServiceTypes(nextServiceTypes);
           setServiceRequests(nextServiceRequests);
           setComplaints(nextComplaints);
+          setHarvestDeliveries(nextHarvestDeliveries);
+          const readyDelivery = nextHarvestDeliveries.find((item) => item.trang_thai === "cho_khach_chon");
+          if (readyDelivery) {
+            setSelectedHarvestRental(String(readyDelivery.ma_hop_dong));
+            setHarvestForm((current) => ({
+              ...current,
+              name: current.name || user.name || "",
+              phone: current.phone || user.phone || "",
+            }));
+            if (!searchParams.get("tab")) setSearchParams(new URLSearchParams("tab=harvest"));
+          }
           const grouped = await Promise.all(
             nextRentals.map((rental) =>
               getJournalsByRental(rental.ma_hop_dong, token).catch(() => []),
@@ -1332,40 +1350,43 @@ function UserPage({ user, token, onLogout }) {
                   🌾 Ô đất này đã được nông dân xác nhận sẵn sàng thu hoạch! Vui lòng chọn hình thức nhận nông sản bên dưới để nông trại tiến hành chuẩn bị.
                 </div>
               )}
-            {harvestSent ? (
-              <div
-                className="form-success"
-                style={{
-                  padding: "16px",
-                  borderRadius: "8px",
-                  background: "#e8f5e9",
-                  border: "1px solid #c8e6c9",
-                }}
-              >
-                <strong
-                  style={{
-                    color: "#1b5e20",
-                    display: "block",
-                    marginBottom: "6px",
-                    fontSize: "14px",
-                  }}
-                >
-                  ✅ Đăng ký nhận nông sản thành công!
-                </strong>
-                <p style={{ margin: 0, color: "#2e7d32", fontSize: "13px" }}>
-                  Thông tin nhận hàng đã được lưu cho mùa vụ này. Nông trại PlotFarm đã tiếp nhận và sẽ chủ động liên hệ giao nông sản sạch tới bạn đúng hẹn.
-                </p>
-                <button
-                  type="button"
-                  className="outline-button"
-                  style={{ marginTop: "14px", fontSize: "12px" }}
-                  onClick={() => setHarvestSent(false)}
-                >
-                  Chỉnh sửa lại thông tin nhận hàng
-                </button>
-              </div>
+            {harvestDeliveries.filter((item) => item.trang_thai === "cho_khach_chon").length === 0 ? (
+              <p className="empty-state">Chưa có ô đất nào sẵn sàng thu hoạch. Khi Farmer cập nhật, form chọn hình thức nhận hàng sẽ tự mở khóa tại đây.</p>
             ) : (
-              <form onSubmit={submitHarvestDelivery}>
+              <form onSubmit={async (event) => {
+                event.preventDefault();
+                const selected = harvestDeliveries.find((item) => String(item.ma_hop_dong) === selectedHarvestRental);
+                if (!selected) return notify("Vui lòng chọn mùa vụ đang chờ nhận hàng.", "error");
+                setHarvestSubmitting(true);
+                try {
+                  const fullAddress = shippingMethod === "Giao tận nơi"
+                    ? `${harvestForm.address ? harvestForm.address + ", " : ""}${harvestDistrict ? harvestDistrict + ", " : ""}${harvestProvince}`
+                    : "Nhận tại nông trại PlotFarm";
+                  await chooseHarvestDelivery(selected.ma_hop_dong, {
+                    hinh_thuc_nhan: shippingMethod === "Giao tận nơi" ? "giao_tan_noi" : "nhan_tai_nong_trai",
+                    ten_nguoi_nhan: harvestForm.name,
+                    so_dien_thoai_nhan: harvestForm.phone,
+                    dia_chi_nhan: fullAddress,
+                    ghi_chu_khach: harvestForm.note,
+                  }, token);
+                  registerHarvestDelivery({
+                    rentalId: selected.ma_hop_dong,
+                    hinh_thuc_nhan_hang: shippingMethod,
+                    ten_nguoi_nhan: harvestForm.name,
+                    so_dien_thoai_nguoi_nhan: harvestForm.phone,
+                    dia_chi_giao_hang: harvestForm.address,
+                    tinh_thanh: harvestProvince,
+                    quan_huyen: harvestDistrict,
+                    ghi_chu: harvestForm.note,
+                  }, token).catch(() => {});
+                  setHarvestDeliveries((items) => items.map((item) => item.ma_hop_dong === selected.ma_hop_dong ? { ...item, trang_thai: "cho_thu_hoach_dong_goi" } : item));
+                  notify("Đã gửi yêu cầu đóng gói và giao hàng tới Farmer.");
+                } catch (harvestError) {
+                  notify(harvestError.message, "error");
+                } finally {
+                  setHarvestSubmitting(false);
+                }
+              }}>
                 <select
                   value={selectedHarvestRental}
                   onChange={(event) =>
@@ -1374,31 +1395,14 @@ function UserPage({ user, token, onLogout }) {
                   required
                 >
                   <option value="">Chọn ô đất</option>
-                  {rentals.map((rental) => (
-                    <option key={rental.ma_hop_dong} value={rental.ma_hop_dong}>
-                      {rental.so_hieu_o} · {rental.ten_o_dat}{" "}
-                      {rental.trang_thai_canh_tac === "san_sang_thu_hoach"
-                        ? "🌾 (Sẵn sàng thu hoạch)"
-                        : ""}
+                  {harvestDeliveries.filter((item) => item.trang_thai === "cho_khach_chon").map((delivery) => (
+                    <option key={delivery.ma_hop_dong} value={delivery.ma_hop_dong}>
+                      {delivery.so_hieu_o} · {delivery.ten_o_dat} · {delivery.ten_cay_trong || "Nông sản theo mùa vụ"}
                     </option>
                   ))}
                 </select>
-                <input
-                  required
-                  placeholder="Tên người nhận"
-                  value={harvestRecipientName}
-                  onChange={(event) =>
-                    setHarvestRecipientName(event.target.value)
-                  }
-                />
-                <input
-                  required
-                  placeholder="Số điện thoại"
-                  value={harvestRecipientPhone}
-                  onChange={(event) =>
-                    setHarvestRecipientPhone(event.target.value)
-                  }
-                />
+                <input required placeholder="Tên người nhận" value={harvestForm.name} onChange={(event) => setHarvestForm({ ...harvestForm, name: event.target.value })} />
+                <input required placeholder="Số điện thoại" value={harvestForm.phone} onChange={(event) => setHarvestForm({ ...harvestForm, phone: event.target.value })} />
                 <select
                   value={shippingMethod}
                   onChange={(event) => {
@@ -1446,22 +1450,12 @@ function UserPage({ user, token, onLogout }) {
                         </option>
                       ))}
                     </select>
-                    <input
-                      required
-                      placeholder="Địa chỉ nhận hàng (Số nhà, tên đường...)"
-                      value={harvestAddress}
-                      onChange={(event) =>
-                        setHarvestAddress(event.target.value)
-                      }
-                    />
+                    <input required placeholder="Địa chỉ nhận hàng (Số nhà, tên đường...)" value={harvestForm.address} onChange={(event) => setHarvestForm({ ...harvestForm, address: event.target.value })} />
                   </>
                 )}
-                <button
-                  className="primary-button"
-                  disabled={harvestSubmitting}
-                >
-                  {harvestSubmitting ? "Đang xử lý..." : "Đăng ký nhận hàng"}{" "}
-                  <span>→</span>
+                <textarea placeholder="Ghi chú cho Farmer (không bắt buộc)" value={harvestForm.note} onChange={(event) => setHarvestForm({ ...harvestForm, note: event.target.value })} />
+                <button className="primary-button" disabled={harvestSubmitting}>
+                  {harvestSubmitting ? "Đang xử lý..." : "Đăng ký nhận hàng"} <span>→</span>
                 </button>
               </form>
             )}

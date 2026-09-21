@@ -167,6 +167,28 @@ export async function updateCultivationStatus(id, status, token) {
   return apiRequest(`/rentals/${id}/cultivation-status`, { method: 'PATCH', body: JSON.stringify({ status }), token })
 }
 
+export async function markHarvestReady(rentalId, token) {
+  return apiRequest(`/rentals/${rentalId}/harvest-ready`, { method: 'PATCH', token })
+}
+
+export async function getFarmerHarvestDeliveries(token) {
+  const result = await apiRequest('/rentals/harvest-deliveries/mine', { token })
+  return result.data
+}
+
+export async function getUserHarvestDeliveries(token) {
+  const result = await apiRequest('/rentals/harvest-deliveries/user', { token })
+  return result.data
+}
+
+export async function chooseHarvestDelivery(rentalId, payload, token) {
+  return apiRequest(`/rentals/${rentalId}/harvest-delivery`, { method: 'POST', body: JSON.stringify(payload), token })
+}
+
+export async function handoverHarvestDelivery(deliveryId, token) {
+  return apiRequest(`/rentals/harvest-deliveries/${deliveryId}/handover`, { method: 'PATCH', token })
+}
+
 export async function updateJournal(id, payload, token) {
   return apiRequest(`/journals/${id}`, { method: 'PATCH', body: JSON.stringify(payload), token })
 }
