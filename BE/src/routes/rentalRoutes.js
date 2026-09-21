@@ -8,7 +8,12 @@ const {
     getRentalById,
     updateCultivationStatus,
     getPaymentInfo,
-    confirmPayment
+    confirmPayment,
+    markHarvestReady,
+    getHarvestDeliveriesForFarmer,
+    getHarvestDeliveriesForUser,
+    chooseHarvestDelivery,
+    handoverHarvestDelivery
 } = require('../controllers/rentalController');
 const { authenticate, authorize } = require('../middleware/authMiddleware');
 const { getAssignments, respondToAssignment } = require('../controllers/assignmentController');
@@ -30,10 +35,15 @@ router.get('/', softAuth, getAllRentals);
 router.get('/active', softAuth, getActiveRentals);
 router.get('/assignments/mine', authenticate, authorize('nong_dan'), getAssignments);
 router.patch('/assignments/:id/respond', authenticate, authorize('nong_dan'), respondToAssignment);
+router.get('/harvest-deliveries/mine', authenticate, authorize('nong_dan'), getHarvestDeliveriesForFarmer);
+router.get('/harvest-deliveries/user', authenticate, authorize('khach_hang'), getHarvestDeliveriesForUser);
+router.patch('/:id/harvest-ready', authenticate, authorize('nong_dan'), markHarvestReady);
+router.post('/:id/harvest-delivery', authenticate, authorize('khach_hang'), chooseHarvestDelivery);
+router.patch('/harvest-deliveries/:id/handover', authenticate, authorize('nong_dan'), handoverHarvestDelivery);
 router.get('/:id/payment-info', softAuth, getPaymentInfo);
 router.post('/:id/confirm-payment', softAuth, confirmPayment);
 router.patch('/:id/payment-status', softAuth, confirmPayment);
-router.patch('/:id/cultivation-status', softAuth, updateCultivationStatus);
+router.patch('/:id/cultivation-status', authenticate, authorize('nong_dan'), updateCultivationStatus);
 router.get('/user/:userId', softAuth, getRentalsByUser);
 router.get('/:id', softAuth, getRentalById);
 

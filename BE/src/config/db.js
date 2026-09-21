@@ -142,6 +142,24 @@ const connectDB = async () => {
                 ALTER TABLE dbo.YeuCauDichVu
                 ADD loai_yeu_cau VARCHAR(30) NULL;
             END
+
+            IF OBJECT_ID('dbo.GiaoNhanThuHoach', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.GiaoNhanThuHoach (
+                    ma_giao_nhan INT IDENTITY(1,1) PRIMARY KEY,
+                    ma_hop_dong INT NOT NULL UNIQUE FOREIGN KEY REFERENCES dbo.HopDongThue(ma_hop_dong) ON DELETE CASCADE,
+                    ma_nong_dan INT NOT NULL FOREIGN KEY REFERENCES dbo.NguoiDung(ma_nguoi_dung),
+                    hinh_thuc_nhan VARCHAR(30) NULL,
+                    ten_nguoi_nhan NVARCHAR(100) NULL,
+                    so_dien_thoai_nhan VARCHAR(20) NULL,
+                    dia_chi_nhan NVARCHAR(500) NULL,
+                    ghi_chu_khach NVARCHAR(1000) NULL,
+                    trang_thai VARCHAR(40) NOT NULL DEFAULT 'cho_khach_chon',
+                    ngay_san_sang DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+                    ngay_khach_chon DATETIME2 NULL,
+                    ngay_ban_giao DATETIME2 NULL
+                );
+            END
         `);
         console.log(`✅ Kết nối SQL Server thành công: [${process.env.DB_NAME || 'PlotFarmDB'}] tại ${serverVal}`);
     } catch (error) {

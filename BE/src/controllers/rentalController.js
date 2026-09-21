@@ -229,11 +229,17 @@ const updateCultivationStatus = async (req, res) => {
         const result = await pool.request()
             .input('id', sql.Int, parseInt(req.params.id, 10))
             .input('status', sql.VarChar(30), status)
+            .input('farmerId', sql.Int, Number(req.user.sub))
             .query(`
                 UPDATE HopDongThue
                 SET trang_thai_canh_tac = @status, ngay_cap_nhat = SYSDATETIME()
                 OUTPUT INSERTED.ma_hop_dong, INSERTED.trang_thai_canh_tac
                 WHERE ma_hop_dong = @id AND trang_thai_hop_dong = 'hieu_luc'
+                  AND EXISTS (
+                    SELECT 1 FROM PhanCongNongDan p
+                    WHERE p.ma_hop_dong = HopDongThue.ma_hop_dong
+                      AND p.ma_nong_dan = @farmerId AND p.trang_thai = 'da_chap_nhan'
+                  )
             `);
 
         if (!result.recordset[0]) return res.status(404).json({ success: false, message: 'Không tìm thấy hợp đồng đang hoạt động' });
@@ -241,6 +247,123 @@ const updateCultivationStatus = async (req, res) => {
     } catch (error) {
         console.error('Lỗi cập nhật trạng thái canh tác:', error);
         return res.status(500).json({ success: false, message: 'Lỗi server nội bộ' });
+    }
+};
+
+const markHarvestReady = async (req, res) => {
+    const pool = await getPool();
+    const transaction = new sql.Transaction(pool);
+    try {
+        const contractId = Number(req.params.id);
+        const farmerId = Number(req.user.sub);
+        await transaction.begin();
+        const detailResult = await new sql.Request(transaction)
+            .input('contractId', sql.Int, contractId).input('farmerId', sql.Int, farmerId)
+            .query(`
+                SELECT h.ma_hop_dong, h.ma_nguoi_dung, o.so_hieu_o, c.ten_cay_trong
+                FROM HopDongThue h JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+                LEFT JOIN CayTrong c ON c.ma_cay_trong = h.ma_cay_trong
+                WHERE h.ma_hop_dong = @contractId AND h.trang_thai_hop_dong = 'hieu_luc'
+                  AND EXISTS (SELECT 1 FROM PhanCongNongDan p WHERE p.ma_hop_dong = h.ma_hop_dong AND p.ma_nong_dan = @farmerId AND p.trang_thai = 'da_chap_nhan')
+            `);
+        const detail = detailResult.recordset[0];
+        if (!detail) {
+            await transaction.rollback();
+            return res.status(403).json({ success: false, message: 'Bạn không được phụ trách hợp đồng này hoặc hợp đồng không còn hiệu lực' });
+        }
+        await new sql.Request(transaction).input('contractId', sql.Int, contractId).query(`
+            UPDATE HopDongThue SET trang_thai_canh_tac = 'san_sang_thu_hoach', ngay_cap_nhat = SYSDATETIME() WHERE ma_hop_dong = @contractId
+        `);
+        const existing = await new sql.Request(transaction).input('contractId', sql.Int, contractId)
+            .query(`SELECT ma_giao_nhan FROM GiaoNhanThuHoach WHERE ma_hop_dong = @contractId`);
+        if (existing.recordset[0]) {
+            await new sql.Request(transaction).input('contractId', sql.Int, contractId).input('farmerId', sql.Int, farmerId).query(`
+                UPDATE GiaoNhanThuHoach SET ma_nong_dan = @farmerId, hinh_thuc_nhan = NULL, ten_nguoi_nhan = NULL,
+                so_dien_thoai_nhan = NULL, dia_chi_nhan = NULL, ghi_chu_khach = NULL, trang_thai = 'cho_khach_chon',
+                ngay_san_sang = SYSDATETIME(), ngay_khach_chon = NULL, ngay_ban_giao = NULL WHERE ma_hop_dong = @contractId
+            `);
+        } else {
+            await new sql.Request(transaction).input('contractId', sql.Int, contractId).input('farmerId', sql.Int, farmerId)
+                .query(`INSERT INTO GiaoNhanThuHoach (ma_hop_dong, ma_nong_dan) VALUES (@contractId, @farmerId)`);
+        }
+        await transaction.commit();
+        createNotification(detail.ma_nguoi_dung, `Mùa vụ ${detail.so_hieu_o} đã sẵn sàng thu hoạch`, `Nông sản ${detail.ten_cay_trong || 'của bạn'} đã sẵn sàng. Vui lòng chọn hình thức nhận hàng.`, 'thu_hoach', '/user?tab=harvest').catch(() => {});
+        return res.json({ success: true, message: 'Đã báo khách hàng chọn hình thức nhận nông sản' });
+    } catch (error) {
+        try { await transaction.rollback(); } catch (_) {}
+        console.error('Lỗi báo sẵn sàng thu hoạch:', error);
+        return res.status(500).json({ success: false, message: 'Không thể cập nhật trạng thái thu hoạch' });
+    }
+};
+
+const getHarvestDeliveriesForUser = async (req, res) => {
+    try {
+        const pool = await getPool();
+        const result = await pool.request().input('userId', sql.Int, Number(req.user.sub)).query(`
+            SELECT g.*, h.so_hop_dong, o.so_hieu_o, o.ten_o_dat, o.dien_tich_m2, c.ten_cay_trong
+            FROM GiaoNhanThuHoach g JOIN HopDongThue h ON h.ma_hop_dong = g.ma_hop_dong
+            JOIN ODat o ON o.ma_o_dat = h.ma_o_dat LEFT JOIN CayTrong c ON c.ma_cay_trong = h.ma_cay_trong
+            WHERE h.ma_nguoi_dung = @userId ORDER BY g.ngay_san_sang DESC
+        `);
+        return res.json({ success: true, data: result.recordset });
+    } catch (error) {
+        console.error('Lỗi lấy giao nhận cho khách:', error);
+        return res.status(500).json({ success: false, message: 'Không thể tải thông tin nhận nông sản' });
+    }
+};
+
+const chooseHarvestDelivery = async (req, res) => {
+    try {
+        const { hinh_thuc_nhan, ten_nguoi_nhan, so_dien_thoai_nhan, dia_chi_nhan, ghi_chu_khach } = req.body;
+        if (!['giao_tan_noi', 'nhan_tai_nong_trai'].includes(hinh_thuc_nhan) || !ten_nguoi_nhan?.trim() || !so_dien_thoai_nhan?.trim() || (hinh_thuc_nhan === 'giao_tan_noi' && !dia_chi_nhan?.trim())) return res.status(400).json({ success: false, message: 'Vui lòng nhập đầy đủ thông tin nhận nông sản' });
+        const pool = await getPool();
+        const result = await pool.request().input('contractId', sql.Int, Number(req.params.id)).input('userId', sql.Int, Number(req.user.sub))
+            .input('method', sql.VarChar(30), hinh_thuc_nhan).input('name', sql.NVarChar(100), ten_nguoi_nhan.trim()).input('phone', sql.VarChar(20), so_dien_thoai_nhan.trim())
+            .input('address', sql.NVarChar(500), dia_chi_nhan?.trim() || null).input('note', sql.NVarChar(1000), ghi_chu_khach?.trim() || null)
+            .query(`
+                UPDATE g SET hinh_thuc_nhan = @method, ten_nguoi_nhan = @name, so_dien_thoai_nhan = @phone, dia_chi_nhan = @address,
+                ghi_chu_khach = @note, trang_thai = 'cho_thu_hoach_dong_goi', ngay_khach_chon = SYSDATETIME()
+                OUTPUT INSERTED.ma_giao_nhan, INSERTED.ma_nong_dan FROM GiaoNhanThuHoach g JOIN HopDongThue h ON h.ma_hop_dong = g.ma_hop_dong
+                WHERE g.ma_hop_dong = @contractId AND h.ma_nguoi_dung = @userId AND g.trang_thai = 'cho_khach_chon'
+            `);
+        const delivery = result.recordset[0];
+        if (!delivery) return res.status(409).json({ success: false, message: 'Yêu cầu này chưa sẵn sàng hoặc đã được xác nhận' });
+        createNotification(delivery.ma_nong_dan, 'Yêu cầu đóng gói & giao hàng mới', 'Khách hàng đã chọn hình thức nhận nông sản. Vui lòng thu hoạch, đóng gói và bàn giao vận chuyển.', 'thu_hoach', '/farmer?tab=harvest').catch(() => {});
+        return res.json({ success: true, message: 'Đã gửi yêu cầu giao nhận tới nông dân' });
+    } catch (error) {
+        console.error('Lỗi khách chọn giao nhận:', error);
+        return res.status(500).json({ success: false, message: 'Không thể lưu hình thức nhận nông sản' });
+    }
+};
+
+const getHarvestDeliveriesForFarmer = async (req, res) => {
+    try {
+        const pool = await getPool();
+        const result = await pool.request().input('farmerId', sql.Int, Number(req.user.sub)).query(`
+            SELECT g.*, h.so_hop_dong, o.so_hieu_o, o.ten_o_dat, o.dien_tich_m2, c.ten_cay_trong, u.ho_va_ten AS ten_khach_hang
+            FROM GiaoNhanThuHoach g JOIN HopDongThue h ON h.ma_hop_dong = g.ma_hop_dong JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+            JOIN NguoiDung u ON u.ma_nguoi_dung = h.ma_nguoi_dung LEFT JOIN CayTrong c ON c.ma_cay_trong = h.ma_cay_trong
+            WHERE g.ma_nong_dan = @farmerId ORDER BY g.ngay_san_sang DESC
+        `);
+        return res.json({ success: true, data: result.recordset });
+    } catch (error) {
+        console.error('Lỗi lấy yêu cầu giao nhận cho nông dân:', error);
+        return res.status(500).json({ success: false, message: 'Không thể tải yêu cầu giao nhận' });
+    }
+};
+
+const handoverHarvestDelivery = async (req, res) => {
+    try {
+        const pool = await getPool();
+        const result = await pool.request().input('id', sql.Int, Number(req.params.id)).input('farmerId', sql.Int, Number(req.user.sub)).query(`
+            UPDATE GiaoNhanThuHoach SET trang_thai = 'da_ban_giao_van_chuyen', ngay_ban_giao = SYSDATETIME() OUTPUT INSERTED.ma_hop_dong
+            WHERE ma_giao_nhan = @id AND ma_nong_dan = @farmerId AND trang_thai = 'cho_thu_hoach_dong_goi'
+        `);
+        if (!result.recordset[0]) return res.status(409).json({ success: false, message: 'Yêu cầu không hợp lệ hoặc đã được bàn giao' });
+        return res.json({ success: true, message: 'Đã bàn giao nông sản cho vận chuyển' });
+    } catch (error) {
+        console.error('Lỗi bàn giao thu hoạch:', error);
+        return res.status(500).json({ success: false, message: 'Không thể xác nhận bàn giao' });
     }
 };
 
@@ -410,5 +533,10 @@ module.exports = {
     updateCultivationStatus,
     getPaymentInfo,
     confirmPayment,
+    markHarvestReady,
+    getHarvestDeliveriesForFarmer,
+    getHarvestDeliveriesForUser,
+    chooseHarvestDelivery,
+    handoverHarvestDelivery,
     generateVietQR
 };
