@@ -10,6 +10,11 @@ const {
     getPaymentInfo,
     confirmPayment
 } = require('../controllers/rentalController');
+const {
+    readyToHarvest,
+    registerDelivery,
+    getHarvestByRental
+} = require('../controllers/harvestController');
 const { authenticate, authorize } = require('../middleware/authMiddleware');
 const { getAssignments, respondToAssignment } = require('../controllers/assignmentController');
 
@@ -34,6 +39,9 @@ router.get('/:id/payment-info', softAuth, getPaymentInfo);
 router.post('/:id/confirm-payment', softAuth, confirmPayment);
 router.patch('/:id/payment-status', softAuth, confirmPayment);
 router.patch('/:id/cultivation-status', softAuth, updateCultivationStatus);
+router.post('/:id/ready-to-harvest', softAuth, readyToHarvest);
+router.post('/:id/harvest-delivery', softAuth, registerDelivery);
+router.get('/:id/harvest', softAuth, getHarvestByRental);
 router.get('/user/:userId', softAuth, getRentalsByUser);
 router.get('/:id', softAuth, getRentalById);
 

@@ -142,6 +142,12 @@ const connectDB = async () => {
                 ALTER TABLE dbo.YeuCauDichVu
                 ADD loai_yeu_cau VARCHAR(30) NULL;
             END
+
+            -- Tương thích database ThuHoach & GiaoHang
+            IF OBJECT_ID('dbo.ThuHoach', 'U') IS NOT NULL
+            BEGIN
+                ALTER TABLE dbo.ThuHoach ALTER COLUMN san_luong_thuc_te_kg DECIMAL(8, 2) NULL;
+            END
         `);
         console.log(`✅ Kết nối SQL Server thành công: [${process.env.DB_NAME || 'PlotFarmDB'}] tại ${serverVal}`);
     } catch (error) {

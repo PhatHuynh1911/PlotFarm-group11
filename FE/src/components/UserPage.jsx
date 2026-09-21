@@ -13,6 +13,7 @@ import {
   getUserServiceRequests,
   getUserComplaints,
   submitComplaint,
+  registerHarvestDelivery,
   PLOT_PLACEHOLDER_IMAGE,
   resolveImageUrl,
   updateCurrentUser,
@@ -104,6 +105,10 @@ function UserPage({ user, token, onLogout }) {
   const [shippingMethod, setShippingMethod] = useState("");
   const [harvestProvince, setHarvestProvince] = useState("");
   const [harvestDistrict, setHarvestDistrict] = useState("");
+  const [harvestRecipientName, setHarvestRecipientName] = useState(user?.name || "");
+  const [harvestRecipientPhone, setHarvestRecipientPhone] = useState(user?.phone || "");
+  const [harvestAddress, setHarvestAddress] = useState("");
+  const [harvestSubmitting, setHarvestSubmitting] = useState(false);
   const harvestDistricts = useMemo(
     () =>
       vietnamProvinces.find((province) => province.name === harvestProvince)
@@ -155,6 +160,12 @@ function UserPage({ user, token, onLogout }) {
             String(assignedRentals[0]?.ma_hop_dong || ""),
           );
           setSelectedJournalRental(String(nextRentals[0]?.ma_hop_dong || ""));
+          const readyRental = nextRentals.find(
+            (rental) => rental.trang_thai_canh_tac === "san_sang_thu_hoach",
+          );
+          setSelectedHarvestRental(
+            String(readyRental?.ma_hop_dong || nextRentals[0]?.ma_hop_dong || ""),
+          );
           setAvailablePlots(
             nextPlots.filter((plot) => plot.status === "trong"),
           );
@@ -339,6 +350,39 @@ function UserPage({ user, token, onLogout }) {
       showNotice("Đã gửi khiếu nại tới Admin. Chúng tôi sẽ xử lý sớm.");
     } catch (requestError) {
       setError(requestError.message);
+    }
+  };
+
+  const submitHarvestDelivery = async (event) => {
+    event.preventDefault();
+    if (!selectedHarvestRental) {
+      notify("Vui lòng chọn ô đất cần đăng ký nhận nông sản", "error");
+      return;
+    }
+    setHarvestSubmitting(true);
+    try {
+      await registerHarvestDelivery(
+        {
+          rentalId: selectedHarvestRental,
+          hinh_thuc_nhan_hang: shippingMethod,
+          ten_nguoi_nhan: harvestRecipientName || user.name,
+          so_dien_thoai_nguoi_nhan: harvestRecipientPhone || user.phone || "",
+          dia_chi_giao_hang: harvestAddress,
+          tinh_thanh: harvestProvince,
+          quan_huyen: harvestDistrict,
+        },
+        token,
+      );
+      setHarvestSent(true);
+      showNotice("Đăng ký hình thức nhận nông sản thành công!");
+      notify(
+        "Đăng ký nhận nông sản thành công! Nông trại sẽ chuẩn bị bàn giao theo yêu cầu của bạn.",
+      );
+    } catch (err) {
+      setError(err.message || "Không thể đăng ký nhận nông sản");
+      notify(err.message || "Không thể đăng ký nhận nông sản", "error");
+    } finally {
+      setHarvestSubmitting(false);
     }
   };
 
@@ -909,33 +953,105 @@ function UserPage({ user, token, onLogout }) {
                 </p>
               )}
               {rentals.length > 0 && (
-                <div className="rental-list">
-                  {rentals.map((rental) => (
-                    <article className="rental-item" key={rental.ma_hop_dong}>
+                <>
+                  {rentals.some(
+                    (rental) =>
+                      rental.trang_thai_canh_tac === "san_sang_thu_hoach",
+                  ) && (
+                    <div
+                      style={{
+                        background: "#e8f5e9",
+                        border: "1px solid #c8e6c9",
+                        borderRadius: "8px",
+                        padding: "14px 18px",
+                        marginBottom: "16px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: "12px",
+                      }}
+                    >
                       <div>
-                        <strong>{rental.so_hieu_o}</strong>
-                        <span>{rental.ten_o_dat}</span>
+                        <strong style={{ color: "#1b5e20", fontSize: "14px" }}>
+                          🌾 Nông sản đã sẵn sàng thu hoạch!
+                        </strong>
+                        <p
+                          style={{
+                            margin: "4px 0 0",
+                            color: "#2e7d32",
+                            fontSize: "12px",
+                          }}
+                        >
+                          Nông dân đã hoàn tất vụ mùa. Hãy đăng ký hình thức nhận tại nông trại hoặc giao tận nơi ngay hôm nay.
+                        </p>
                       </div>
-                      <div>
-                        <small>Thời hạn</small>
-                        <span>
-                          {formatDate(rental.ngay_bat_dau)} -{" "}
-                          {formatDate(rental.ngay_ket_thuc)}
-                        </span>
-                      </div>
-                      <div>
-                        <small>Trạng thái</small>
-                        <b>{rental.trang_thai_hop_dong}</b>
-                      </div>
-                      <div>
-                        <small>Thao tác</small>
-                        <button onClick={() => setActiveTab("live")}>
-                          Xem vườn →
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
+                      <button
+                        className="primary-button"
+                        style={{
+                          padding: "8px 14px",
+                          fontSize: "12px",
+                          whiteSpace: "nowrap",
+                        }}
+                        onClick={() => setActiveTab("harvest")}
+                      >
+                        Đăng ký nhận nông sản →
+                      </button>
+                    </div>
+                  )}
+                  <div className="rental-list">
+                    {rentals.map((rental) => (
+                      <article className="rental-item" key={rental.ma_hop_dong}>
+                        <div>
+                          <strong>{rental.so_hieu_o}</strong>
+                          <span>{rental.ten_o_dat}</span>
+                        </div>
+                        <div>
+                          <small>Thời hạn</small>
+                          <span>
+                            {formatDate(rental.ngay_bat_dau)} -{" "}
+                            {formatDate(rental.ngay_ket_thuc)}
+                          </span>
+                        </div>
+                        <div>
+                          <small>Trạng thái</small>
+                          <b>
+                            {rental.trang_thai_canh_tac === "san_sang_thu_hoach" ? (
+                              <span style={{ color: "#2e7d32" }}>
+                                🌾 Sẵn sàng thu hoạch
+                              </span>
+                            ) : (
+                              rental.trang_thai_hop_dong
+                            )}
+                          </b>
+                        </div>
+                        <div>
+                          <small>Thao tác</small>
+                          {rental.trang_thai_canh_tac === "san_sang_thu_hoach" ? (
+                            <button
+                              style={{
+                                background: "#2d6a4f",
+                                color: "#fff",
+                                fontWeight: "bold",
+                              }}
+                              onClick={() => {
+                                setSelectedHarvestRental(
+                                  String(rental.ma_hop_dong),
+                                );
+                                setActiveTab("harvest");
+                              }}
+                            >
+                              Nhận nông sản →
+                            </button>
+                          ) : (
+                            <button onClick={() => setActiveTab("live")}>
+                              Xem vườn →
+                            </button>
+                          )}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </>
               )}
             </section>
           </>
@@ -1198,17 +1314,58 @@ function UserPage({ user, token, onLogout }) {
               <h2>Nhận thành quả từ khu vườn</h2>
               <p>Đăng ký địa chỉ và cách vận chuyển trước ngày thu hoạch.</p>
             </div>
+            {selectedHarvestRental &&
+              rentals.find(
+                (r) => String(r.ma_hop_dong) === String(selectedHarvestRental),
+              )?.trang_thai_canh_tac === "san_sang_thu_hoach" && (
+                <div
+                  style={{
+                    background: "#e8f5e9",
+                    border: "1px solid #a5d6a7",
+                    borderRadius: "6px",
+                    padding: "10px 14px",
+                    marginBottom: "16px",
+                    color: "#1b5e20",
+                    fontSize: "13px",
+                  }}
+                >
+                  🌾 Ô đất này đã được nông dân xác nhận sẵn sàng thu hoạch! Vui lòng chọn hình thức nhận nông sản bên dưới để nông trại tiến hành chuẩn bị.
+                </div>
+              )}
             {harvestSent ? (
-              <p className="form-success">
-                Thông tin nhận hàng đã được lưu cho mùa vụ này.
-              </p>
-            ) : (
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  setHarvestSent(true);
+              <div
+                className="form-success"
+                style={{
+                  padding: "16px",
+                  borderRadius: "8px",
+                  background: "#e8f5e9",
+                  border: "1px solid #c8e6c9",
                 }}
               >
+                <strong
+                  style={{
+                    color: "#1b5e20",
+                    display: "block",
+                    marginBottom: "6px",
+                    fontSize: "14px",
+                  }}
+                >
+                  ✅ Đăng ký nhận nông sản thành công!
+                </strong>
+                <p style={{ margin: 0, color: "#2e7d32", fontSize: "13px" }}>
+                  Thông tin nhận hàng đã được lưu cho mùa vụ này. Nông trại PlotFarm đã tiếp nhận và sẽ chủ động liên hệ giao nông sản sạch tới bạn đúng hẹn.
+                </p>
+                <button
+                  type="button"
+                  className="outline-button"
+                  style={{ marginTop: "14px", fontSize: "12px" }}
+                  onClick={() => setHarvestSent(false)}
+                >
+                  Chỉnh sửa lại thông tin nhận hàng
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={submitHarvestDelivery}>
                 <select
                   value={selectedHarvestRental}
                   onChange={(event) =>
@@ -1219,12 +1376,29 @@ function UserPage({ user, token, onLogout }) {
                   <option value="">Chọn ô đất</option>
                   {rentals.map((rental) => (
                     <option key={rental.ma_hop_dong} value={rental.ma_hop_dong}>
-                      {rental.so_hieu_o} · {rental.ten_o_dat}
+                      {rental.so_hieu_o} · {rental.ten_o_dat}{" "}
+                      {rental.trang_thai_canh_tac === "san_sang_thu_hoach"
+                        ? "🌾 (Sẵn sàng thu hoạch)"
+                        : ""}
                     </option>
                   ))}
                 </select>
-                <input required placeholder="Tên người nhận" />
-                <input required placeholder="Số điện thoại" />
+                <input
+                  required
+                  placeholder="Tên người nhận"
+                  value={harvestRecipientName}
+                  onChange={(event) =>
+                    setHarvestRecipientName(event.target.value)
+                  }
+                />
+                <input
+                  required
+                  placeholder="Số điện thoại"
+                  value={harvestRecipientPhone}
+                  onChange={(event) =>
+                    setHarvestRecipientPhone(event.target.value)
+                  }
+                />
                 <select
                   value={shippingMethod}
                   onChange={(event) => {
@@ -1237,8 +1411,8 @@ function UserPage({ user, token, onLogout }) {
                   required
                 >
                   <option value="">Chọn hình thức vận chuyển</option>
-                  <option>Giao tận nơi</option>
-                  <option>Nhận tại nông trại</option>
+                  <option value="Giao tận nơi">Giao tận nơi</option>
+                  <option value="Nhận tại nông trại">Nhận tại nông trại</option>
                 </select>
                 {shippingMethod === "Giao tận nơi" && (
                   <>
@@ -1272,11 +1446,22 @@ function UserPage({ user, token, onLogout }) {
                         </option>
                       ))}
                     </select>
-                    <input required placeholder="Địa chỉ nhận hàng" />
+                    <input
+                      required
+                      placeholder="Địa chỉ nhận hàng (Số nhà, tên đường...)"
+                      value={harvestAddress}
+                      onChange={(event) =>
+                        setHarvestAddress(event.target.value)
+                      }
+                    />
                   </>
                 )}
-                <button className="primary-button">
-                  Đăng ký nhận hàng <span>→</span>
+                <button
+                  className="primary-button"
+                  disabled={harvestSubmitting}
+                >
+                  {harvestSubmitting ? "Đang xử lý..." : "Đăng ký nhận hàng"}{" "}
+                  <span>→</span>
                 </button>
               </form>
             )}

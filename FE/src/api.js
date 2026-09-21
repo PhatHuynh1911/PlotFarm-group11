@@ -210,3 +210,29 @@ export async function updateCurrentUser(payload, token) {
   })
   return result
 }
+
+export async function readyToHarvest(rentalOrPlotId, payload = {}, token) {
+  return apiRequest(`/rentals/${rentalOrPlotId}/ready-to-harvest`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    token,
+  })
+}
+
+export async function registerHarvestDelivery(payload, token) {
+  return apiRequest('/harvest/delivery', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    token,
+  })
+}
+
+export async function getHarvestByRental(rentalId, token) {
+  const result = await apiRequest(`/harvest/rental/${rentalId}`, { token })
+  return result.data
+}
+
+export async function getAllHarvests(token) {
+  const result = await apiRequest('/harvest', { token })
+  return result.data
+}

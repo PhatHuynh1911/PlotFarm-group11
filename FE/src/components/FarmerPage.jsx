@@ -15,6 +15,7 @@ import {
   updateJournal,
   deleteJournal,
   updateCultivationStatus,
+  readyToHarvest,
   uploadJournalMedia,
   resolveImageUrl,
   updateCurrentUser,
@@ -352,10 +353,46 @@ function FarmerPage({ user, onLogout }) {
     setTimeout(() => setCameraMessage(""), 2500);
   };
 
-  const confirmHarvest = (plotId) =>
-    setHarvested((items) =>
-      items.includes(plotId) ? items : [...items, plotId],
-    );
+  const handleReadyToHarvest = async (plot) => {
+    try {
+      const rentalId = plot.rentalId;
+      if (!rentalId) {
+        notify("Không tìm thấy mã hợp đồng tương ứng", "error");
+        return;
+      }
+      await readyToHarvest(rentalId, { plotId: plot.id }, token);
+      setPlots((items) =>
+        items.map((item) =>
+          item.rentalId === rentalId
+            ? {
+                ...item,
+                stage: "san_sang_thu_hoach",
+                stageLabel: cultivationLabels.san_sang_thu_hoach,
+                next: "Đã sẵn sàng thu hoạch, chờ khách đăng ký nhận hàng",
+                progress: 100,
+              }
+            : item,
+        ),
+      );
+      setHarvested((items) =>
+        items.includes(plot.id) ? items : [...items, plot.id],
+      );
+      notify(`Ô đất ${plot.id} đã chuyển sang trạng thái sẵn sàng thu hoạch! Hệ thống đã gửi thông báo đến khách hàng.`);
+    } catch (err) {
+      notify(err.message || "Không thể kích hoạt sẵn sàng thu hoạch", "error");
+    }
+  };
+
+  const confirmHarvest = (plotId) => {
+    const targetPlot = plots.find((p) => p.id === plotId);
+    if (targetPlot) {
+      handleReadyToHarvest(targetPlot);
+    } else {
+      setHarvested((items) =>
+        items.includes(plotId) ? items : [...items, plotId],
+      );
+    }
+  };
   const activeRequests = requests.filter(
     (request) => request.status !== "hoan_thanh",
   ).length;
@@ -649,6 +686,31 @@ function FarmerPage({ user, onLogout }) {
                     >
                       Đã nhận giống và tiến hành gieo trồng
                     </button>
+                  )}
+                  {plot.stage === "dang_canh_tac" && (
+                    <button
+                      className="primary-button"
+                      style={{ background: "#2d6a4f", marginTop: "8px" }}
+                      onClick={() => handleReadyToHarvest(plot)}
+                    >
+                      🌾 Báo sẵn sàng thu hoạch
+                    </button>
+                  )}
+                  {plot.stage === "san_sang_thu_hoach" && (
+                    <span
+                      style={{
+                        display: "inline-block",
+                        background: "#e8f5e9",
+                        color: "#2e7d32",
+                        padding: "6px 10px",
+                        borderRadius: "6px",
+                        fontWeight: "600",
+                        fontSize: "12px",
+                        marginTop: "8px",
+                      }}
+                    >
+                      ✅ Đã sẵn sàng thu hoạch (Chờ khách đăng ký nhận hàng)
+                    </span>
                   )}
                   <small>Việc tiếp theo: {plot.next}</small>
                 </article>
@@ -1023,12 +1085,16 @@ function FarmerPage({ user, onLogout }) {
                     </div>
                     <button
                       className={
-                        isDone ? "harvest-confirmed" : "primary-button"
+                        plot.stage === "san_sang_thu_hoach" || isDone
+                          ? "harvest-confirmed"
+                          : "primary-button"
                       }
-                      disabled={isDone || plot.stage !== "san_sang_thu_hoach"}
-                      onClick={() => confirmHarvest(plot.id)}
+                      disabled={plot.stage === "san_sang_thu_hoach" || isDone}
+                      onClick={() => handleReadyToHarvest(plot)}
                     >
-                      {isDone ? "Đã chuyển giao" : "Xác nhận thu hoạch"}
+                      {plot.stage === "san_sang_thu_hoach" || isDone
+                        ? "Đã sẵn sàng thu hoạch"
+                        : "Sẵn sàng thu hoạch"}
                     </button>
                   </article>
                 );
