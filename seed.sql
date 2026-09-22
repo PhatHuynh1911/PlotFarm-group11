@@ -209,7 +209,7 @@ SET IDENTITY_INSERT dbo.DanhMucCayTrong OFF;
 GO
 
 -- ==============================================================================
--- 7. THÊM CÂY TRỒNG (Mã cây trồng từ 1 đến 4, cột chuẩn hinh_anh_cay)
+-- 7. THÊM CÂY TRỒNG (Mã cây trồng từ 1 đến 16, cột chuẩn hinh_anh_cay)
 -- ==============================================================================
 SET IDENTITY_INSERT dbo.CayTrong ON;
 INSERT INTO dbo.CayTrong (
@@ -245,6 +245,90 @@ VALUES
     N'2 lần/ngày', N'Đón nắng toàn phần', 3.80, 'de', N'Quanh năm',
     N'Bắt nhánh leo giàn lưới, tưới đều đặn buổi sáng. Bón bổ sung dịch đạm cá vi sinh khi cây trổ hoa đậu quả.',
     'https://images.unsplash.com/photo-1604977042946-1eecc30f269e?auto=format&fit=crop&w=500&q=80',
+    'kha_dung'
+),
+(
+    5, 1, N'Cải bó xôi xanh mướt', N'Spinacia oleracea', 30, 7,
+    N'2 lần/ngày', N'6-8 giờ/ngày', 2.40, 'de', N'Thu Đông và Xuân',
+    N'Giữ đất ẩm đều, thu hoạch lá ngoài khi cây đạt kích thước phù hợp và bổ sung phân hữu cơ định kỳ.',
+    'https://images.unsplash.com/photo-1576045057995-568f588f82fb?auto=format&fit=crop&w=500&q=80',
+    'kha_dung'
+),
+(
+    6, 1, N'Rau muống hữu cơ', N'Ipomoea aquatica', 60, 10,
+    N'2 lần/ngày', N'Đón nắng toàn phần', 3.60, 'de', N'Quanh năm',
+    N'Tưới đủ ẩm mỗi ngày, cắt ngọn cách gốc để cây tiếp tục đâm chồi và bón phân sau mỗi lần thu hoạch.',
+    'https://images.unsplash.com/photo-1628773822503-930a7eaecf80?auto=format&fit=crop&w=500&q=80',
+    'kha_dung'
+),
+(
+    7, 2, N'Ớt chuông đỏ', N'Capsicum annuum', 90, 20,
+    N'1 lần/ngày', N'Đón nắng toàn phần (7-8h)', 3.20, 'trung_binh', N'Xuân Hè và Thu Đông',
+    N'Làm giàn đỡ khi cây lớn, tưới sát gốc vào buổi sáng và bổ sung kali khi cây bắt đầu ra hoa.',
+    'https://images.unsplash.com/photo-1563565375-f3fdfdbefa83?auto=format&fit=crop&w=500&q=80',
+    'kha_dung'
+),
+(
+    8, 2, N'Đậu cô ve leo giàn', N'Phaseolus vulgaris', 120, 18,
+    N'2 lần/ngày', N'Đón nắng toàn phần', 3.90, 'trung_binh', N'Xuân Hè và Thu Đông',
+    N'Căng giàn chắc cho cây leo, tưới đều khi ra hoa và thu quả non thường xuyên để kích thích lứa mới.',
+    'https://images.unsplash.com/photo-1567375698348-5d9d5ae99de0?auto=format&fit=crop&w=500&q=80',
+    'kha_dung'
+),
+(
+    9, 2, N'Bí ngòi xanh', N'Cucurbita pepo', 150, 20,
+    N'1 lần/ngày', N'Đón nắng toàn phần', 4.10, 'trung_binh', N'Xuân Hè',
+    N'Tưới sâu quanh gốc, phủ rơm giữ ẩm và kiểm tra mặt dưới lá để phòng ngừa sâu bệnh sinh học.',
+    'https://images.unsplash.com/photo-1568584711075-3d021a7c3ca3?auto=format&fit=crop&w=500&q=80',
+    'kha_dung'
+),
+(
+    10, 2, N'Cà tím dài', N'Solanum melongena', 180, 25,
+    N'1 lần/ngày', N'Đón nắng toàn phần (7-8h)', 3.70, 'trung_binh', N'Xuân Hè và Thu Đông',
+    N'Cắm cọc cố định thân, tỉa cành sát gốc và thu hái khi quả còn bóng, chắc để cây sai quả hơn.',
+    'https://images.unsplash.com/photo-1615484477201-9f4953340fab?auto=format&fit=crop&w=500&q=80',
+    'kha_dung'
+),
+(
+    11, 1, N'Cải kale xoăn', N'Brassica oleracea var. sabellica', 210, 14,
+    N'1 lần/ngày', N'6-8 giờ/ngày', 2.90, 'trung_binh', N'Thu Đông và Xuân',
+    N'Bón phân hữu cơ giàu đạm, hái lá từ dưới lên và giữ khoảng cách thông thoáng để hạn chế nấm bệnh.',
+    'https://images.unsplash.com/photo-1524179091875-bf99a9a6af57?auto=format&fit=crop&w=500&q=80',
+    'kha_dung'
+),
+(
+    12, 3, N'Húng quế Genovese', N'Ocimum basilicum', 240, 10,
+    N'2 lần/ngày', N'Đón nắng buổi sáng', 1.80, 'de', N'Quanh năm',
+    N'Bấm ngọn thường xuyên trước khi cây ra hoa, tưới nhẹ vào gốc và đặt cây nơi thoáng có nắng.',
+    'https://images.unsplash.com/photo-1618375569909-3c8616cf7733?auto=format&fit=crop&w=500&q=80',
+    'kha_dung'
+),
+(
+    13, 3, N'Rau mùi ta', N'Coriandrum sativum', 270, 12,
+    N'1 lần/ngày', N'4-6 giờ/ngày', 1.60, 'de', N'Thu Đông và Xuân',
+    N'Gieo hạt trên đất tơi xốp, tưới phun sương giữ ẩm và tỉa lá non khi cây phát triển ổn định.',
+    'https://images.unsplash.com/photo-1588879460618-924d9e1d9b05?auto=format&fit=crop&w=500&q=80',
+    'kha_dung'
+),
+(
+    14, 3, N'Sả chanh', N'Cymbopogon citratus', 300, 30,
+    N'1 lần/ngày', N'Đón nắng toàn phần', 2.10, 'de', N'Quanh năm',
+    N'Tưới vừa đủ ẩm, vun gốc định kỳ và cắt bỏ lá già để bụi sả phát triển khỏe, thơm tinh dầu.',
+    'https://images.unsplash.com/photo-1604848698030-c434ba08ece1?auto=format&fit=crop&w=500&q=80',
+    'kha_dung'
+),
+(
+    15, 3, N'Gừng hữu cơ', N'Zingiber officinale', 330, 45,
+    N'1 lần/ngày', N'4-6 giờ/ngày', 2.50, 'trung_binh', N'Mùa mưa và Xuân Hè',
+    N'Giữ đất thoát nước tốt, phủ rơm quanh gốc và vun thêm đất khi thân củ bắt đầu phát triển.',
+    'https://images.unsplash.com/photo-1615485500704-8e990f9900f7?auto=format&fit=crop&w=500&q=80',
+    'kha_dung'
+),
+(
+    16, 3, N'Nghệ vàng', N'Curcuma longa', 360, 45,
+    N'1 lần/ngày', N'4-6 giờ/ngày', 2.80, 'de', N'Quanh năm',
+    N'Trồng trên đất giàu mùn, giữ ẩm vừa phải và giảm tưới trước thời điểm thu hoạch củ.',
+    'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&w=500&q=80',
     'kha_dung'
 );
 SET IDENTITY_INSERT dbo.CayTrong OFF;
