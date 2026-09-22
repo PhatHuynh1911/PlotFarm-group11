@@ -39,6 +39,21 @@ const requestStatus = {
   hoan_thanh: "Đã hoàn thành",
   tu_choi: "Từ chối",
 };
+const contractStatusLabels = {
+  hieu_luc: "Đang thuê",
+  da_ket_thuc: "Đã kết thúc",
+  da_huy: "Đã hủy",
+};
+// Nguồn sự thật cho trạng thái sau thu hoạch là trang_thai_canh_tac === "da_thu_hoach" hoặc trang_thai_hop_dong === "da_ket_thuc" (do BE trả về sau khi bàn giao)
+function rentalStatusLabel(rental) {
+  if (
+    rental.trang_thai_canh_tac === "da_thu_hoach" ||
+    rental.trang_thai_hop_dong === "da_ket_thuc"
+  ) {
+    return "Đã hoàn tất thu hoạch";
+  }
+  return contractStatusLabels[rental.trang_thai_hop_dong] || rental.trang_thai_hop_dong;
+}
 
 function journalImages(item) {
   const raw = item?.danh_sach_hinh_anh ?? item?.hinh_anh ?? "[]";
@@ -734,10 +749,8 @@ function UserPage({ user, token, onLogout }) {
                       <span style={{ color: "#c98b3c", fontWeight: "700" }}>Chờ thanh toán</span>
                     ) : rental.trang_thai_canh_tac === "da_thu_hoach" || rental.trang_thai_hop_dong === "da_ket_thuc" ? (
                       <span style={{ color: "#198754", fontWeight: "700" }}>Đã hoàn tất thu hoạch</span>
-                    ) : rental.trang_thai_hop_dong === "hieu_luc" ? (
-                      "Đang thuê"
                     ) : (
-                      rental.trang_thai_hop_dong
+                      rentalStatusLabel(rental)
                     )}
                   </p>
                   <h3>{rental.ten_o_dat}</h3>
@@ -1261,8 +1274,10 @@ function UserPage({ user, token, onLogout }) {
                               <span style={{ color: "#2e7d32" }}>
                                 🌾 Sẵn sàng thu hoạch
                               </span>
+                            ) : rental.trang_thai_canh_tac === "da_thu_hoach" || rental.trang_thai_hop_dong === "da_ket_thuc" ? (
+                              <span style={{ color: "#198754" }}>Đã hoàn tất thu hoạch</span>
                             ) : (
-                              rental.trang_thai_hop_dong
+                              rentalStatusLabel(rental)
                             )}
                           </b>
                         </div>
@@ -1283,6 +1298,10 @@ function UserPage({ user, token, onLogout }) {
                               }}
                             >
                               Nhận nông sản →
+                            </button>
+                          ) : rental.trang_thai_canh_tac === "da_thu_hoach" || rental.trang_thai_hop_dong === "da_ket_thuc" ? (
+                            <button onClick={() => setRentalDetail(rental)}>
+                              Xem chi tiết →
                             </button>
                           ) : (
                             <button onClick={() => setActiveTab("live")}>

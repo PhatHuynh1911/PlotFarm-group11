@@ -190,6 +190,43 @@ const connectDB = async () => {
             BEGIN
                 DROP TABLE dbo.GiaoHang;
             END
+
+            -- Tự sửa dữ liệu lệch: hợp đồng đã bàn giao (GiaoNhanThuHoach.trang_thai = 'da_ban_giao_van_chuyen')
+            -- nhưng HopDongThue/ODat/PhanCongNongDan/ThuHoach chưa được đóng mùa vụ tương ứng.
+            IF OBJECT_ID('dbo.GiaoNhanThuHoach', 'U') IS NOT NULL
+            BEGIN
+                UPDATE h
+                SET h.trang_thai_canh_tac = 'da_thu_hoach', h.trang_thai_hop_dong = 'da_ket_thuc'
+                FROM dbo.HopDongThue h
+                INNER JOIN dbo.GiaoNhanThuHoach g ON g.ma_hop_dong = h.ma_hop_dong
+                WHERE g.trang_thai = 'da_ban_giao_van_chuyen'
+                  AND (h.trang_thai_canh_tac <> 'da_thu_hoach' OR h.trang_thai_hop_dong <> 'da_ket_thuc');
+
+                UPDATE o
+                SET o.trang_thai = 'trong'
+                FROM dbo.ODat o
+                INNER JOIN dbo.HopDongThue h ON h.ma_o_dat = o.ma_o_dat
+                INNER JOIN dbo.GiaoNhanThuHoach g ON g.ma_hop_dong = h.ma_hop_dong
+                WHERE g.trang_thai = 'da_ban_giao_van_chuyen' AND o.trang_thai <> 'trong';
+
+                IF OBJECT_ID('dbo.PhanCongNongDan', 'U') IS NOT NULL
+                BEGIN
+                    UPDATE p
+                    SET p.trang_thai = 'hoan_thanh'
+                    FROM dbo.PhanCongNongDan p
+                    INNER JOIN dbo.GiaoNhanThuHoach g ON g.ma_hop_dong = p.ma_hop_dong
+                    WHERE g.trang_thai = 'da_ban_giao_van_chuyen' AND p.trang_thai NOT IN ('hoan_thanh', 'tu_choi', 'da_huy');
+                END
+
+                IF OBJECT_ID('dbo.ThuHoach', 'U') IS NOT NULL
+                BEGIN
+                    UPDATE t
+                    SET t.trang_thai = 'da_thu_hoach'
+                    FROM dbo.ThuHoach t
+                    INNER JOIN dbo.GiaoNhanThuHoach g ON g.ma_hop_dong = t.ma_hop_dong
+                    WHERE g.trang_thai = 'da_ban_giao_van_chuyen' AND t.trang_thai <> 'da_thu_hoach';
+                END
+            END
         `);
         console.log(`✅ Kết nối SQL Server thành công: [${process.env.DB_NAME || 'PlotFarmDB'}] tại ${serverVal}`);
     } catch (error) {

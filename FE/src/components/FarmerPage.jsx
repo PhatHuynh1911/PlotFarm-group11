@@ -660,7 +660,11 @@ function FarmerPage({ user, onLogout }) {
                         <span className="assignment-status">
                           {assignment.trang_thai === "da_chap_nhan"
                             ? "Đã chấp nhận"
-                            : `Đã từ chối${assignment.ly_do_tu_choi ? ` (${assignment.ly_do_tu_choi})` : ""}`}
+                            : assignment.trang_thai === "hoan_thanh"
+                              ? "Đã hoàn thành thu hoạch"
+                              : assignment.trang_thai === "da_huy"
+                                ? "Đã hủy"
+                                : `Đã từ chối${assignment.ly_do_tu_choi ? ` (${assignment.ly_do_tu_choi})` : ""}`}
                         </span>
                       )}
                     </div>

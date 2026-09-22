@@ -43,6 +43,7 @@ const labels = {
     da_chap_nhan: "Đã chấp nhận",
     tu_choi: "Đã từ chối",
     da_huy: "Đã hủy",
+    hoan_thanh: "Đã hoàn thành thu hoạch",
   },
   paymentStatus: {
     cho_thanh_toan: "Chờ thanh toán",

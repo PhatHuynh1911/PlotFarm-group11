@@ -36,7 +36,7 @@ const getAssignments = async (req, res) => {
             JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
             JOIN NguoiDung k ON k.ma_nguoi_dung = h.ma_nguoi_dung
             JOIN NguoiDung n ON n.ma_nguoi_dung = p.ma_nong_dan
-            WHERE h.trang_thai_hop_dong = 'hieu_luc' ${filter}
+            WHERE h.trang_thai_hop_dong IN ('hieu_luc', 'da_ket_thuc') ${filter}
             ORDER BY p.ngay_gui DESC
         `);
         return res.json({ success: true, data: result.recordset });
