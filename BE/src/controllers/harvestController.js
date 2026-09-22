@@ -255,16 +255,16 @@ const registerDelivery = async (req, res) => {
 
         const customerId = req.user?.sub ? Number(req.user.sub) : (rental?.ma_nguoi_dung || 1);
         
-        // Chuẩn hóa hình thức nhận hàng
+        // Chuẩn hóa hình thức nhận hàng sang chuẩn của GiaoNhanThuHoach
         let shippingType = 'giao_tan_noi';
-        if (hinh_thuc_nhan_hang === 'nhan_tai_vuon' || hinh_thuc_nhan_hang === 'Nhận tại nông trại') {
-            shippingType = 'nhan_tai_vuon';
+        if (hinh_thuc_nhan_hang === 'nhan_tai_vuon' || hinh_thuc_nhan_hang === 'Nhận tại nông trại' || hinh_thuc_nhan_hang === 'nhan_tai_nong_trai') {
+            shippingType = 'nhan_tai_nong_trai';
         }
 
         // Tạo chuỗi địa chỉ đầy đủ
         let fullAddress = dia_chi_giao_hang || '';
-        if (shippingType === 'nhan_tai_vuon') {
-            fullAddress = 'Nhận trực tiếp tại Nông trại PlotFarm Củ Chi, TP. Hồ Chí Minh';
+        if (shippingType === 'nhan_tai_nong_trai') {
+            fullAddress = 'Nhận trực tiếp tại Nông trại PlotFarm';
         } else {
             const parts = [dia_chi_giao_hang, quan_huyen, tinh_thanh].filter(Boolean);
             if (parts.length > 1) {
@@ -275,73 +275,110 @@ const registerDelivery = async (req, res) => {
         const recipientName = ten_nguoi_nhan || rental?.ho_va_ten || 'Khách hàng PlotFarm';
         const recipientPhone = so_dien_thoai_nguoi_nhan || rental?.so_dien_thoai || '';
 
-        // Kiểm tra xem đã có bản ghi GiaoHang cho đợt thu hoạch này chưa (ma_thu_hoach là UNIQUE)
-        const checkDelivery = await pool.request()
-            .input('harvestId', sql.Int, harvestId)
-            .query(`SELECT ma_giao_hang FROM dbo.GiaoHang WHERE ma_thu_hoach = @harvestId`);
-
+        // Cập nhật hoặc khởi tạo trong bảng chuẩn dbo.GiaoNhanThuHoach (thay thế dbo.GiaoHang)
         let deliveryRecord;
+        const checkDelivery = await pool.request()
+            .input('rentalId', sql.Int, targetRentalId)
+            .query(`SELECT ma_giao_nhan, ma_nong_dan FROM dbo.GiaoNhanThuHoach WHERE ma_hop_dong = @rentalId`);
+
         if (checkDelivery.recordset[0]) {
             const updateRes = await pool.request()
-                .input('deliveryId', sql.Int, checkDelivery.recordset[0].ma_giao_hang)
+                .input('deliveryId', sql.Int, checkDelivery.recordset[0].ma_giao_nhan)
                 .input('shippingType', sql.VarChar(30), shippingType)
                 .input('recipientName', sql.NVarChar(100), recipientName)
                 .input('recipientPhone', sql.VarChar(20), recipientPhone)
-                .input('deliveryAddress', sql.NVarChar(255), fullAddress)
-                .input('notes', sql.NVarChar(500), ghi_chu || null)
+                .input('deliveryAddress', sql.NVarChar(500), fullAddress)
+                .input('notes', sql.NVarChar(1000), ghi_chu || null)
                 .query(`
-                    UPDATE dbo.GiaoHang
-                    SET hinh_thuc_nhan_hang = @shippingType,
+                    UPDATE dbo.GiaoNhanThuHoach
+                    SET hinh_thuc_nhan = @shippingType,
                         ten_nguoi_nhan = @recipientName,
-                        so_dien_thoai_nguoi_nhan = @recipientPhone,
-                        dia_chi_giao_hang = @deliveryAddress,
-                        ghi_chu_giao_hang = @notes
+                        so_dien_thoai_nhan = @recipientPhone,
+                        dia_chi_nhan = @deliveryAddress,
+                        ghi_chu_khach = @notes,
+                        trang_thai = 'cho_thu_hoach_dong_goi',
+                        ngay_khach_chon = SYSDATETIME()
                     OUTPUT INSERTED.*
-                    WHERE ma_giao_hang = @deliveryId
+                    WHERE ma_giao_nhan = @deliveryId
                 `);
             deliveryRecord = updateRes.recordset[0];
         } else {
+            // Tìm nông dân phụ trách
+            let farmerId = 1;
+            const assignmentCheck = await pool.request()
+                .input('rentalId', sql.Int, targetRentalId)
+                .query(`SELECT TOP 1 ma_nong_dan FROM PhanCongNongDan WHERE ma_hop_dong = @rentalId AND trang_thai = 'da_chap_nhan'`);
+            if (assignmentCheck.recordset[0]) {
+                farmerId = assignmentCheck.recordset[0].ma_nong_dan;
+            }
+
             const insertRes = await pool.request()
-                .input('harvestId', sql.Int, harvestId)
-                .input('customerId', sql.Int, customerId)
+                .input('rentalId', sql.Int, targetRentalId)
+                .input('farmerId', sql.Int, farmerId)
                 .input('shippingType', sql.VarChar(30), shippingType)
                 .input('recipientName', sql.NVarChar(100), recipientName)
                 .input('recipientPhone', sql.VarChar(20), recipientPhone)
-                .input('deliveryAddress', sql.NVarChar(255), fullAddress)
-                .input('shippingFee', sql.Decimal(14, 2), 0.0)
-                .input('notes', sql.NVarChar(500), ghi_chu || null)
+                .input('deliveryAddress', sql.NVarChar(500), fullAddress)
+                .input('notes', sql.NVarChar(1000), ghi_chu || null)
                 .query(`
-                    INSERT INTO dbo.GiaoHang (
-                        ma_thu_hoach, ma_khach_hang, hinh_thuc_nhan_hang,
-                        ten_nguoi_nhan, so_dien_thoai_nguoi_nhan, dia_chi_giao_hang,
-                        phi_van_chuyen, trang_thai_giao_hang, ghi_chu_giao_hang, ngay_tao
+                    INSERT INTO dbo.GiaoNhanThuHoach (
+                        ma_hop_dong, ma_nong_dan, hinh_thuc_nhan,
+                        ten_nguoi_nhan, so_dien_thoai_nhan, dia_chi_nhan,
+                        ghi_chu_khach, trang_thai, ngay_san_sang, ngay_khach_chon
                     )
                     OUTPUT INSERTED.*
                     VALUES (
-                        @harvestId, @customerId, @shippingType,
+                        @rentalId, @farmerId, @shippingType,
                         @recipientName, @recipientPhone, @deliveryAddress,
-                        @shippingFee, 'cho_giao', @notes, SYSDATETIME()
+                        @notes, 'cho_thu_hoach_dong_goi', SYSDATETIME(), SYSDATETIME()
                     )
                 `);
             deliveryRecord = insertRes.recordset[0];
+        }
+
+        // Cập nhật trạng thái đợt thu hoạch trong dbo.ThuHoach (nếu có)
+        if (harvestId) {
+            await pool.request()
+                .input('harvestId', sql.Int, harvestId)
+                .query(`UPDATE dbo.ThuHoach SET trang_thai = 'da_len_lich_giao' WHERE ma_thu_hoach = @harvestId`);
         }
 
         // Bắn thông báo cho Admin
         const plotCode = rental?.so_hieu_o || 'ô đất';
         await notifyAdmins(
             `Đăng ký nhận nông sản: Ô ${plotCode}`,
-            `Khách hàng ${recipientName} đã đăng ký hình thức: ${shippingType === 'nhan_tai_vuon' ? 'Nhận tại nông trại' : 'Giao tận nơi (' + fullAddress + ')'}.`,
+            `Khách hàng ${recipientName} đã đăng ký hình thức: ${shippingType === 'nhan_tai_nong_trai' ? 'Nhận tại nông trại' : 'Giao tận nơi (' + fullAddress + ')'}.`,
             'giao_hang',
             '/admin?tab=rentals'
         );
 
+        // Bắn thông báo cho Farmer phụ trách
+        if (deliveryRecord?.ma_nong_dan) {
+            await createNotification(
+                deliveryRecord.ma_nong_dan,
+                `Khách đăng ký nhận nông sản: Ô ${plotCode}`,
+                `Khách hàng đã đăng ký hình thức nhận nông sản (${shippingType === 'nhan_tai_nong_trai' ? 'Tại nông trại' : 'Giao tận nơi'}). Hãy tiến hành đóng gói và bàn giao.`,
+                'thu_hoach',
+                '/farmer?tab=harvest'
+            );
+        }
+
+        const formattedDelivery = {
+            ...deliveryRecord,
+            ma_giao_hang: deliveryRecord?.ma_giao_nhan,
+            hinh_thuc_nhan_hang: deliveryRecord?.hinh_thuc_nhan,
+            dia_chi_giao_hang: deliveryRecord?.dia_chi_nhan,
+            trang_thai_giao_hang: deliveryRecord?.trang_thai,
+            so_dien_thoai_nguoi_nhan: deliveryRecord?.so_dien_thoai_nhan,
+        };
+
         return res.status(200).json({
             success: true,
             message: 'Đăng ký hình thức nhận nông sản thành công!',
-            data: deliveryRecord
+            data: formattedDelivery
         });
     } catch (error) {
-        console.error('Lỗi khi đăng ký nhận hàng:', error);
+        console.error('Lỗi đăng ký nhận nông sản:', error);
         return res.status(500).json({
             success: false,
             message: 'Lỗi máy chủ nội bộ khi đăng ký nhận hàng',
@@ -351,8 +388,8 @@ const registerDelivery = async (req, res) => {
 };
 
 /**
- * Lấy chi tiết thu hoạch & giao hàng theo hợp đồng
- * GET /api/harvest/rental/:rentalId
+ * Lấy chi tiết thông tin thu hoạch và giao hàng theo mã hợp đồng
+ * GET /api/harvest/rental/:id
  */
 const getHarvestByRental = async (req, res) => {
     try {
@@ -368,15 +405,27 @@ const getHarvestByRental = async (req, res) => {
                     o.so_hieu_o, o.ten_o_dat,
                     u.ho_va_ten AS ten_khach_hang,
                     f.ho_va_ten AS ten_nong_dan,
-                    g.ma_giao_hang, g.hinh_thuc_nhan_hang, g.ten_nguoi_nhan,
-                    g.so_dien_thoai_nguoi_nhan, g.dia_chi_giao_hang,
-                    g.trang_thai_giao_hang, g.ma_van_don, g.don_vi_van_chuyen
+                    g.ma_giao_nhan,
+                    g.ma_giao_nhan AS ma_giao_hang,
+                    g.hinh_thuc_nhan,
+                    g.hinh_thuc_nhan AS hinh_thuc_nhan_hang,
+                    g.ten_nguoi_nhan,
+                    g.so_dien_thoai_nhan,
+                    g.so_dien_thoai_nhan AS so_dien_thoai_nguoi_nhan,
+                    g.dia_chi_nhan,
+                    g.dia_chi_nhan AS dia_chi_giao_hang,
+                    g.ghi_chu_khach,
+                    g.trang_thai AS trang_thai_giao_nhan,
+                    g.trang_thai AS trang_thai_giao_hang,
+                    g.ngay_san_sang,
+                    g.ngay_khach_chon,
+                    g.ngay_ban_giao
                 FROM dbo.ThuHoach t
                 JOIN HopDongThue h ON h.ma_hop_dong = t.ma_hop_dong
                 JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
                 JOIN NguoiDung u ON u.ma_nguoi_dung = h.ma_nguoi_dung
                 JOIN NguoiDung f ON f.ma_nguoi_dung = t.ma_nong_dan
-                LEFT JOIN dbo.GiaoHang g ON g.ma_thu_hoach = t.ma_thu_hoach
+                LEFT JOIN dbo.GiaoNhanThuHoach g ON g.ma_hop_dong = h.ma_hop_dong
                 WHERE t.ma_hop_dong = @rentalId
                 ORDER BY t.ma_thu_hoach DESC
             `);
@@ -405,14 +454,27 @@ const getAllHarvests = async (req, res) => {
                 o.so_hieu_o, o.ten_o_dat,
                 u.ho_va_ten AS ten_khach_hang, u.email AS email_khach_hang,
                 f.ho_va_ten AS ten_nong_dan,
-                g.ma_giao_hang, g.hinh_thuc_nhan_hang, g.trang_thai_giao_hang,
-                g.ten_nguoi_nhan, g.so_dien_thoai_nguoi_nhan, g.dia_chi_giao_hang
+                g.ma_giao_nhan,
+                g.ma_giao_nhan AS ma_giao_hang,
+                g.hinh_thuc_nhan,
+                g.hinh_thuc_nhan AS hinh_thuc_nhan_hang,
+                g.ten_nguoi_nhan,
+                g.so_dien_thoai_nhan,
+                g.so_dien_thoai_nhan AS so_dien_thoai_nguoi_nhan,
+                g.dia_chi_nhan,
+                g.dia_chi_nhan AS dia_chi_giao_hang,
+                g.ghi_chu_khach,
+                g.trang_thai AS trang_thai_giao_nhan,
+                g.trang_thai AS trang_thai_giao_hang,
+                g.ngay_san_sang,
+                g.ngay_khach_chon,
+                g.ngay_ban_giao
             FROM dbo.ThuHoach t
             JOIN HopDongThue h ON h.ma_hop_dong = t.ma_hop_dong
             JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
             JOIN NguoiDung u ON u.ma_nguoi_dung = h.ma_nguoi_dung
             JOIN NguoiDung f ON f.ma_nguoi_dung = t.ma_nong_dan
-            LEFT JOIN dbo.GiaoHang g ON g.ma_thu_hoach = t.ma_thu_hoach
+            LEFT JOIN dbo.GiaoNhanThuHoach g ON g.ma_hop_dong = h.ma_hop_dong
             ORDER BY t.ngay_tao DESC
         `);
 

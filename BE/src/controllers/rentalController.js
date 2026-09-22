@@ -169,7 +169,7 @@ const getRentalsByUser = async (req, res) => {
                        h.tong_tien, h.trang_thai_hop_dong, h.trang_thai_thanh_toan, h.trang_thai_canh_tac, h.yeu_cau_dac_biet,
                        o.ma_o_dat, o.so_hieu_o, o.ten_o_dat, o.dien_tich_m2, o.chieu_dai_m, o.chieu_rong_m,
                        o.loai_dat, o.he_thong_tuoi, o.huong_anh_sang, o.gia_thue_thang, o.mo_ta_chi_tiet,
-                       o.hinh_anh_o_dat,
+                       o.hinh_anh_o_dat, o.trang_thai AS trang_thai_o_dat,
                       c.ma_cay_trong, c.ten_cay_trong, c.hinh_anh_cay,
                       nt.ten_nong_trai, nt.dia_chi AS dia_chi_nong_trai, nt.tinh_thanh, nt.quan_huyen,
                       n.ho_va_ten AS ten_nong_dan, n.so_dien_thoai AS sdt_nong_dan, p.trang_thai AS trang_thai_phan_cong
@@ -382,15 +382,89 @@ const getHarvestDeliveriesForFarmer = async (req, res) => {
 };
 
 const handoverHarvestDelivery = async (req, res) => {
+    const pool = await getPool();
+    const transaction = new sql.Transaction(pool);
     try {
-        const pool = await getPool();
-        const result = await pool.request().input('id', sql.Int, Number(req.params.id)).input('farmerId', sql.Int, Number(req.user.sub)).query(`
-            UPDATE GiaoNhanThuHoach SET trang_thai = 'da_ban_giao_van_chuyen', ngay_ban_giao = SYSDATETIME() OUTPUT INSERTED.ma_hop_dong
-            WHERE ma_giao_nhan = @id AND ma_nong_dan = @farmerId AND trang_thai = 'cho_thu_hoach_dong_goi'
-        `);
-        if (!result.recordset[0]) return res.status(409).json({ success: false, message: 'Yêu cầu không hợp lệ hoặc đã được bàn giao' });
-        return res.json({ success: true, message: 'Đã bàn giao nông sản cho vận chuyển' });
+        await transaction.begin();
+
+        const handoverReq = new sql.Request(transaction);
+        const result = await handoverReq
+            .input('id', sql.Int, Number(req.params.id))
+            .input('farmerId', sql.Int, Number(req.user.sub))
+            .query(`
+                UPDATE GiaoNhanThuHoach 
+                SET trang_thai = 'da_ban_giao_van_chuyen', ngay_ban_giao = SYSDATETIME() 
+                OUTPUT INSERTED.ma_hop_dong, INSERTED.ma_giao_nhan
+                WHERE ma_giao_nhan = @id AND ma_nong_dan = @farmerId AND trang_thai = 'cho_thu_hoach_dong_goi'
+            `);
+
+        if (!result.recordset[0]) {
+            await transaction.rollback();
+            return res.status(409).json({ success: false, message: 'Yêu cầu không hợp lệ hoặc đã được bàn giao' });
+        }
+
+        const maHopDong = result.recordset[0].ma_hop_dong;
+
+        // 1. Cập nhật hợp đồng thuê sang đã kết thúc & đã thu hoạch
+        const rentalReq = new sql.Request(transaction);
+        const rentalRes = await rentalReq
+            .input('maHopDong', sql.Int, maHopDong)
+            .query(`
+                UPDATE HopDongThue
+                SET trang_thai_canh_tac = 'da_thu_hoach',
+                    trang_thai_hop_dong = 'da_ket_thuc'
+                OUTPUT INSERTED.ma_o_dat, INSERTED.ma_nguoi_dung, INSERTED.so_hop_dong
+                WHERE ma_hop_dong = @maHopDong
+            `);
+
+        const rentalInfo = rentalRes.recordset[0];
+
+        if (rentalInfo && rentalInfo.ma_o_dat) {
+            // 2. Giải phóng ô đất về trạng thái trống
+            const plotReq = new sql.Request(transaction);
+            await plotReq
+                .input('maODat', sql.Int, rentalInfo.ma_o_dat)
+                .query(`UPDATE ODat SET trang_thai = 'trong' WHERE ma_o_dat = @maODat`);
+
+            // 3. Cập nhật trạng thái phân công nông dân hoàn thành
+            const assignReq = new sql.Request(transaction);
+            await assignReq
+                .input('maHopDong', sql.Int, maHopDong)
+                .query(`UPDATE PhanCongNongDan SET trang_thai = 'hoan_thanh' WHERE ma_hop_dong = @maHopDong`);
+
+            // 4. Cập nhật ThuHoach nếu có bản ghi
+            const harvestReq = new sql.Request(transaction);
+            await harvestReq
+                .input('maHopDong', sql.Int, maHopDong)
+                .query(`UPDATE ThuHoach SET trang_thai = 'da_thu_hoach' WHERE ma_hop_dong = @maHopDong`);
+        }
+
+        await transaction.commit();
+
+        // 5. Gửi thông báo cho khách hàng và Admin
+        if (rentalInfo) {
+            try {
+                await createNotification({
+                    ma_nguoi_dung: rentalInfo.ma_nguoi_dung,
+                    tieu_de: 'Nông sản của bạn đã được bàn giao',
+                    noi_dung: `Đơn thu hoạch cho hợp đồng ${rentalInfo.so_hop_dong} đã được bàn giao vận chuyển và ô đất đã hoàn tất mùa vụ.`,
+                    loai_thong_bao: 'giao_hang',
+                    duong_dan: '/user'
+                });
+                await notifyAdmins(
+                    'Thu hoạch & bàn giao hoàn tất',
+                    `Hợp đồng ${rentalInfo.so_hop_dong} đã hoàn tất thu hoạch và bàn giao vận chuyển. Ô đất đã được giải phóng thành công.`,
+                    'thu_hoach',
+                    '/admin'
+                );
+            } catch (notifErr) {
+                console.error('Lỗi gửi thông báo bàn giao thu hoạch:', notifErr);
+            }
+        }
+
+        return res.json({ success: true, message: 'Đã bàn giao nông sản cho vận chuyển và giải phóng ô đất thành công' });
     } catch (error) {
+        try { await transaction.rollback(); } catch (rbErr) {}
         console.error('Lỗi bàn giao thu hoạch:', error);
         return res.status(500).json({ success: false, message: 'Không thể xác nhận bàn giao' });
     }

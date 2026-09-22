@@ -732,6 +732,8 @@ function UserPage({ user, token, onLogout }) {
                   <p className="plot-status">
                     {rental.trang_thai_thanh_toan === "cho_thanh_toan" ? (
                       <span style={{ color: "#c98b3c", fontWeight: "700" }}>Chờ thanh toán</span>
+                    ) : rental.trang_thai_canh_tac === "da_thu_hoach" || rental.trang_thai_hop_dong === "da_ket_thuc" ? (
+                      <span style={{ color: "#198754", fontWeight: "700" }}>Đã hoàn tất thu hoạch</span>
                     ) : rental.trang_thai_hop_dong === "hieu_luc" ? (
                       "Đang thuê"
                     ) : (
@@ -894,7 +896,9 @@ function UserPage({ user, token, onLogout }) {
                 required
               >
                 <option value="">Chọn ô đất</option>
-                {rentals.map((rental) => (
+                {rentals
+                  .filter((rental) => rental.trang_thai_hop_dong === "hieu_luc" && rental.trang_thai_canh_tac !== "da_thu_hoach")
+                  .map((rental) => (
                   <option key={rental.ma_hop_dong} value={rental.ma_hop_dong}>
                     {rental.so_hieu_o} · {rental.ten_o_dat}
                   </option>
