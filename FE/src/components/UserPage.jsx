@@ -182,7 +182,9 @@ function UserPage({ user, token, onLogout }) {
           setSelectedCareRental(
             String(assignedRentals[0]?.ma_hop_dong || ""),
           );
-          setSelectedJournalRental(String(nextRentals[0]?.ma_hop_dong || ""));
+          setSelectedJournalRental(
+            String(assignedRentals[0]?.ma_hop_dong || ""),
+          );
           const readyRental = nextRentals.find(
             (rental) => rental.trang_thai_canh_tac === "san_sang_thu_hoach",
           );
@@ -1771,15 +1773,13 @@ function UserPage({ user, token, onLogout }) {
                       setBooking({ ...booking, duration: event.target.value })
                     }
                   >
-                    <option value="3">
-                      3 tháng · {formatMoney(selectedPlot.price * 3)}
-                    </option>
-                    <option value="6">
-                      6 tháng · {formatMoney(selectedPlot.price * 6)}
-                    </option>
-                    <option value="12">
-                      12 tháng · {formatMoney(selectedPlot.price * 12)}
-                    </option>
+                    {Array.from({ length: 12 }, (_, index) => index + 1).map(
+                      (duration) => (
+                        <option key={duration} value={duration}>
+                          {duration} tháng · {formatMoney(selectedPlot.price * duration)}
+                        </option>
+                      ),
+                    )}
                   </select>
                 </label>
                 <label>
