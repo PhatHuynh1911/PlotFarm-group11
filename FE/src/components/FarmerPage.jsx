@@ -92,39 +92,43 @@ function FarmerPage({ user, onLogout }) {
       .then(async ([rentals, serviceRequests, nextAssignments, deliveries]) => {
         setAssignments(nextAssignments);
         setHarvestDeliveries(deliveries);
-        const mappedPlots = rentals.map((rental) => ({
-          id: rental.so_hieu_o,
-          crop: rental.ten_cay_trong || "Chưa chọn cây trồng",
-          customer: rental.ten_khach_hang,
-          area: `${rental.dien_tich_m2} m²`,
-          stage: rental.trang_thai_canh_tac || "cho_gieo_trong",
-          stageLabel:
-            cultivationLabels[rental.trang_thai_canh_tac] ||
-            cultivationLabels.cho_gieo_trong,
-          progress:
-            rental.trang_thai_canh_tac === "san_sang_thu_hoach"
-              ? 100
-              : Math.min(
-                  Math.max(
-                    Math.round(
-                      ((rental.so_ngay_da_trong || 0) /
-                        (rental.thoi_gian_sinh_truong_ngay || 90)) *
-                        100,
+        const mappedPlots = rentals
+          .filter(
+            (rental) => rental.trang_thai_giao_nhan !== "da_ban_giao_van_chuyen",
+          )
+          .map((rental) => ({
+            id: rental.so_hieu_o,
+            crop: rental.ten_cay_trong || "Chưa chọn cây trồng",
+            customer: rental.ten_khach_hang,
+            area: `${rental.dien_tich_m2} m²`,
+            stage: rental.trang_thai_canh_tac || "cho_gieo_trong",
+            stageLabel:
+              cultivationLabels[rental.trang_thai_canh_tac] ||
+              cultivationLabels.cho_gieo_trong,
+            progress:
+              rental.trang_thai_canh_tac === "san_sang_thu_hoach"
+                ? 100
+                : Math.min(
+                    Math.max(
+                      Math.round(
+                        ((rental.so_ngay_da_trong || 0) /
+                          (rental.thoi_gian_sinh_truong_ngay || 90)) *
+                          100,
+                      ),
+                      0,
                     ),
-                    0,
+                    100,
                   ),
-                  100,
-                ),
-          next:
-            rental.trang_thai_canh_tac === "cho_gieo_trong"
-              ? "Xác nhận đã nhận giống để bắt đầu"
-              : "Theo dõi và chăm sóc theo lịch",
-          specialRequest: rental.yeu_cau_dac_biet,
-          startDate: rental.ngay_bat_dau,
-          payment: rental.trang_thai_thanh_toan,
-          camera: false,
-          rentalId: rental.ma_hop_dong,
-        }));
+            next:
+              rental.trang_thai_canh_tac === "cho_gieo_trong"
+                ? "Xác nhận đã nhận giống để bắt đầu"
+                : "Theo dõi và chăm sóc theo lịch",
+            specialRequest: rental.yeu_cau_dac_biet,
+            startDate: rental.ngay_bat_dau,
+            payment: rental.trang_thai_thanh_toan,
+            camera: false,
+            rentalId: rental.ma_hop_dong,
+          }));
         setPlots(mappedPlots);
         if (mappedPlots[0]?.id) {
           setJournalForm((prev) => ({ ...prev, plot: mappedPlots[0].id }));
@@ -412,6 +416,9 @@ function FarmerPage({ user, onLogout }) {
             ? { ...item, trang_thai: "da_ban_giao_van_chuyen" }
             : item,
         ),
+      );
+      setPlots((items) =>
+        items.filter((item) => item.rentalId !== delivery.ma_hop_dong),
       );
       notify("Đã bàn giao nông sản cho đơn vị vận chuyển.");
     } catch (handoverError) {

@@ -205,12 +205,14 @@ const getActiveRentals = async (req, res) => {
                    h.trang_thai_thanh_toan, h.trang_thai_canh_tac, h.yeu_cau_dac_biet,
                    u.ho_va_ten AS ten_khach_hang, u.so_dien_thoai AS sdt_khach_hang,
                    c.ma_cay_trong, c.ten_cay_trong, c.thoi_gian_sinh_truong_ngay,
+                   g.trang_thai AS trang_thai_giao_nhan,
                    DATEDIFF(day, h.ngay_bat_dau, SYSDATETIME()) AS so_ngay_da_trong
             FROM HopDongThue h
             JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
             JOIN NguoiDung u ON u.ma_nguoi_dung = h.ma_nguoi_dung
             LEFT JOIN CayTrong c ON c.ma_cay_trong = h.ma_cay_trong
-            WHERE h.trang_thai_hop_dong = 'hieu_luc' ${farmerFilter}
+            LEFT JOIN GiaoNhanThuHoach g ON g.ma_hop_dong = h.ma_hop_dong
+            WHERE h.trang_thai_hop_dong = 'hieu_luc' AND (g.trang_thai IS NULL OR g.trang_thai <> 'da_ban_giao_van_chuyen') ${farmerFilter}
             ORDER BY o.so_hieu_o ASC
         `);
 
