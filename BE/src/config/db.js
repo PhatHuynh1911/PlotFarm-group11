@@ -143,7 +143,7 @@ const connectDB = async () => {
                 ADD loai_yeu_cau VARCHAR(30) NULL;
             END
 
-            -- Tương thích database ThuHoach & GiaoHang
+            -- Tương thích database ThuHoach & GiaoNhanThuHoach
             IF OBJECT_ID('dbo.ThuHoach', 'U') IS NOT NULL
             BEGIN
                 ALTER TABLE dbo.ThuHoach ALTER COLUMN san_luong_thuc_te_kg DECIMAL(8, 2) NULL;
@@ -165,6 +165,30 @@ const connectDB = async () => {
                     ngay_khach_chon DATETIME2 NULL,
                     ngay_ban_giao DATETIME2 NULL
                 );
+            END
+
+            -- Dọn dẹp các bảng thừa trùng chức năng (Nhiệm vụ 22/09)
+            -- 1. Xóa khóa ngoại tới DanhMucCayTrong nếu còn
+            DECLARE @fk_dm NVARCHAR(256);
+            SELECT @fk_dm = fk.name 
+            FROM sys.foreign_keys fk
+            INNER JOIN sys.tables tr ON fk.referenced_object_id = tr.object_id
+            WHERE tr.name = 'DanhMucCayTrong';
+            IF @fk_dm IS NOT NULL
+            BEGIN
+                EXEC('ALTER TABLE dbo.CayTrong DROP CONSTRAINT ' + @fk_dm);
+            END
+
+            -- 2. Xóa bảng DanhMucCayTrong
+            IF OBJECT_ID('dbo.DanhMucCayTrong', 'U') IS NOT NULL
+            BEGIN
+                DROP TABLE dbo.DanhMucCayTrong;
+            END
+
+            -- 3. Xóa bảng GiaoHang
+            IF OBJECT_ID('dbo.GiaoHang', 'U') IS NOT NULL
+            BEGIN
+                DROP TABLE dbo.GiaoHang;
             END
         `);
         console.log(`✅ Kết nối SQL Server thành công: [${process.env.DB_NAME || 'PlotFarmDB'}] tại ${serverVal}`);

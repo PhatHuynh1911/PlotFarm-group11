@@ -1,13 +1,12 @@
 const { sql, getPool } = require('../config/db');
 
-// Lấy danh sách cây trồng
+// Lấy danh sách cây trồng (từ bảng chuẩn dbo.CayTrong)
 const getAllCrops = async (req, res) => {
     try {
         const pool = await getPool();
         const result = await pool.request().query(`
-            SELECT c.*, d.ten_danh_muc
-            FROM CayTrong c
-            LEFT JOIN DanhMucCayTrong d ON d.ma_danh_muc = c.ma_danh_muc
+            SELECT c.*, COALESCE(c.mua_vu_phu_hop, N'Nông sản hữu cơ') AS ten_danh_muc
+            FROM dbo.CayTrong c
             ORDER BY c.ten_cay_trong ASC
         `);
 
@@ -30,9 +29,8 @@ const getCropById = async (req, res) => {
         const result = await pool.request()
             .input('id', sql.Int, parseInt(id, 10))
             .query(`
-                SELECT c.*, d.ten_danh_muc 
-                FROM CayTrong c
-                LEFT JOIN DanhMucCayTrong d ON d.ma_danh_muc = c.ma_danh_muc
+                SELECT c.*, COALESCE(c.mua_vu_phu_hop, N'Nông sản hữu cơ') AS ten_danh_muc 
+                FROM dbo.CayTrong c
                 WHERE c.ma_cay_trong = @id
             `);
 
