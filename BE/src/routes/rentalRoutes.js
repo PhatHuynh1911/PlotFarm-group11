@@ -52,8 +52,8 @@ router.patch('/:id/payment-status', softAuth, confirmPayment);
 router.patch('/:id/cultivation-status', softAuth, updateCultivationStatus);
 router.post('/:id/ready-to-harvest', softAuth, readyToHarvest);
 router.get('/:id/harvest', softAuth, getHarvestByRental);
-router.post('/:id/gia-han', softAuth, extendRental);
-router.post('/:id/extend', softAuth, extendRental);
+router.post('/:id/gia-han', authenticate, authorize('khach_hang'), extendRental);
+router.post('/:id/extend', authenticate, authorize('khach_hang'), extendRental);
 router.get('/user/:userId', softAuth, getRentalsByUser);
 router.get('/:id', softAuth, getRentalById);
 
