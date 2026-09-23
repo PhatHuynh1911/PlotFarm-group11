@@ -750,13 +750,13 @@ const extendRental = async (req, res) => {
 
         // 5. Gửi thông báo cho Khách hàng & Admin
         try {
-            await createNotification({
-                ma_nguoi_dung: contract.ma_nguoi_dung,
-                tieu_de: 'Gia hạn hợp đồng thành công',
-                noi_dung: `Hợp đồng ${contract.so_hop_dong} (${contract.so_hieu_o}) đã được gia hạn thêm ${additionalMonths > 0 ? additionalMonths + ' tháng' : additionalDays + ' ngày'} đến ngày ${newEndDate.toLocaleDateString('vi-VN')}. Chi phí gia hạn: ${extensionCost.toLocaleString('vi-VN')} đ.`,
-                loai_thong_bao: 'thue_dat',
-                duong_dan: '/user'
-            });
+            await createNotification(
+                contract.ma_nguoi_dung,
+                'Gia hạn hợp đồng thành công',
+                `Hợp đồng ${contract.so_hop_dong} (${contract.so_hieu_o}) đã được gia hạn thêm ${additionalMonths > 0 ? additionalMonths + ' tháng' : additionalDays + ' ngày'} đến ngày ${newEndDate.toLocaleDateString('vi-VN')}. Chi phí gia hạn: ${extensionCost.toLocaleString('vi-VN')} đ.`,
+                'thue_dat',
+                '/user'
+            );
             await notifyAdmins(
                 `Yêu cầu gia hạn hợp đồng: ${contract.so_hop_dong}`,
                 `Khách hàng ${contract.ten_khach_hang} vừa gia hạn hợp đồng ${contract.so_hop_dong} (${contract.so_hieu_o}) thêm ${additionalMonths > 0 ? additionalMonths + ' tháng' : additionalDays + ' ngày'}. Phí gia hạn: ${extensionCost.toLocaleString('vi-VN')} đ.`,
