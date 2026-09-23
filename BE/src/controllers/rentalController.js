@@ -67,7 +67,8 @@ const createRental = async (req, res) => {
                 const altCropsReq = await new sql.Request(transaction)
                     .input('maxDays', sql.Int, rentalDays)
                     .query(`
-                        SELECT ma_cay_trong, ten_cay_trong, thoi_gian_sinh_truong_ngay, hinh_anh_cay, gia_cay, do_kho
+                        SELECT ma_cay_trong, ten_cay_trong, thoi_gian_sinh_truong_ngay,
+                               hinh_anh_cay, do_kho_cham_soc
                         FROM CayTrong 
                         WHERE thoi_gian_sinh_truong_ngay <= @maxDays
                         ORDER BY thoi_gian_sinh_truong_ngay DESC
