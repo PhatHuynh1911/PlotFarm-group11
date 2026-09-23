@@ -591,7 +591,7 @@ export const vietnamProvinces = [
     "districts": [
       "Thành phố Nha Trang",
       "Thành phố Cam Ranh",
-      "Huy��n Cam Lâm",
+      "Huyện Cam Lâm",
       "Huyện Vạn Ninh",
       "Thị xã Ninh Hòa",
       "Huyện Khánh Vĩnh",

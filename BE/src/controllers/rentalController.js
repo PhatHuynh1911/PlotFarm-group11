@@ -685,12 +685,13 @@ const extendRental = async (req, res) => {
         const checkReq = new sql.Request(transaction);
         const contractRes = await checkReq
             .input('id', sql.Int, id)
+            .input('userId', sql.Int, Number(req.user.sub))
             .query(`
                 SELECT h.*, o.so_hieu_o, o.ten_o_dat, o.gia_thue_thang, u.ho_va_ten AS ten_khach_hang, u.email AS email_khach_hang
                 FROM HopDongThue h
                 JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
                 JOIN NguoiDung u ON u.ma_nguoi_dung = h.ma_nguoi_dung
-                WHERE h.ma_hop_dong = @id
+                WHERE h.ma_hop_dong = @id AND h.ma_nguoi_dung = @userId
             `);
 
         const contract = contractRes.recordset[0];
