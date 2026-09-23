@@ -450,7 +450,8 @@ const handoverHarvestDelivery = async (req, res) => {
             .query(`
                 UPDATE HopDongThue
                 SET trang_thai_canh_tac = 'da_thu_hoach',
-                    trang_thai_hop_dong = 'da_ket_thuc'
+                    trang_thai_hop_dong = 'da_ket_thuc',
+                    ngay_cap_nhat = SYSDATETIME()
                 OUTPUT INSERTED.ma_o_dat, INSERTED.ma_nguoi_dung, INSERTED.so_hop_dong
                 WHERE ma_hop_dong = @maHopDong
             `);
@@ -462,19 +463,22 @@ const handoverHarvestDelivery = async (req, res) => {
             const plotReq = new sql.Request(transaction);
             await plotReq
                 .input('maODat', sql.Int, rentalInfo.ma_o_dat)
-                .query(`UPDATE ODat SET trang_thai = 'trong' WHERE ma_o_dat = @maODat`);
+                .query(`UPDATE ODat SET trang_thai = 'trong', ngay_cap_nhat = SYSDATETIME() WHERE ma_o_dat = @maODat`);
 
             // 3. Cập nhật trạng thái phân công nông dân hoàn thành
             const assignReq = new sql.Request(transaction);
             await assignReq
                 .input('maHopDong', sql.Int, maHopDong)
-                .query(`UPDATE PhanCongNongDan SET trang_thai = 'hoan_thanh' WHERE ma_hop_dong = @maHopDong`);
+                .query(`UPDATE PhanCongNongDan SET trang_thai = 'hoan_thanh' WHERE ma_hop_dong = @maHopDong AND trang_thai = 'da_chap_nhan'`);
 
             // 4. Cập nhật ThuHoach nếu có bản ghi
             const harvestReq = new sql.Request(transaction);
             await harvestReq
                 .input('maHopDong', sql.Int, maHopDong)
-                .query(`UPDATE ThuHoach SET trang_thai = 'da_thu_hoach' WHERE ma_hop_dong = @maHopDong`);
+                .query(`
+                    IF OBJECT_ID('dbo.ThuHoach', 'U') IS NOT NULL
+                        UPDATE ThuHoach SET trang_thai = 'da_thu_hoach' WHERE ma_hop_dong = @maHopDong;
+                `);
         }
 
         await transaction.commit();
