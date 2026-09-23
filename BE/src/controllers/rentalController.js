@@ -54,7 +54,45 @@ const createRental = async (req, res) => {
 
         await transaction.begin();
 
-        // 1. Kiểm tra ô đất còn trống + lấy giá thật từ DB
+        // 1. Kiểm tra thời gian sinh trưởng cây trồng vs Thời hạn thuê
+        const rentalDays = thoi_han_thang * 30;
+        if (ma_cay_trong) {
+            const cropCheck = await new sql.Request(transaction)
+                .input('cropId', sql.Int, parseInt(ma_cay_trong, 10))
+                .query(`SELECT ma_cay_trong, ten_cay_trong, thoi_gian_sinh_truong_ngay FROM CayTrong WHERE ma_cay_trong = @cropId`);
+
+            const crop = cropCheck.recordset[0];
+            if (crop && crop.thoi_gian_sinh_truong_ngay > rentalDays) {
+                // Lấy danh sách cây trồng thay thế hợp lệ (thoi_gian_sinh_truong_ngay <= rentalDays)
+                const altCropsReq = await new sql.Request(transaction)
+                    .input('maxDays', sql.Int, rentalDays)
+                    .query(`
+                        SELECT ma_cay_trong, ten_cay_trong, thoi_gian_sinh_truong_ngay, hinh_anh_cay, gia_cay, do_kho
+                        FROM CayTrong 
+                        WHERE thoi_gian_sinh_truong_ngay <= @maxDays
+                        ORDER BY thoi_gian_sinh_truong_ngay DESC
+                    `);
+
+                await transaction.rollback();
+                const minMonths = Math.ceil(crop.thoi_gian_sinh_truong_ngay / 30);
+                return res.status(400).json({
+                    success: false,
+                    code: 'GROWTH_TIME_EXCEEDS_RENTAL',
+                    message: `Thời gian sinh trưởng của cây "${crop.ten_cay_trong}" (${crop.thoi_gian_sinh_truong_ngay} ngày) vượt quá thời hạn thuê (${rentalDays} ngày / ${thoi_han_thang} tháng). Bạn cần thuê tối thiểu ${minMonths} tháng hoặc chọn loại cây trồng khác phù hợp.`,
+                    data: {
+                        crop_id: crop.ma_cay_trong,
+                        crop_name: crop.ten_cay_trong,
+                        growth_days: crop.thoi_gian_sinh_truong_ngay,
+                        rental_days: rentalDays,
+                        rental_months: thoi_han_thang,
+                        min_months_required: minMonths,
+                        suggested_crops: altCropsReq.recordset
+                    }
+                });
+            }
+        }
+
+        // 2. Kiểm tra ô đất còn trống + lấy giá thật từ DB
         const checkResult = await new sql.Request(transaction)
             .input('ma_o_dat', sql.Int, parseInt(ma_o_dat, 10))
             .query(`SELECT so_hieu_o, ten_o_dat, trang_thai, gia_thue_thang FROM ODat WHERE ma_o_dat = @ma_o_dat`);
@@ -627,6 +665,131 @@ const confirmPayment = async (req, res) => {
     }
 };
 
+// Gia hạn thời gian thuê ô đất (Nhiệm vụ 23/09)
+const extendRental = async (req, res) => {
+    const pool = await getPool();
+    const transaction = new sql.Transaction(pool);
+
+    try {
+        const id = parseInt(req.params.id, 10);
+        let additionalMonths = parseInt(req.body.so_thang_gia_han || req.body.additional_months || req.body.months || 0, 10);
+        let additionalDays = parseInt(req.body.so_ngay_gia_han || req.body.additional_days || 0, 10);
+
+        if (additionalMonths <= 0 && additionalDays <= 0) {
+            additionalMonths = 1;
+        }
+
+        await transaction.begin();
+
+        // 1. Kiểm tra hợp đồng
+        const checkReq = new sql.Request(transaction);
+        const contractRes = await checkReq
+            .input('id', sql.Int, id)
+            .query(`
+                SELECT h.*, o.so_hieu_o, o.ten_o_dat, o.gia_thue_thang, u.ho_va_ten AS ten_khach_hang, u.email AS email_khach_hang
+                FROM HopDongThue h
+                JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+                JOIN NguoiDung u ON u.ma_nguoi_dung = h.ma_nguoi_dung
+                WHERE h.ma_hop_dong = @id
+            `);
+
+        const contract = contractRes.recordset[0];
+        if (!contract) {
+            await transaction.rollback();
+            return res.status(404).json({ success: false, message: 'Không tìm thấy hợp đồng' });
+        }
+
+        if (contract.trang_thai_hop_dong === 'da_ket_thuc' || contract.trang_thai_hop_dong === 'da_huy') {
+            await transaction.rollback();
+            return res.status(400).json({ success: false, message: 'Hợp đồng đã kết thúc hoặc bị hủy, không thể gia hạn' });
+        }
+
+        // 2. Tính toán chi phí gia hạn & ngày kết thúc mới
+        const monthlyPrice = Number(contract.gia_thue_thang || contract.don_gia_thang);
+        let extensionCost = 0;
+        let newEndDate;
+        let newTotalMonths = contract.thoi_han_thang;
+
+        const currentEndDate = new Date(contract.ngay_ket_thuc);
+
+        if (additionalMonths > 0) {
+            extensionCost = monthlyPrice * additionalMonths;
+            newTotalMonths += additionalMonths;
+            newEndDate = new Date(currentEndDate);
+            newEndDate.setMonth(newEndDate.getMonth() + additionalMonths);
+        } else {
+            extensionCost = Math.round((monthlyPrice / 30) * additionalDays);
+            newEndDate = new Date(currentEndDate);
+            newEndDate.setDate(newEndDate.getDate() + additionalDays);
+        }
+
+        const newEndDateStr = newEndDate.toISOString().split('T')[0];
+        const newTotalAmount = Number(contract.tong_tien) + extensionCost;
+
+        // 3. Cập nhật ngày kết thúc, thời hạn và tổng tiền trong HopDongThue
+        const updateReq = new sql.Request(transaction);
+        await updateReq
+            .input('id', sql.Int, id)
+            .input('newEndDate', sql.Date, newEndDateStr)
+            .input('newTotalMonths', sql.Int, newTotalMonths)
+            .input('newTotalAmount', sql.Decimal(14, 2), newTotalAmount)
+            .query(`
+                UPDATE HopDongThue
+                SET ngay_ket_thuc = @newEndDate,
+                    thoi_han_thang = @newTotalMonths,
+                    tong_tien = @newTotalAmount,
+                    ngay_cap_nhat = SYSDATETIME()
+                WHERE ma_hop_dong = @id
+            `);
+
+        await transaction.commit();
+
+        // 4. Sinh mã thanh toán VietQR cho khoản phí gia hạn
+        const qrContent = `${contract.so_hop_dong}-GH${additionalMonths > 0 ? additionalMonths + 'T' : additionalDays + 'N'}`;
+        const paymentInfo = generateVietQR(qrContent, extensionCost);
+
+        // 5. Gửi thông báo cho Khách hàng & Admin
+        try {
+            await createNotification(
+                contract.ma_nguoi_dung,
+                'Gia hạn hợp đồng thành công',
+                `Hợp đồng ${contract.so_hop_dong} (${contract.so_hieu_o}) đã được gia hạn thêm ${additionalMonths > 0 ? additionalMonths + ' tháng' : additionalDays + ' ngày'} đến ngày ${newEndDate.toLocaleDateString('vi-VN')}. Chi phí gia hạn: ${extensionCost.toLocaleString('vi-VN')} đ.`,
+                'thue_dat',
+                '/user'
+            );
+            await notifyAdmins(
+                `Yêu cầu gia hạn hợp đồng: ${contract.so_hop_dong}`,
+                `Khách hàng ${contract.ten_khach_hang} vừa gia hạn hợp đồng ${contract.so_hop_dong} (${contract.so_hieu_o}) thêm ${additionalMonths > 0 ? additionalMonths + ' tháng' : additionalDays + ' ngày'}. Phí gia hạn: ${extensionCost.toLocaleString('vi-VN')} đ.`,
+                'thue_dat',
+                '/admin?tab=rentals'
+            );
+        } catch (notifErr) {
+            console.error('Lỗi gửi thông báo gia hạn:', notifErr);
+        }
+
+        return res.json({
+            success: true,
+            message: `Gia hạn hợp đồng thành công thêm ${additionalMonths > 0 ? additionalMonths + ' tháng' : additionalDays + ' ngày'}`,
+            data: {
+                ma_hop_dong: contract.ma_hop_dong,
+                so_hop_dong: contract.so_hop_dong,
+                so_thang_gia_han: additionalMonths,
+                so_ngay_gia_han: additionalDays,
+                chi_phi_gia_han: extensionCost,
+                ngay_ket_thuc_cu: contract.ngay_ket_thuc,
+                ngay_ket_thuc_moi: newEndDateStr,
+                tong_tien_moi: newTotalAmount,
+                payment_info: paymentInfo,
+                qr_code_url: paymentInfo.qr_code_url
+            }
+        });
+    } catch (error) {
+        try { await transaction.rollback(); } catch (rbErr) {}
+        console.error('Lỗi khi gia hạn hợp đồng:', error);
+        return res.status(500).json({ success: false, message: 'Lỗi server khi gia hạn hợp đồng' });
+    }
+};
+
 module.exports = {
     createRental,
     getAllRentals,
@@ -641,5 +804,6 @@ module.exports = {
     getHarvestDeliveriesForUser,
     chooseHarvestDelivery,
     handoverHarvestDelivery,
-    generateVietQR
+    generateVietQR,
+    extendRental
 };

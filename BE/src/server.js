@@ -45,6 +45,7 @@ app.use('/api/plots', plotRoutes);
 app.use('/api/farms', farmRoutes);
 app.use('/api/crops', cropRoutes);
 app.use('/api/rentals', rentalRoutes);
+app.use('/api/hop-dong-thue', rentalRoutes);
 app.use('/api/journals', journalRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/camera', cameraRoutes);

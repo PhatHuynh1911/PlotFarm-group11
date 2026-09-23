@@ -19,6 +19,7 @@ import {
   updateCurrentUser,
   getUserHarvestDeliveries,
   chooseHarvestDelivery,
+  extendRental,
 } from "../api.js";
 import AccountMenu from "./AccountMenu.jsx";
 import ProfilePanel from "./ProfilePanel.jsx";
@@ -143,6 +144,9 @@ function UserPage({ user, token, onLogout }) {
     tieu_de: "",
     mo_ta_chi_tiet: "",
   });
+  const [activeExtendModal, setActiveExtendModal] = useState(null);
+  const [extendMonths, setExtendMonths] = useState(1);
+  const [extendSubmitting, setExtendSubmitting] = useState(false);
 
   const selectTab = (tab) => {
     setSearchParams((current) => {
@@ -273,7 +277,55 @@ function UserPage({ user, token, onLogout }) {
   };
   const continueToPayment = (event) => {
     event.preventDefault();
+    const selectedCropObj = crops.find(
+      (crop) => String(crop.ma_cay_trong) === String(booking.crop),
+    );
+    const rentalDays = Number(booking.duration) * 30;
+    if (selectedCropObj && selectedCropObj.thoi_gian_sinh_truong_ngay > rentalDays) {
+      const minMonths = Math.ceil(selectedCropObj.thoi_gian_sinh_truong_ngay / 30);
+      notify(
+        `Cây "${selectedCropObj.ten_cay_trong}" cần ${selectedCropObj.thoi_gian_sinh_truong_ngay} ngày để phát triển. Bạn cần thuê tối thiểu ${minMonths} tháng!`,
+        "error"
+      );
+      return;
+    }
     setBookingStep("payment");
+  };
+
+  const handleExtendSubmit = async (event) => {
+    event.preventDefault();
+    if (!activeExtendModal) return;
+    setExtendSubmitting(true);
+    try {
+      const response = await extendRental(
+        activeExtendModal.ma_hop_dong,
+        { so_thang_gia_han: extendMonths },
+        token
+      );
+      if (response.success) {
+        notify(response.message || "Gia hạn hợp đồng thành công!");
+        showNotice(
+          `Đã gia hạn hợp đồng ${activeExtendModal.so_hop_dong} thêm ${extendMonths} tháng. Vui lòng thanh toán qua VietQR.`
+        );
+        const contractInfo = activeExtendModal;
+        setActiveExtendModal(null);
+        setRentals(await getUserRentals(user.id, token));
+        if (response.data?.payment_info) {
+          setActivePaymentModal({
+            so_hop_dong: `${contractInfo.so_hop_dong} (Gia hạn)`,
+            tong_tien: response.data.chi_phi_gia_han,
+            payment_info: response.data.payment_info,
+            qr_code_url: response.data.qr_code_url,
+          });
+        }
+      } else {
+        notify(response.message || "Không thể gia hạn hợp đồng", "error");
+      }
+    } catch (err) {
+      notify(err.message || "Lỗi khi gia hạn hợp đồng", "error");
+    } finally {
+      setExtendSubmitting(false);
+    }
   };
   const submitBooking = async (event) => {
     event.preventDefault();
@@ -632,6 +684,115 @@ function UserPage({ user, token, onLogout }) {
     </div>
   );
 
+  const extendModal = activeExtendModal && (
+    <div className="booking-backdrop" onClick={() => setActiveExtendModal(null)}>
+      <div
+        className="booking-modal"
+        style={{ width: "min(100%, 540px)", maxHeight: "90vh", overflowY: "auto" }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <button
+          type="button"
+          className="modal-close"
+          onClick={() => setActiveExtendModal(null)}
+        >
+          ×
+        </button>
+        <p className="eyebrow" style={{ color: "#2b8a3e", marginBottom: "4px" }}>
+          GIA HẠN THUÊ Ô {activeExtendModal.so_hieu_o}
+        </p>
+        <h2 style={{ fontSize: "22px", margin: "0 0 8px" }}>Gia hạn mùa vụ canh tác</h2>
+        <p style={{ color: "#526658", fontSize: "14px", margin: "0 0 16px" }}>
+          Ô đất: <b>{activeExtendModal.ten_o_dat}</b> · Hợp đồng: <b>{activeExtendModal.so_hop_dong}</b>
+        </p>
+
+        <div className="booking-summary" style={{ marginBottom: "16px" }}>
+          <div>
+            <span>Hạn kết thúc hiện tại</span>
+            <strong>{formatDate(activeExtendModal.ngay_ket_thuc)}</strong>
+          </div>
+          <div>
+            <span>Đơn giá thuê</span>
+            <strong>{formatMoney(activeExtendModal.gia_thue_thang || 0)}/tháng</strong>
+          </div>
+        </div>
+
+        <form onSubmit={handleExtendSubmit}>
+          <label style={{ display: "block", marginBottom: "14px", fontWeight: "600", fontSize: "14px" }}>
+            Chọn số tháng muốn gia hạn thêm:
+            <select
+              value={extendMonths}
+              onChange={(e) => setExtendMonths(Number(e.target.value))}
+              style={{
+                width: "100%",
+                marginTop: "6px",
+                padding: "10px",
+                borderRadius: "8px",
+                border: "1px solid #c3d4c9",
+                fontSize: "14px",
+              }}
+            >
+              {[1, 2, 3, 6, 9, 12].map((m) => {
+                const addedCost = (Number(activeExtendModal.gia_thue_thang) || 0) * m;
+                return (
+                  <option key={m} value={m}>
+                    + {m} tháng · Chi phí: {formatMoney(addedCost)}
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+
+          <div
+            style={{
+              backgroundColor: "#f0f7f3",
+              padding: "14px",
+              borderRadius: "8px",
+              marginBottom: "20px",
+              border: "1px solid #d2e7db",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+              <span style={{ color: "#526658", fontSize: "14px" }}>Chi phí gia hạn (+{extendMonths} tháng):</span>
+              <strong style={{ color: "#2b8a3e", fontSize: "16px" }}>
+                {formatMoney((Number(activeExtendModal.gia_thue_thang) || 0) * extendMonths)}
+              </strong>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
+              <span style={{ color: "#526658" }}>Hạn kết thúc mới dự kiến:</span>
+              <strong>
+                {(() => {
+                  const d = new Date(activeExtendModal.ngay_ket_thuc);
+                  d.setMonth(d.getMonth() + extendMonths);
+                  return formatDate(d);
+                })()}
+              </strong>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button
+              type="button"
+              className="outline-button"
+              style={{ flex: 1 }}
+              onClick={() => setActiveExtendModal(null)}
+            >
+              Đóng
+            </button>
+            <button
+              type="submit"
+              className="primary-button"
+              style={{ flex: 2 }}
+              disabled={extendSubmitting}
+            >
+              {extendSubmitting ? "Đang xử lý..." : "Xác nhận gia hạn & Thanh toán VietQR →"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+
   const workspace = (content) => (
     <main className="dashboard-page user-dashboard">
       <header className="dashboard-header">
@@ -687,6 +848,7 @@ function UserPage({ user, token, onLogout }) {
       </section>
       {paymentModal}
       {rentalDetailModal}
+      {extendModal}
     </main>
   );
 
@@ -784,15 +946,35 @@ function UserPage({ user, token, onLogout }) {
                       Thanh toán VietQR →
                     </button>
                   ) : (
-                    <button
-                      className="outline-button"
-                      onClick={() => {
-                        setSelectedJournalRental(String(rental.ma_hop_dong));
-                        setActiveTab("journal");
-                      }}
-                    >
-                      Xem nhật ký canh tác →
-                    </button>
+                    <>
+                      <button
+                        className="outline-button"
+                        onClick={() => {
+                          setSelectedJournalRental(String(rental.ma_hop_dong));
+                          setActiveTab("journal");
+                        }}
+                      >
+                        Xem nhật ký canh tác →
+                      </button>
+                      {rental.trang_thai_hop_dong === "hieu_luc" && (
+                        <button
+                          className="outline-button"
+                          style={{
+                            marginTop: "8px",
+                            width: "100%",
+                            borderColor: "#2b8a3e",
+                            color: "#2b8a3e",
+                            fontWeight: "600",
+                          }}
+                          onClick={() => {
+                            setActiveExtendModal(rental);
+                            setExtendMonths(1);
+                          }}
+                        >
+                          Gia hạn thuê đất →
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </article>
@@ -1792,11 +1974,54 @@ function UserPage({ user, token, onLogout }) {
                   >
                     {crops.map((crop) => (
                       <option key={crop.ma_cay_trong} value={crop.ma_cay_trong}>
-                        {crop.ten_cay_trong}
+                        {crop.ten_cay_trong} ({crop.thoi_gian_sinh_truong_ngay} ngày)
                       </option>
                     ))}
                   </select>
                 </label>
+                {(() => {
+                  const selCrop = crops.find(
+                    (c) => String(c.ma_cay_trong) === String(booking.crop),
+                  );
+                  const rentalDays = Number(booking.duration) * 30;
+                  if (selCrop && selCrop.thoi_gian_sinh_truong_ngay > rentalDays) {
+                    const minMonths = Math.ceil(selCrop.thoi_gian_sinh_truong_ngay / 30);
+                    return (
+                      <div
+                        style={{
+                          padding: "12px 14px",
+                          backgroundColor: "#fff3cd",
+                          border: "1px solid #ffeeba",
+                          borderRadius: "8px",
+                          margin: "10px 0 16px",
+                          color: "#856404",
+                          fontSize: "13px",
+                          lineHeight: "1.5",
+                        }}
+                      >
+                        <strong>⚠️ Thời gian sinh trưởng vượt quá thời hạn thuê:</strong>
+                        <p style={{ margin: "4px 0 8px" }}>
+                          Cây <b>{selCrop.ten_cay_trong}</b> cần <b>{selCrop.thoi_gian_sinh_truong_ngay} ngày</b> để lớn, nhưng bạn chỉ chọn thuê <b>{rentalDays} ngày ({booking.duration} tháng)</b>.
+                        </p>
+                        <button
+                          type="button"
+                          className="outline-button"
+                          style={{
+                            fontSize: "12px",
+                            padding: "6px 12px",
+                            borderColor: "#856404",
+                            color: "#856404",
+                            fontWeight: "600",
+                          }}
+                          onClick={() => setBooking({ ...booking, duration: String(minMonths) })}
+                        >
+                          Tăng thời hạn thuê lên {minMonths} tháng →
+                        </button>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
                 <button className="primary-button booking-submit">
                   Xem lại & thanh toán <span>→</span>
                 </button>

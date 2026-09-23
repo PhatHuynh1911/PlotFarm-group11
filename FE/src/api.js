@@ -258,3 +258,12 @@ export async function getAllHarvests(token) {
   const result = await apiRequest('/harvest', { token })
   return result.data
 }
+
+export async function extendRental(rentalId, payload, token) {
+  return apiRequest(`/rentals/${rentalId}/gia-han`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    token,
+  })
+}
+
