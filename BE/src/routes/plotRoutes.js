@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getAllPlots, getPlotByIdOrCode, updatePlotStatus } = require('../controllers/plotController');
+const { getAllPlots, getAvailablePlots, getPlotByIdOrCode, updatePlotStatus } = require('../controllers/plotController');
 const { readyToHarvest } = require('../controllers/harvestController');
 
 const softAuth = (req, res, next) => {
@@ -15,6 +15,8 @@ const softAuth = (req, res, next) => {
 };
 
 router.get('/', getAllPlots);
+router.get('/available-plots', getAvailablePlots);
+router.get('/available', getAvailablePlots);
 router.get('/:idOrCode', getPlotByIdOrCode);
 router.patch('/:id/status', updatePlotStatus);
 router.post('/:id/ready-to-harvest', softAuth, readyToHarvest);

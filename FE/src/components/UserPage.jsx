@@ -20,6 +20,7 @@ import {
   getUserHarvestDeliveries,
   chooseHarvestDelivery,
   extendRental,
+  chooseNewCrop,
 } from "../api.js";
 import AccountMenu from "./AccountMenu.jsx";
 import ProfilePanel from "./ProfilePanel.jsx";
@@ -147,6 +148,10 @@ function UserPage({ user, token, onLogout }) {
   const [activeExtendModal, setActiveExtendModal] = useState(null);
   const [extendMonths, setExtendMonths] = useState(1);
   const [extendSubmitting, setExtendSubmitting] = useState(false);
+  const [activeNewCropModal, setActiveNewCropModal] = useState(null);
+  const [newCropSelectedId, setNewCropSelectedId] = useState("");
+  const [newCropNote, setNewCropNote] = useState("");
+  const [newCropSubmitting, setNewCropSubmitting] = useState(false);
 
   const selectTab = (tab) => {
     setSearchParams((current) => {
@@ -325,6 +330,39 @@ function UserPage({ user, token, onLogout }) {
       notify(err.message || "Lỗi khi gia hạn hợp đồng", "error");
     } finally {
       setExtendSubmitting(false);
+    }
+  };
+
+  const handleChooseNewCropSubmit = async (event) => {
+    event.preventDefault();
+    if (!activeNewCropModal || !newCropSelectedId) {
+      notify("Vui lòng chọn loại giống cây trồng", "error");
+      return;
+    }
+    setNewCropSubmitting(true);
+    try {
+      const response = await chooseNewCrop(
+        activeNewCropModal.ma_hop_dong,
+        {
+          ma_cay_trong: Number(newCropSelectedId),
+          yeu_cau_dac_biet: newCropNote,
+        },
+        token
+      );
+      if (response.success) {
+        notify(response.message || "Khởi tạo vụ mùa mới thành công!");
+        showNotice(
+          `Đã khởi tạo vụ mùa mới trên ô đất ${activeNewCropModal.so_hieu_o} với giống cây ${response.data?.ten_cay_trong}. Nông dân sẽ sớm bắt đầu gieo trồng!`
+        );
+        setActiveNewCropModal(null);
+        setRentals(await getUserRentals(user.id, token));
+      } else {
+        notify(response.message || "Không thể khởi tạo vụ mùa mới", "error");
+      }
+    } catch (err) {
+      notify(err.message || "Lỗi khi khởi tạo vụ mùa mới", "error");
+    } finally {
+      setNewCropSubmitting(false);
     }
   };
   const submitBooking = async (event) => {
@@ -793,6 +831,173 @@ function UserPage({ user, token, onLogout }) {
     </div>
   );
 
+  const newCropModal = activeNewCropModal && (
+    <div className="booking-backdrop" onClick={() => setActiveNewCropModal(null)}>
+      <div
+        className="booking-modal"
+        style={{ width: "min(100%, 540px)", maxHeight: "90vh", overflowY: "auto" }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <button
+          type="button"
+          className="modal-close"
+          onClick={() => setActiveNewCropModal(null)}
+        >
+          ×
+        </button>
+        <p className="eyebrow" style={{ color: "#198754", marginBottom: "4px" }}>
+          KHỞI TẠO VỤ MÙA MỚI · Ô {activeNewCropModal.so_hieu_o}
+        </p>
+        <h2 style={{ fontSize: "22px", margin: "0 0 8px" }}>Chọn cây trồng chu kỳ tiếp theo</h2>
+        <p style={{ color: "#526658", fontSize: "14px", margin: "0 0 16px" }}>
+          Ô đất: <b>{activeNewCropModal.ten_o_dat}</b> · Hạn thuê còn: <b>{daysRemaining(activeNewCropModal.ngay_ket_thuc)} ngày</b> (đến {formatDate(activeNewCropModal.ngay_ket_thuc)})
+        </p>
+
+        <form onSubmit={handleChooseNewCropSubmit}>
+          <label style={{ display: "block", marginBottom: "14px", fontWeight: "600", fontSize: "14px" }}>
+            Chọn giống cây trồng vụ này:
+            <select
+              value={newCropSelectedId}
+              onChange={(e) => setNewCropSelectedId(e.target.value)}
+              style={{
+                width: "100%",
+                marginTop: "6px",
+                padding: "10px",
+                borderRadius: "8px",
+                border: "1px solid #c3d4c9",
+                fontSize: "14px",
+              }}
+            >
+              {crops.map((c) => (
+                <option key={c.ma_cay_trong} value={c.ma_cay_trong}>
+                  {c.ten_cay_trong} (Sinh trưởng: {c.thoi_gian_sinh_truong_ngay || 30} ngày · Giá giống: {formatMoney(c.gia_cay || 0)})
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {(() => {
+            const selectedCropObj = crops.find((c) => String(c.ma_cay_trong) === String(newCropSelectedId)) || crops[0];
+            const growthDays = selectedCropObj?.thoi_gian_sinh_truong_ngay || 30;
+            const remainingDays = daysRemaining(activeNewCropModal.ngay_ket_thuc);
+            const isExceeded = growthDays > remainingDays;
+
+            return (
+              <>
+                {selectedCropObj && (
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "12px",
+                      alignItems: "center",
+                      backgroundColor: "#f7faf8",
+                      padding: "12px",
+                      borderRadius: "8px",
+                      marginBottom: "14px",
+                      border: "1px solid #e1ebe4",
+                    }}
+                  >
+                    {selectedCropObj.hinh_anh_cay && (
+                      <img
+                        src={resolveImageUrl(selectedCropObj.hinh_anh_cay)}
+                        alt={selectedCropObj.ten_cay_trong}
+                        style={{ width: "50px", height: "50px", objectFit: "cover", borderRadius: "6px" }}
+                      />
+                    )}
+                    <div style={{ flex: 1, fontSize: "13px" }}>
+                      <b>{selectedCropObj.ten_cay_trong}</b>
+                      <div style={{ color: "#526658" }}>
+                        Thời gian sinh trưởng: <b>{growthDays} ngày</b> · Độ khó: {selectedCropObj.do_kho || "Dễ"}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {isExceeded && (
+                  <div
+                    style={{
+                      backgroundColor: "#fff3cd",
+                      border: "1px solid #ffe69c",
+                      color: "#664d03",
+                      padding: "12px",
+                      borderRadius: "8px",
+                      marginBottom: "16px",
+                      fontSize: "13px",
+                      lineHeight: "1.5",
+                    }}
+                  >
+                    ⚠️ <b>Thời gian sinh trưởng vượt quá hạn thuê còn lại:</b> Cây "{selectedCropObj?.ten_cay_trong}" cần {growthDays} ngày nhưng ô đất chỉ còn {remainingDays} ngày thuê. Bạn cần gia hạn thêm hợp đồng hoặc chọn cây ngắn ngày hơn!
+                    <button
+                      type="button"
+                      style={{
+                        display: "block",
+                        marginTop: "8px",
+                        background: "#856404",
+                        color: "#fff",
+                        border: "none",
+                        padding: "6px 12px",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        fontWeight: "600",
+                        fontSize: "12px",
+                      }}
+                      onClick={() => {
+                        const targetRental = activeNewCropModal;
+                        setActiveNewCropModal(null);
+                        setActiveExtendModal(targetRental);
+                        setExtendMonths(Math.ceil((growthDays - remainingDays) / 30));
+                      }}
+                    >
+                      Gia hạn thêm hợp đồng ngay →
+                    </button>
+                  </div>
+                )}
+
+                <label style={{ display: "block", marginBottom: "16px", fontWeight: "600", fontSize: "14px" }}>
+                  Ghi chú / Yêu cầu chăm sóc đặc biệt (tùy chọn):
+                  <textarea
+                    value={newCropNote}
+                    onChange={(e) => setNewCropNote(e.target.value)}
+                    placeholder="VD: Vụ này gieo hạt mật độ thưa, bón phân hữu cơ sinh học..."
+                    rows={3}
+                    style={{
+                      width: "100%",
+                      marginTop: "6px",
+                      padding: "10px",
+                      borderRadius: "8px",
+                      border: "1px solid #c3d4c9",
+                      fontSize: "13px",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </label>
+
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <button
+                    type="button"
+                    className="outline-button"
+                    style={{ flex: 1 }}
+                    onClick={() => setActiveNewCropModal(null)}
+                  >
+                    Hủy bỏ
+                  </button>
+                  <button
+                    type="submit"
+                    className="primary-button"
+                    style={{ flex: 2, backgroundColor: "#198754", borderColor: "#198754" }}
+                    disabled={newCropSubmitting || isExceeded}
+                  >
+                    {newCropSubmitting ? "Đang xử lý..." : "🌱 Xác nhận trồng vụ này"}
+                  </button>
+                </div>
+              </>
+            );
+          })()}
+        </form>
+      </div>
+    </div>
+  );
+
   const workspace = (content) => (
     <main className="dashboard-page user-dashboard">
       <header className="dashboard-header">
@@ -849,6 +1054,7 @@ function UserPage({ user, token, onLogout }) {
       {paymentModal}
       {rentalDetailModal}
       {extendModal}
+      {newCropModal}
     </main>
   );
 
@@ -911,7 +1117,11 @@ function UserPage({ user, token, onLogout }) {
                   <p className="plot-status">
                     {rental.trang_thai_thanh_toan === "cho_thanh_toan" ? (
                       <span style={{ color: "#c98b3c", fontWeight: "700" }}>Chờ thanh toán</span>
-                    ) : rental.trang_thai_canh_tac === "da_thu_hoach" || rental.trang_thai_hop_dong === "da_ket_thuc" ? (
+                    ) : rental.trang_thai_hop_dong === "da_ket_thuc" ? (
+                      <span style={{ color: "#6c757d", fontWeight: "700" }}>Hợp đồng đã kết thúc</span>
+                    ) : rental.trang_thai_canh_tac === "cho_chon_cay_moi" || (rental.trang_thai_canh_tac === "da_thu_hoach" && daysRemaining(rental.ngay_ket_thuc) > 0) ? (
+                      <span style={{ color: "#0d6efd", fontWeight: "700" }}>🌾 Đã thu hoạch · Chờ vụ mới</span>
+                    ) : rental.trang_thai_canh_tac === "da_thu_hoach" ? (
                       <span style={{ color: "#198754", fontWeight: "700" }}>Đã hoàn tất thu hoạch</span>
                     ) : (
                       rentalStatusLabel(rental)
@@ -947,8 +1157,28 @@ function UserPage({ user, token, onLogout }) {
                     </button>
                   ) : (
                     <>
+                      {(rental.trang_thai_canh_tac === "cho_chon_cay_moi" || (rental.trang_thai_canh_tac === "da_thu_hoach" && daysRemaining(rental.ngay_ket_thuc) > 0)) && (
+                        <button
+                          className="primary-button"
+                          style={{
+                            marginTop: "8px",
+                            width: "100%",
+                            backgroundColor: "#198754",
+                            borderColor: "#198754",
+                            fontWeight: "700",
+                          }}
+                          onClick={() => {
+                            setActiveNewCropModal(rental);
+                            setNewCropSelectedId(crops[0]?.ma_cay_trong || "");
+                            setNewCropNote("");
+                          }}
+                        >
+                          🌱 Chọn cây trồng vụ mới →
+                        </button>
+                      )}
                       <button
                         className="outline-button"
+                        style={{ marginTop: "8px" }}
                         onClick={() => {
                           setSelectedJournalRental(String(rental.ma_hop_dong));
                           setActiveTab("journal");

@@ -15,6 +15,8 @@ const formatPlot = (plot) => {
         area: Number(plot.dien_tich_m2),
         price: Number(plot.gia_thue_thang),
         status: plot.trang_thai,
+        season_status: plot.trang_thai_vu_mua || 'san_sang',
+        trang_thai_vu_mua: plot.trang_thai_vu_mua || 'san_sang',
         soil: plot.loai_dat || 'Đất thịt phù sa giàu mùn',
         location: plot.ten_nong_trai || 'Vườn PlotFarm',
         description: plot.mo_ta_chi_tiet || '',
@@ -34,7 +36,18 @@ const getAllPlots = async (req, res) => {
         const pool = await getPool();
         const result = await pool.request().query(`
             SELECT o.ma_o_dat, o.ma_nong_trai, o.so_hieu_o, o.ten_o_dat, 
-                   o.dien_tich_m2, o.gia_thue_thang, o.trang_thai, o.loai_dat,
+                   o.dien_tich_m2, o.gia_thue_thang, 
+                   CASE 
+                       WHEN EXISTS (
+                           SELECT 1 FROM HopDongThue h 
+                           WHERE h.ma_o_dat = o.ma_o_dat 
+                             AND h.trang_thai_hop_dong NOT IN ('da_ket_thuc', 'da_huy')
+                             AND h.ngay_ket_thuc >= CAST(GETDATE() AS DATE)
+                       ) THEN 'da_thue'
+                       ELSE o.trang_thai 
+                   END AS trang_thai,
+                   ISNULL(o.trang_thai_vu_mua, 'san_sang') AS trang_thai_vu_mua,
+                   o.loai_dat,
                    o.position_x, o.position_y, o.hinh_anh_o_dat, o.mo_ta_chi_tiet,
                    n.ten_nong_trai, n.dia_chi AS dia_chi_nong_trai
             FROM ODat o
@@ -51,6 +64,42 @@ const getAllPlots = async (req, res) => {
         });
     } catch (error) {
         console.error('Lỗi khi lấy danh sách ô đất:', error);
+        res.status(500).json({ success: false, message: 'Lỗi server nội bộ' });
+    }
+};
+
+// Lấy danh sách ô đất đang thực sự trống (Nhiệm vụ 24/09)
+// Đảm bảo các ô đất còn thời hạn hợp đồng thuê (dù đã thu hoạch xong vụ cũ) không bị lọt vào danh sách "ô đất trống"
+const getAvailablePlots = async (req, res) => {
+    try {
+        const pool = await getPool();
+        const result = await pool.request().query(`
+            SELECT o.ma_o_dat, o.ma_nong_trai, o.so_hieu_o, o.ten_o_dat, 
+                   o.dien_tich_m2, o.gia_thue_thang, o.trang_thai,
+                   ISNULL(o.trang_thai_vu_mua, 'san_sang') AS trang_thai_vu_mua,
+                   o.loai_dat, o.position_x, o.position_y, o.hinh_anh_o_dat, o.mo_ta_chi_tiet,
+                   n.ten_nong_trai, n.dia_chi AS dia_chi_nong_trai
+            FROM ODat o
+            LEFT JOIN NongTrai n ON n.ma_nong_trai = o.ma_nong_trai
+            WHERE o.trang_thai = 'trong'
+              AND NOT EXISTS (
+                  SELECT 1 FROM HopDongThue h 
+                  WHERE h.ma_o_dat = o.ma_o_dat 
+                    AND h.trang_thai_hop_dong NOT IN ('da_ket_thuc', 'da_huy')
+                    AND h.ngay_ket_thuc >= CAST(GETDATE() AS DATE)
+              )
+            ORDER BY o.so_hieu_o ASC
+        `);
+        
+        const formatted = result.recordset.map(formatPlot);
+
+        res.status(200).json({
+            success: true,
+            count: formatted.length,
+            data: formatted
+        });
+    } catch (error) {
+        console.error('Lỗi khi lấy danh sách ô đất trống:', error);
         res.status(500).json({ success: false, message: 'Lỗi server nội bộ' });
     }
 };
@@ -120,4 +169,4 @@ const updatePlotStatus = async (req, res) => {
     }
 };
 
-module.exports = { getAllPlots, getPlotByIdOrCode, updatePlotStatus, formatPlot };
+module.exports = { getAllPlots, getAvailablePlots, getPlotByIdOrCode, updatePlotStatus, formatPlot };

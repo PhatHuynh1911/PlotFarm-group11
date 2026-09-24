@@ -104,6 +104,31 @@ const createRental = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Không tìm thấy ô đất' });
         }
 
+        // Kiểm tra xem ô đất có hợp đồng đang còn hiệu lực không (ngay_ket_thuc >= ngày hiện tại)
+        const activeContractCheck = await new sql.Request(transaction)
+            .input('ma_o_dat', sql.Int, parseInt(ma_o_dat, 10))
+            .query(`
+                SELECT TOP 1 ma_hop_dong, so_hop_dong, ngay_ket_thuc, trang_thai_hop_dong
+                FROM HopDongThue
+                WHERE ma_o_dat = @ma_o_dat
+                  AND trang_thai_hop_dong NOT IN ('da_ket_thuc', 'da_huy')
+                  AND ngay_ket_thuc >= CAST(GETDATE() AS DATE)
+            `);
+
+        if (activeContractCheck.recordset.length > 0) {
+            await new sql.Request(transaction)
+                .input('ma_o_dat', sql.Int, parseInt(ma_o_dat, 10))
+                .query(`UPDATE ODat SET trang_thai = 'da_thue' WHERE ma_o_dat = @ma_o_dat AND trang_thai <> 'da_thue'`);
+
+            await transaction.rollback();
+            const activeContract = activeContractCheck.recordset[0];
+            return res.status(400).json({
+                success: false,
+                code: 'PLOT_HAS_ACTIVE_CONTRACT',
+                message: `Ô đất ${oDat.so_hieu_o} hiện đang có hợp đồng thuê (${activeContract.so_hop_dong}) còn hiệu lực đến ngày ${new Date(activeContract.ngay_ket_thuc).toLocaleDateString('vi-VN')}. Không thể tạo hợp đồng thuê mới đè lên.`
+            });
+        }
+
         if (oDat.trang_thai !== 'trong') {
             await transaction.rollback();
             return res.status(400).json({ success: false, message: 'Ô đất không còn trống, không thể tạo hợp đồng' });
@@ -443,28 +468,52 @@ const handoverHarvestDelivery = async (req, res) => {
 
         const maHopDong = result.recordset[0].ma_hop_dong;
 
-        // 1. Cập nhật hợp đồng thuê sang đã kết thúc & đã thu hoạch
-        const rentalReq = new sql.Request(transaction);
-        const rentalRes = await rentalReq
+        // 1. Kiểm tra hợp đồng thuê và ngày hết hạn
+        const checkContractReq = new sql.Request(transaction);
+        const contractRes = await checkContractReq
             .input('maHopDong', sql.Int, maHopDong)
             .query(`
+                SELECT h.ma_hop_dong, h.ma_o_dat, h.ma_nguoi_dung, h.so_hop_dong, h.ngay_ket_thuc, o.so_hieu_o
+                FROM HopDongThue h
+                JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+                WHERE h.ma_hop_dong = @maHopDong
+            `);
+
+        const rentalInfo = contractRes.recordset[0];
+        const isStillActive = rentalInfo && new Date(rentalInfo.ngay_ket_thuc) > new Date();
+
+        // Cập nhật hợp đồng thuê: Nếu còn hạn -> cho_chon_cay_moi và giữ hieu_luc. Nếu đã hết hạn -> da_thu_hoach và da_ket_thuc
+        const rentalReq = new sql.Request(transaction);
+        await rentalReq
+            .input('maHopDong', sql.Int, maHopDong)
+            .input('canhTac', sql.VarChar(30), isStillActive ? 'cho_chon_cay_moi' : 'da_thu_hoach')
+            .input('trangThaiHD', sql.VarChar(30), isStillActive ? 'hieu_luc' : 'da_ket_thuc')
+            .query(`
                 UPDATE HopDongThue
-                SET trang_thai_canh_tac = 'da_thu_hoach',
-                    trang_thai_hop_dong = 'da_ket_thuc'
-                OUTPUT INSERTED.ma_o_dat, INSERTED.ma_nguoi_dung, INSERTED.so_hop_dong
+                SET trang_thai_canh_tac = @canhTac,
+                    trang_thai_hop_dong = @trangThaiHD,
+                    ngay_cap_nhat = SYSDATETIME()
                 WHERE ma_hop_dong = @maHopDong
             `);
 
-        const rentalInfo = rentalRes.recordset[0];
-
         if (rentalInfo && rentalInfo.ma_o_dat) {
-            // 2. Giải phóng ô đất về trạng thái trống
+            // 2. Cập nhật Ô đất:
+            // - Nếu còn hạn thuê: Ô đất VẪN LÀ 'da_thue', trạng thái vụ mùa là 'cho_chon_cay_moi' (TUYỆT ĐỐI không giải phóng về 'trong')
+            // - Nếu đã hết hạn thuê: Giải phóng về 'trong' và trạng thái vụ mùa là 'san_sang'
             const plotReq = new sql.Request(transaction);
             await plotReq
                 .input('maODat', sql.Int, rentalInfo.ma_o_dat)
-                .query(`UPDATE ODat SET trang_thai = 'trong' WHERE ma_o_dat = @maODat`);
+                .input('plotStatus', sql.VarChar(30), isStillActive ? 'da_thue' : 'trong')
+                .input('seasonStatus', sql.VarChar(50), isStillActive ? 'cho_chon_cay_moi' : 'san_sang')
+                .query(`
+                    UPDATE ODat 
+                    SET trang_thai = @plotStatus,
+                        trang_thai_vu_mua = @seasonStatus,
+                        ngay_cap_nhat = SYSDATETIME() 
+                    WHERE ma_o_dat = @maODat
+                `);
 
-            // 3. Cập nhật trạng thái phân công nông dân hoàn thành
+            // 3. Cập nhật trạng thái phân công nông dân hoàn thành vụ mùa này
             const assignReq = new sql.Request(transaction);
             await assignReq
                 .input('maHopDong', sql.Int, maHopDong)
@@ -482,19 +531,24 @@ const handoverHarvestDelivery = async (req, res) => {
         // 5. Gửi thông báo cho khách hàng và Admin
         if (rentalInfo) {
             try {
-                await createNotification({
-                    ma_nguoi_dung: rentalInfo.ma_nguoi_dung,
-                    tieu_de: 'Nông sản của bạn đã được bàn giao',
-                    noi_dung: `Đơn thu hoạch cho hợp đồng ${rentalInfo.so_hop_dong} đã được bàn giao vận chuyển và ô đất đã hoàn tất mùa vụ.`,
-                    loai_thong_bao: 'giao_hang',
-                    duong_dan: '/user'
-                });
-                await notifyAdmins(
+                const notifContent = isStillActive
+                    ? `Đơn thu hoạch cho hợp đồng ${rentalInfo.so_hop_dong} (${rentalInfo.so_hieu_o}) đã hoàn tất bàn giao. Hợp đồng của bạn vẫn còn hạn thuê, bạn có thể chọn cây trồng mới cho vụ tiếp theo bất cứ lúc nào!`
+                    : `Đơn thu hoạch cho hợp đồng ${rentalInfo.so_hop_dong} (${rentalInfo.so_hieu_o}) đã được bàn giao vận chuyển và ô đất đã hoàn tất mùa vụ.`;
+
+                createNotification(
+                    rentalInfo.ma_nguoi_dung,
+                    'Nông sản của bạn đã được bàn giao',
+                    notifContent,
+                    'giao_hang',
+                    '/user'
+                ).catch(e => console.error('Lỗi thông báo KH:', e));
+
+                notifyAdmins(
                     'Thu hoạch & bàn giao hoàn tất',
-                    `Hợp đồng ${rentalInfo.so_hop_dong} đã hoàn tất thu hoạch và bàn giao vận chuyển. Ô đất đã được giải phóng thành công.`,
+                    `Hợp đồng ${rentalInfo.so_hop_dong} (${rentalInfo.so_hieu_o}) đã hoàn tất bàn giao vận chuyển. ${isStillActive ? 'Ô đất vẫn thuộc quyền thuê của user (chờ vụ mới).' : 'Ô đất đã được giải phóng về trạng thái trống.'}`,
                     'thu_hoach',
                     '/admin'
-                );
+                ).catch(e => console.error('Lỗi thông báo Admin:', e));
             } catch (notifErr) {
                 console.error('Lỗi gửi thông báo bàn giao thu hoạch:', notifErr);
             }
@@ -790,6 +844,180 @@ const extendRental = async (req, res) => {
     }
 };
 
+// Khởi tạo vụ mùa mới cho khách hàng cũ đang có hợp đồng còn hạn (Nhiệm vụ 24/09)
+const chooseNewCrop = async (req, res) => {
+    const pool = await getPool();
+    const transaction = new sql.Transaction(pool);
+
+    try {
+        const id = parseInt(req.params.id, 10);
+        const { ma_cay_trong, crop_id, yeu_cau_dac_biet } = req.body;
+        const newCropId = parseInt(ma_cay_trong || crop_id, 10);
+
+        if (!newCropId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Vui lòng chọn loại giống cây trồng cho vụ mùa mới'
+            });
+        }
+
+        await transaction.begin();
+
+        // 1. Kiểm tra hợp đồng thuê
+        const contractReq = new sql.Request(transaction);
+        const contractRes = await contractReq
+            .input('id', sql.Int, id)
+            .query(`
+                SELECT h.*, o.so_hieu_o, o.ten_o_dat, u.ho_va_ten AS ten_khach_hang
+                FROM HopDongThue h
+                JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+                JOIN NguoiDung u ON u.ma_nguoi_dung = h.ma_nguoi_dung
+                WHERE h.ma_hop_dong = @id
+            `);
+
+        const contract = contractRes.recordset[0];
+        if (!contract) {
+            await transaction.rollback();
+            return res.status(404).json({ success: false, message: 'Không tìm thấy hợp đồng thuê' });
+        }
+
+        if (contract.trang_thai_hop_dong === 'da_ket_thuc' || contract.trang_thai_hop_dong === 'da_huy') {
+            await transaction.rollback();
+            return res.status(400).json({ success: false, message: 'Hợp đồng đã kết thúc hoặc bị hủy, không thể trồng vụ mới' });
+        }
+
+        const now = new Date();
+        const endDate = new Date(contract.ngay_ket_thuc);
+        const remainingDays = Math.max(0, Math.ceil((endDate - now) / (1000 * 60 * 60 * 24)));
+
+        if (remainingDays <= 0) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'Hợp đồng thuê đất đã hết hạn. Vui lòng gia hạn thêm thời gian thuê trước khi chọn cây trồng vụ mới.'
+            });
+        }
+
+        // 2. Kiểm tra thông tin cây trồng mới
+        const cropReq = new sql.Request(transaction);
+        const cropRes = await cropReq
+            .input('cropId', sql.Int, newCropId)
+            .query(`SELECT ma_cay_trong, ten_cay_trong, thoi_gian_sinh_truong_ngay, hinh_anh_cay, gia_cay FROM CayTrong WHERE ma_cay_trong = @cropId`);
+
+        const crop = cropRes.recordset[0];
+        if (!crop) {
+            await transaction.rollback();
+            return res.status(404).json({ success: false, message: 'Không tìm thấy loại cây trồng đã chọn' });
+        }
+
+        // 3. So sánh thời gian sinh trưởng của cây mới với số ngày thuê còn lại
+        if (crop.thoi_gian_sinh_truong_ngay && crop.thoi_gian_sinh_truong_ngay > remainingDays) {
+            const suggestedReq = new sql.Request(transaction);
+            const suggestedCrops = await suggestedReq
+                .input('remainingDays', sql.Int, remainingDays)
+                .query(`
+                    SELECT ma_cay_trong, ten_cay_trong, thoi_gian_sinh_truong_ngay, hinh_anh_cay, gia_cay
+                    FROM CayTrong
+                    WHERE thoi_gian_sinh_truong_ngay <= @remainingDays
+                    ORDER BY thoi_gian_sinh_truong_ngay DESC
+                `);
+
+            await transaction.rollback();
+            const daysNeededMore = crop.thoi_gian_sinh_truong_ngay - remainingDays;
+            const monthsNeededMore = Math.ceil(daysNeededMore / 30);
+
+            return res.status(400).json({
+                success: false,
+                code: 'GROWTH_TIME_EXCEEDS_REMAINING_RENTAL',
+                message: `Cây "${crop.ten_cay_trong}" cần ${crop.thoi_gian_sinh_truong_ngay} ngày để sinh trưởng, nhưng thời hạn thuê của bạn chỉ còn ${remainingDays} ngày. Bạn cần gia hạn thêm tối thiểu ${monthsNeededMore} tháng hoặc chọn loại cây ngắn ngày hơn.`,
+                data: {
+                    crop_name: crop.ten_cay_trong,
+                    growth_days: crop.thoi_gian_sinh_truong_ngay,
+                    remaining_days: remainingDays,
+                    months_needed_more: monthsNeededMore,
+                    suggested_crops: suggestedCrops.recordset
+                }
+            });
+        }
+
+        // 4. Cập nhật hợp đồng: gắn ma_cay_trong mới và chuyển trang_thai_canh_tac = 'cho_gieo_trong'
+        const updateContractReq = new sql.Request(transaction);
+        await updateContractReq
+            .input('id', sql.Int, id)
+            .input('cropId', sql.Int, newCropId)
+            .input('yeuCau', sql.NVarChar(500), yeu_cau_dac_biet || contract.yeu_cau_dac_biet)
+            .query(`
+                UPDATE HopDongThue
+                SET ma_cay_trong = @cropId,
+                    trang_thai_canh_tac = 'cho_gieo_trong',
+                    yeu_cau_dac_biet = @yeuCau,
+                    ngay_cap_nhat = SYSDATETIME()
+                WHERE ma_hop_dong = @id
+            `);
+
+        // 5. Cập nhật trạng thái vụ mùa của Ô đất thành 'dang_canh_tac'
+        const updatePlotReq = new sql.Request(transaction);
+        await updatePlotReq
+            .input('plotId', sql.Int, contract.ma_o_dat)
+            .query(`
+                UPDATE ODat
+                SET trang_thai = 'da_thue',
+                    trang_thai_vu_mua = 'dang_canh_tac',
+                    ngay_cap_nhat = SYSDATETIME()
+                WHERE ma_o_dat = @plotId
+            `);
+
+        // 6. Reset hoặc tạo mới phân công nông dân để bắt đầu chăm sóc vụ mùa mới
+        const checkAssignReq = new sql.Request(transaction);
+        const assignCheck = await checkAssignReq
+            .input('contractId', sql.Int, id)
+            .query(`SELECT TOP 1 ma_phan_cong, ma_nong_dan FROM PhanCongNongDan WHERE ma_hop_dong = @contractId ORDER BY ma_phan_cong DESC`);
+
+        if (assignCheck.recordset.length > 0) {
+            const assign = assignCheck.recordset[0];
+            await new sql.Request(transaction)
+                .input('assignId', sql.Int, assign.ma_phan_cong)
+                .query(`UPDATE PhanCongNongDan SET trang_thai = 'dang_thuc_hien', ngay_cap_nhat = SYSDATETIME() WHERE ma_phan_cong = @assignId`);
+        }
+
+        await transaction.commit();
+
+        // 7. Gửi thông báo cho khách hàng và Admin
+        createNotification(
+            contract.ma_nguoi_dung,
+            'Khởi tạo vụ mùa mới thành công',
+            `Bạn đã chọn giống cây "${crop.ten_cay_trong}" cho chu kỳ canh tác mới trên ô đất ${contract.so_hieu_o}. Nông dân sẽ sớm bắt đầu gieo trồng!`,
+            'canh_tac',
+            '/user?tab=gardens'
+        ).catch(e => console.error('Lỗi thông báo KH:', e));
+
+        notifyAdmins(
+            `Vụ mùa mới trên ô đất ${contract.so_hieu_o}`,
+            `Khách hàng ${contract.ten_khach_hang} vừa chọn cây "${crop.ten_cay_trong}" cho chu kỳ canh tác tiếp theo trên ô đất ${contract.so_hieu_o} (Hợp đồng: ${contract.so_hop_dong}).`,
+            'canh_tac',
+            '/admin?tab=assignments'
+        ).catch(e => console.error('Lỗi thông báo Admin:', e));
+
+        return res.json({
+            success: true,
+            message: `Khởi tạo vụ mùa mới thành công! Đã chọn giống cây "${crop.ten_cay_trong}" cho ô đất ${contract.so_hieu_o}.`,
+            data: {
+                ma_hop_dong: contract.ma_hop_dong,
+                so_hop_dong: contract.so_hop_dong,
+                ma_cay_trong: crop.ma_cay_trong,
+                ten_cay_trong: crop.ten_cay_trong,
+                thoi_gian_sinh_truong_ngay: crop.thoi_gian_sinh_truong_ngay,
+                trang_thai_canh_tac: 'cho_gieo_trong',
+                so_ngay_thue_con_lai: remainingDays
+            }
+        });
+    } catch (error) {
+        try { await transaction.rollback(); } catch (rbErr) {}
+        console.error('Lỗi khi khởi tạo vụ mùa mới:', error);
+        return res.status(500).json({ success: false, message: 'Lỗi server khi khởi tạo vụ mùa mới' });
+    }
+};
+
 module.exports = {
     createRental,
     getAllRentals,
@@ -805,5 +1033,6 @@ module.exports = {
     chooseHarvestDelivery,
     handoverHarvestDelivery,
     generateVietQR,
-    extendRental
+    extendRental,
+    chooseNewCrop
 };
