@@ -1,0 +1,7 @@
+
+> plotfarm-backend@1.0.0 start
+> node src/server.js
+
+◇ injected env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+📖 Swagger Documentation đang chạy tại http://localhost:5000/api-docs

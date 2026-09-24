@@ -5,6 +5,7 @@ const formatPlot = (plot) => {
     const rawImage = plot.hinh_anh_o_dat || plot.image_url || plot.image || null;
     const posX = plot.position_x != null ? Number(plot.position_x) : 50.0;
     const posY = plot.position_y != null ? Number(plot.position_y) : 50.0;
+    const resolvedStatus = plot.trang_thai_hien_thi || plot.trang_thai;
 
     return {
         ...plot,
@@ -14,7 +15,7 @@ const formatPlot = (plot) => {
         name: plot.ten_o_dat,
         area: Number(plot.dien_tich_m2),
         price: Number(plot.gia_thue_thang),
-        status: plot.trang_thai,
+        status: resolvedStatus,
         season_status: plot.trang_thai_vu_mua || 'san_sang',
         trang_thai_vu_mua: plot.trang_thai_vu_mua || 'san_sang',
         soil: plot.loai_dat || 'Đất thịt phù sa giàu mùn',
@@ -35,24 +36,31 @@ const getAllPlots = async (req, res) => {
     try {
         const pool = await getPool();
         const result = await pool.request().query(`
-            SELECT o.ma_o_dat, o.ma_nong_trai, o.so_hieu_o, o.ten_o_dat, 
-                   o.dien_tich_m2, o.gia_thue_thang, 
-                   CASE 
-                       WHEN EXISTS (
-                           SELECT 1 FROM HopDongThue h 
-                           WHERE h.ma_o_dat = o.ma_o_dat 
-                             AND h.trang_thai_hop_dong NOT IN ('da_ket_thuc', 'da_huy')
-                             AND h.ngay_ket_thuc >= CAST(GETDATE() AS DATE)
-                       ) THEN 'da_thue'
-                       ELSE o.trang_thai 
-                   END AS trang_thai,
-                   ISNULL(o.trang_thai_vu_mua, 'san_sang') AS trang_thai_vu_mua,
-                   o.loai_dat,
-                   o.position_x, o.position_y, o.hinh_anh_o_dat, o.mo_ta_chi_tiet,
-                   n.ten_nong_trai, n.dia_chi AS dia_chi_nong_trai
-            FROM ODat o
-            LEFT JOIN NongTrai n ON n.ma_nong_trai = o.ma_nong_trai
-            ORDER BY o.so_hieu_o ASC
+            IF OBJECT_ID('dbo.HopDongThue', 'U') IS NULL
+            BEGIN
+                SELECT o.*, o.trang_thai AS trang_thai_hien_thi,
+                       n.ten_nong_trai, n.dia_chi AS dia_chi_nong_trai
+                FROM ODat o
+                LEFT JOIN NongTrai n ON n.ma_nong_trai = o.ma_nong_trai
+                ORDER BY o.so_hieu_o ASC;
+            END
+            ELSE
+            BEGIN
+                SELECT o.*,
+                       CASE 
+                           WHEN EXISTS (
+                               SELECT 1 FROM HopDongThue h 
+                               WHERE h.ma_o_dat = o.ma_o_dat 
+                                 AND h.trang_thai_hop_dong NOT IN ('da_ket_thuc', 'da_huy')
+                                 AND h.ngay_ket_thuc >= CAST(GETDATE() AS DATE)
+                           ) THEN 'da_thue'
+                           ELSE o.trang_thai 
+                       END AS trang_thai_hien_thi,
+                       n.ten_nong_trai, n.dia_chi AS dia_chi_nong_trai
+                FROM ODat o
+                LEFT JOIN NongTrai n ON n.ma_nong_trai = o.ma_nong_trai
+                ORDER BY o.so_hieu_o ASC;
+            END
         `);
         
         const formatted = result.recordset.map(formatPlot);
@@ -74,21 +82,28 @@ const getAvailablePlots = async (req, res) => {
     try {
         const pool = await getPool();
         const result = await pool.request().query(`
-            SELECT o.ma_o_dat, o.ma_nong_trai, o.so_hieu_o, o.ten_o_dat, 
-                   o.dien_tich_m2, o.gia_thue_thang, o.trang_thai,
-                   ISNULL(o.trang_thai_vu_mua, 'san_sang') AS trang_thai_vu_mua,
-                   o.loai_dat, o.position_x, o.position_y, o.hinh_anh_o_dat, o.mo_ta_chi_tiet,
-                   n.ten_nong_trai, n.dia_chi AS dia_chi_nong_trai
-            FROM ODat o
-            LEFT JOIN NongTrai n ON n.ma_nong_trai = o.ma_nong_trai
-            WHERE o.trang_thai = 'trong'
-              AND NOT EXISTS (
-                  SELECT 1 FROM HopDongThue h 
-                  WHERE h.ma_o_dat = o.ma_o_dat 
-                    AND h.trang_thai_hop_dong NOT IN ('da_ket_thuc', 'da_huy')
-                    AND h.ngay_ket_thuc >= CAST(GETDATE() AS DATE)
-              )
-            ORDER BY o.so_hieu_o ASC
+                        IF OBJECT_ID('dbo.HopDongThue', 'U') IS NULL
+                        BEGIN
+                                SELECT o.*, n.ten_nong_trai, n.dia_chi AS dia_chi_nong_trai
+                                FROM ODat o
+                                LEFT JOIN NongTrai n ON n.ma_nong_trai = o.ma_nong_trai
+                                WHERE o.trang_thai = 'trong'
+                                ORDER BY o.so_hieu_o ASC;
+                        END
+                        ELSE
+                        BEGIN
+                                SELECT o.*, n.ten_nong_trai, n.dia_chi AS dia_chi_nong_trai
+                                FROM ODat o
+                                LEFT JOIN NongTrai n ON n.ma_nong_trai = o.ma_nong_trai
+                                WHERE o.trang_thai = 'trong'
+                                    AND NOT EXISTS (
+                                            SELECT 1 FROM HopDongThue h 
+                                            WHERE h.ma_o_dat = o.ma_o_dat 
+                                                AND h.trang_thai_hop_dong NOT IN ('da_ket_thuc', 'da_huy')
+                                                AND h.ngay_ket_thuc >= CAST(GETDATE() AS DATE)
+                                    )
+                                ORDER BY o.so_hieu_o ASC;
+                        END
         `);
         
         const formatted = result.recordset.map(formatPlot);
