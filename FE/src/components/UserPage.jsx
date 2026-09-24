@@ -7,7 +7,7 @@ import {
   createServiceRequest,
   getCrops,
   getJournalsByRental,
-  getPlots,
+  getAvailablePlots,
   getServiceTypes,
   getUserRentals,
   getUserServiceRequests,
@@ -167,7 +167,7 @@ function UserPage({ user, token, onLogout }) {
   useEffect(() => {
     Promise.all([
       getUserRentals(user.id, token),
-      getPlots(),
+      getAvailablePlots(token),
       getCrops(),
       getServiceTypes(),
       getUserServiceRequests(user.id, token),
@@ -200,9 +200,7 @@ function UserPage({ user, token, onLogout }) {
           setSelectedHarvestRental(
             String(readyRental?.ma_hop_dong || nextRentals[0]?.ma_hop_dong || ""),
           );
-          setAvailablePlots(
-            nextPlots.filter((plot) => plot.status === "trong"),
-          );
+          setAvailablePlots(nextPlots);
           setCrops(nextCrops);
           setServiceTypes(nextServiceTypes);
           setServiceRequests(nextServiceRequests);

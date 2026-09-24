@@ -18,6 +18,7 @@ const labels = {
     trong: "Trống",
     dang_chon: "Đang chọn",
     da_thue: "Đã thuê",
+    da_thue_cho_vu_moi: "Đang thuê (Chờ trồng vụ mới)",
     bao_tri: "Bảo trì",
   },
   requestStatus: {
@@ -537,7 +538,7 @@ function Plots({ items, editingPlot, setEditingPlot, onSubmit, onCancel, onDelet
                 </small>
               </div>
               <span className="status-pill">
-                {labels.plotStatus[item.status] || item.status}
+                {labels.plotStatus[item.displayStatus] || labels.plotStatus[item.status] || item.status}
               </span>
               <div className="admin-plot-actions">
                 <button
@@ -649,7 +650,12 @@ function Plots({ items, editingPlot, setEditingPlot, onSubmit, onCancel, onDelet
 }
 
 function AssignmentPanel({ items, farmers, assignments, onAssign }) {
-  const activeItems = items.filter((item) => item.status === "hieu_luc");
+  const activeItems = items.filter(
+    (item) => item.status === "hieu_luc" && item.cultivationStatus !== "cho_chon_cay_moi",
+  );
+  const waitingNewSeasonItems = items.filter(
+    (item) => item.status === "hieu_luc" && item.cultivationStatus === "cho_chon_cay_moi",
+  );
   const [selectedContract, setSelectedContract] = useState("");
   const [selectedFarmer, setSelectedFarmer] = useState("");
   const currentAssignment = assignments.find(
@@ -681,6 +687,11 @@ function AssignmentPanel({ items, farmers, assignments, onAssign }) {
           Chọn ô đất đang có hợp đồng hiệu lực, sau đó gán một nông dân đang
           hoạt động.
         </p>
+        {waitingNewSeasonItems.length > 0 && (
+          <p className="assignment-current">
+            {waitingNewSeasonItems.length} ô đang thuê chờ khách chọn giống vụ mới; các ô này tạm thời không thể phân công.
+          </p>
+        )}
         <form className="admin-form" onSubmit={submit}>
           <label>
             {" "}
@@ -846,7 +857,9 @@ function Rentals({ items, assignments }) {
                           : {}
                       }
                     >
-                      {assignment ? (labels.assignmentStatus[assignment.trang_thai] || assignment.trang_thai) : "Chưa phân công"}
+                      {item.cultivationStatus === "cho_chon_cay_moi"
+                        ? "Đang thuê (Chờ trồng vụ mới)"
+                        : assignment ? (labels.assignmentStatus[assignment.trang_thai] || assignment.trang_thai) : "Chưa phân công"}
                     </span>
                     {assignment?.trang_thai === "tu_choi" && assignment.ly_do_tu_choi && (
                       <div style={{ fontSize: "11px", color: "#c94a4a", marginTop: "3px" }}>

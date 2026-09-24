@@ -71,6 +71,8 @@ const formatAdminPlot = (row) => {
         area: Number(row.dien_tich_m2 != null ? row.dien_tich_m2 : row.area),
         price: Number(row.gia_thue_thang != null ? row.gia_thue_thang : row.price),
         status: row.trang_thai || row.status,
+        displayStatus: row.trang_thai_hien_thi || row.trang_thai || row.status,
+        cultivationStatus: row.trang_thai_canh_tac || null,
         image: rawImage,
         image_url: rawImage,
         hinh_anh_o_dat: rawImage,
@@ -86,11 +88,25 @@ const plots = async (req, res) => {
     try {
         const pool = await getPool();
         const result = await pool.request().query(`
-            SELECT ma_o_dat, ma_nong_trai, so_hieu_o, ten_o_dat, 
-                   dien_tich_m2, gia_thue_thang, trang_thai, 
+            SELECT o.ma_o_dat, o.ma_nong_trai, o.so_hieu_o, o.ten_o_dat,
+                   o.dien_tich_m2, o.gia_thue_thang, o.trang_thai,
+                   CASE
+                       WHEN h.ma_hop_dong IS NOT NULL AND h.trang_thai_canh_tac = 'cho_chon_cay_moi'
+                           THEN 'da_thue_cho_vu_moi'
+                       WHEN h.ma_hop_dong IS NOT NULL THEN 'da_thue'
+                       ELSE o.trang_thai
+                   END AS trang_thai_hien_thi,
+                   h.trang_thai_canh_tac,
                    hinh_anh_o_dat, position_x, position_y, mo_ta_chi_tiet 
-            FROM ODat 
-            ORDER BY so_hieu_o
+            FROM ODat o
+            OUTER APPLY (
+                SELECT TOP 1 ma_hop_dong, trang_thai_canh_tac
+                FROM HopDongThue h
+                WHERE h.ma_o_dat = o.ma_o_dat AND h.trang_thai_hop_dong = 'hieu_luc'
+                      AND h.ngay_ket_thuc >= CAST(GETDATE() AS DATE)
+                ORDER BY h.ngay_ket_thuc DESC
+            ) h
+            ORDER BY o.so_hieu_o
         `);
         const formatted = result.recordset.map(formatAdminPlot);
         return res.json({ success: true, data: formatted });
@@ -230,6 +246,7 @@ const rentals = async (req, res) => {
         const result = await pool.request().query(`
             SELECT h.ma_hop_dong AS id, h.so_hop_dong AS code, h.tong_tien AS total,
                    h.trang_thai_hop_dong AS status, h.trang_thai_thanh_toan AS paymentStatus,
+                   h.trang_thai_canh_tac AS cultivationStatus,
                    h.ngay_tao AS createdAt, u.ho_va_ten AS customer, o.so_hieu_o AS plot
             FROM HopDongThue h JOIN NguoiDung u ON u.ma_nguoi_dung = h.ma_nguoi_dung
             JOIN ODat o ON o.ma_o_dat = h.ma_o_dat ORDER BY h.ngay_tao DESC
