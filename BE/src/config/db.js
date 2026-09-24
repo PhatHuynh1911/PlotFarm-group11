@@ -191,23 +191,52 @@ const connectDB = async () => {
                 DROP TABLE dbo.GiaoHang;
             END
 
-            -- Tự sửa dữ liệu lệch: hợp đồng đã bàn giao (GiaoNhanThuHoach.trang_thai = 'da_ban_giao_van_chuyen')
-            -- nhưng HopDongThue/ODat/PhanCongNongDan/ThuHoach chưa được đóng mùa vụ tương ứng.
+            -- Bổ sung cột trang_thai_vu_mua vào ODat nếu chưa có
+            IF COL_LENGTH('dbo.ODat', 'trang_thai_vu_mua') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ODat ADD trang_thai_vu_mua VARCHAR(50) NOT NULL CONSTRAINT DF_ODat_TrangThaiVuMua DEFAULT 'san_sang';
+            END
+
+            -- Tự sửa dữ liệu lệch: phân tách rõ Trạng thái Ô đất vs Hợp đồng thuê
             IF OBJECT_ID('dbo.GiaoNhanThuHoach', 'U') IS NOT NULL
             BEGIN
+                -- 1. Nếu hợp đồng đã hoàn tất giao hàng NHƯNG ĐÃ HẾT HẠN THUÊ (ngay_ket_thuc <= ngày hiện tại)
+                -- => Kết thúc hợp đồng và giải phóng ô đất về 'trong'
                 UPDATE h
                 SET h.trang_thai_canh_tac = 'da_thu_hoach', h.trang_thai_hop_dong = 'da_ket_thuc'
                 FROM dbo.HopDongThue h
                 INNER JOIN dbo.GiaoNhanThuHoach g ON g.ma_hop_dong = h.ma_hop_dong
                 WHERE g.trang_thai = 'da_ban_giao_van_chuyen'
+                  AND h.ngay_ket_thuc <= CAST(SYSDATETIME() AS DATE)
                   AND (h.trang_thai_canh_tac <> 'da_thu_hoach' OR h.trang_thai_hop_dong <> 'da_ket_thuc');
 
                 UPDATE o
-                SET o.trang_thai = 'trong'
+                SET o.trang_thai = 'trong', o.trang_thai_vu_mua = 'san_sang'
+                FROM dbo.ODat o
+                WHERE o.trang_thai <> 'trong'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM dbo.HopDongThue h2 
+                      WHERE h2.ma_o_dat = o.ma_o_dat 
+                        AND h2.trang_thai_hop_dong NOT IN ('da_ket_thuc', 'da_huy')
+                        AND h2.ngay_ket_thuc > CAST(SYSDATETIME() AS DATE)
+                  );
+
+                -- 2. Nếu hợp đồng đã hoàn tất giao hàng NHƯNG VẪN CÒN HẠN THUÊ (ngay_ket_thuc > ngày hiện tại)
+                -- => Giữ nguyên hợp đồng có hiệu lực, ô đất vẫn 'da_thue' và chuyển vụ mùa sang 'cho_chon_cay_moi'
+                UPDATE h
+                SET h.trang_thai_canh_tac = 'cho_chon_cay_moi', h.trang_thai_hop_dong = 'hieu_luc'
+                FROM dbo.HopDongThue h
+                INNER JOIN dbo.GiaoNhanThuHoach g ON g.ma_hop_dong = h.ma_hop_dong
+                WHERE g.trang_thai = 'da_ban_giao_van_chuyen'
+                  AND h.ngay_ket_thuc > CAST(SYSDATETIME() AS DATE)
+                  AND h.trang_thai_hop_dong = 'da_ket_thuc';
+
+                UPDATE o
+                SET o.trang_thai = 'da_thue', o.trang_thai_vu_mua = 'cho_chon_cay_moi'
                 FROM dbo.ODat o
                 INNER JOIN dbo.HopDongThue h ON h.ma_o_dat = o.ma_o_dat
-                INNER JOIN dbo.GiaoNhanThuHoach g ON g.ma_hop_dong = h.ma_hop_dong
-                WHERE g.trang_thai = 'da_ban_giao_van_chuyen' AND o.trang_thai <> 'trong';
+                WHERE h.trang_thai_hop_dong NOT IN ('da_ket_thuc', 'da_huy')
+                  AND h.ngay_ket_thuc > CAST(SYSDATETIME() AS DATE);
 
                 IF OBJECT_ID('dbo.PhanCongNongDan', 'U') IS NOT NULL
                 BEGIN

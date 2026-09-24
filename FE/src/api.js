@@ -267,3 +267,16 @@ export async function extendRental(rentalId, payload, token) {
   })
 }
 
+export async function getAvailablePlots(token) {
+  const result = await apiRequest('/plots/available-plots', { token })
+  return (result.data || []).map(normalizePlot)
+}
+
+export async function chooseNewCrop(rentalId, payload, token) {
+  return apiRequest(`/rentals/${rentalId}/chon-cay-moi`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    token,
+  })
+}
+
