@@ -169,6 +169,8 @@ const connectDB = async () => {
 
             -- Dọn dẹp các bảng thừa trùng chức năng (Nhiệm vụ 22/09)
             -- 1. Xóa khóa ngoại tới DanhMucCayTrong nếu còn
+            -- Không chạy thao tác xóa dữ liệu khi khởi động server.
+            IF 1 = 0 BEGIN
             DECLARE @fk_dm NVARCHAR(256);
             SELECT @fk_dm = fk.name 
             FROM sys.foreign_keys fk
@@ -189,6 +191,7 @@ const connectDB = async () => {
             IF OBJECT_ID('dbo.GiaoHang', 'U') IS NOT NULL
             BEGIN
                 DROP TABLE dbo.GiaoHang;
+            END
             END
 
             -- Bổ sung cột trang_thai_vu_mua vào ODat nếu chưa có
