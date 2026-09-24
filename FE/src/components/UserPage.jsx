@@ -317,6 +317,7 @@ function UserPage({ user, token, onLogout }) {
         setRentals(await getUserRentals(user.id, token));
         if (response.data?.payment_info) {
           setActivePaymentModal({
+            ma_hop_dong: contractInfo.ma_hop_dong,
             so_hop_dong: `${contractInfo.so_hop_dong} (Gia hạn)`,
             tong_tien: response.data.chi_phi_gia_han,
             payment_info: response.data.payment_info,

@@ -67,7 +67,8 @@ const createRental = async (req, res) => {
                 const altCropsReq = await new sql.Request(transaction)
                     .input('maxDays', sql.Int, rentalDays)
                     .query(`
-                        SELECT ma_cay_trong, ten_cay_trong, thoi_gian_sinh_truong_ngay, hinh_anh_cay, gia_cay, do_kho
+                        SELECT ma_cay_trong, ten_cay_trong, thoi_gian_sinh_truong_ngay,
+                               hinh_anh_cay, do_kho_cham_soc
                         FROM CayTrong 
                         WHERE thoi_gian_sinh_truong_ngay <= @maxDays
                         ORDER BY thoi_gian_sinh_truong_ngay DESC
@@ -517,13 +518,16 @@ const handoverHarvestDelivery = async (req, res) => {
             const assignReq = new sql.Request(transaction);
             await assignReq
                 .input('maHopDong', sql.Int, maHopDong)
-                .query(`UPDATE PhanCongNongDan SET trang_thai = 'hoan_thanh' WHERE ma_hop_dong = @maHopDong`);
+                .query(`UPDATE PhanCongNongDan SET trang_thai = 'hoan_thanh' WHERE ma_hop_dong = @maHopDong AND trang_thai = 'da_chap_nhan'`);
 
             // 4. Cập nhật ThuHoach nếu có bản ghi
             const harvestReq = new sql.Request(transaction);
             await harvestReq
                 .input('maHopDong', sql.Int, maHopDong)
-                .query(`UPDATE ThuHoach SET trang_thai = 'da_thu_hoach' WHERE ma_hop_dong = @maHopDong`);
+                .query(`
+                    IF OBJECT_ID('dbo.ThuHoach', 'U') IS NOT NULL
+                        UPDATE ThuHoach SET trang_thai = 'da_thu_hoach' WHERE ma_hop_dong = @maHopDong;
+                `);
         }
 
         await transaction.commit();
@@ -739,12 +743,13 @@ const extendRental = async (req, res) => {
         const checkReq = new sql.Request(transaction);
         const contractRes = await checkReq
             .input('id', sql.Int, id)
+            .input('userId', sql.Int, Number(req.user.sub))
             .query(`
                 SELECT h.*, o.so_hieu_o, o.ten_o_dat, o.gia_thue_thang, u.ho_va_ten AS ten_khach_hang, u.email AS email_khach_hang
                 FROM HopDongThue h
                 JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
                 JOIN NguoiDung u ON u.ma_nguoi_dung = h.ma_nguoi_dung
-                WHERE h.ma_hop_dong = @id
+                WHERE h.ma_hop_dong = @id AND h.ma_nguoi_dung = @userId
             `);
 
         const contract = contractRes.recordset[0];
