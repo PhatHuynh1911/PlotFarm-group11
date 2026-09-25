@@ -15,7 +15,9 @@ const {
     chooseHarvestDelivery,
     handoverHarvestDelivery,
     extendRental,
-    chooseNewCrop
+    chooseNewCrop,
+    cancelRental,
+    expirePendingRentals
 } = require('../controllers/rentalController');
 const {
     readyToHarvest,

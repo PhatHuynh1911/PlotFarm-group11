@@ -198,6 +198,7 @@ const createRental = async (req, res) => {
 // Lấy danh sách tất cả hợp đồng thuê đất
 const getAllRentals = async (req, res) => {
     try {
+        await autoExpirePendingRentalsHelper(30).catch(() => {});
         const pool = await getPool();
         const result = await pool.request().query(`
             SELECT h.*, u.ho_va_ten AS ten_khach_hang, u.email AS email_khach_hang,
@@ -223,6 +224,7 @@ const getAllRentals = async (req, res) => {
 // Lấy danh sách hợp đồng của người dùng
 const getRentalsByUser = async (req, res) => {
     try {
+        await autoExpirePendingRentalsHelper(30).catch(() => {});
         const pool = await getPool();
         const targetUserId = req.user?.role === 'khach_hang' ? req.user.sub : (req.params.userId || req.user?.sub);
         const result = await pool.request()
@@ -1030,6 +1032,232 @@ const chooseNewCrop = async (req, res) => {
     }
 };
 
+// Tự động quét và giải phóng các hợp đồng quá hạn thanh toán
+const autoExpirePendingRentalsHelper = async (timeoutMinutes = 30) => {
+    try {
+        const pool = await getPool();
+        const expiredCheck = await pool.request()
+            .input('timeout', sql.Int, timeoutMinutes)
+            .query(`
+                SELECT h.ma_hop_dong, h.so_hop_dong, h.ma_o_dat, h.ma_nguoi_dung, o.so_hieu_o, o.ten_o_dat
+                FROM HopDongThue h
+                JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+                WHERE h.trang_thai_thanh_toan = 'cho_thanh_toan'
+                  AND h.trang_thai_hop_dong = 'cho_thanh_toan'
+                  AND DATEDIFF(minute, h.ngay_tao, SYSDATETIME()) >= @timeout
+            `);
+
+        const expiredList = expiredCheck.recordset;
+        if (!expiredList || expiredList.length === 0) {
+            return [];
+        }
+
+        for (const item of expiredList) {
+            const trans = new sql.Transaction(pool);
+            try {
+                await trans.begin();
+                await new sql.Request(trans)
+                    .input('id', sql.Int, item.ma_hop_dong)
+                    .query(`
+                        UPDATE HopDongThue
+                        SET trang_thai_hop_dong = 'da_huy',
+                            trang_thai_thanh_toan = 'da_huy',
+                            ngay_cap_nhat = SYSDATETIME()
+                        WHERE ma_hop_dong = @id
+                    `);
+
+                const activeCheck = await new sql.Request(trans)
+                    .input('plotId', sql.Int, item.ma_o_dat)
+                    .input('currentId', sql.Int, item.ma_hop_dong)
+                    .query(`
+                        SELECT COUNT(*) AS active_count
+                        FROM HopDongThue
+                        WHERE ma_o_dat = @plotId
+                          AND ma_hop_dong <> @currentId
+                          AND trang_thai_hop_dong NOT IN ('da_ket_thuc', 'da_huy')
+                    `);
+
+                if (activeCheck.recordset[0]?.active_count === 0) {
+                    await new sql.Request(trans)
+                        .input('plotId', sql.Int, item.ma_o_dat)
+                        .query(`
+                            UPDATE ODat
+                            SET trang_thai = 'trong',
+                                trang_thai_vu_mua = 'san_sang',
+                                ngay_cap_nhat = SYSDATETIME()
+                            WHERE ma_o_dat = @plotId
+                        `);
+                }
+                await trans.commit();
+
+                createNotification(
+                    item.ma_nguoi_dung,
+                    `Đơn thuê ô đất ${item.so_hieu_o} đã hết hạn`,
+                    `Đơn đặt thuê ô đất ${item.so_hieu_o} (${item.so_hop_dong}) đã bị hủy tự động do quá thời hạn thanh toán ${timeoutMinutes} phút. Ô đất đã được giải phóng.`,
+                    'thue_dat',
+                    '/user?tab=gardens'
+                ).catch(() => {});
+            } catch (err) {
+                try { await trans.rollback(); } catch (_) {}
+                console.error(`Lỗi giải phóng hợp đồng treo #${item.ma_hop_dong}:`, err);
+            }
+        }
+
+        return expiredList;
+    } catch (err) {
+        console.error('Lỗi khi tự động hủy đơn treo quá hạn:', err);
+        return [];
+    }
+};
+
+// API Hủy đơn đặt thuê đất từ phía người dùng hoặc Admin
+const cancelRental = async (req, res) => {
+    const pool = await getPool();
+    const transaction = new sql.Transaction(pool);
+
+    try {
+        const id = parseInt(req.params.id, 10);
+        if (isNaN(id)) {
+            return res.status(400).json({ success: false, message: 'Mã hợp đồng không hợp lệ' });
+        }
+
+        await transaction.begin();
+
+        const rentalCheck = await new sql.Request(transaction)
+            .input('id', sql.Int, id)
+            .query(`
+                SELECT h.ma_hop_dong, h.so_hop_dong, h.ma_nguoi_dung, h.ma_o_dat,
+                       h.trang_thai_thanh_toan, h.trang_thai_hop_dong,
+                       o.so_hieu_o, o.ten_o_dat, u.ho_va_ten AS ten_khach_hang
+                FROM HopDongThue h
+                JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+                JOIN NguoiDung u ON u.ma_nguoi_dung = h.ma_nguoi_dung
+                WHERE h.ma_hop_dong = @id
+            `);
+
+        const rental = rentalCheck.recordset[0];
+        if (!rental) {
+            await transaction.rollback();
+            return res.status(404).json({ success: false, message: 'Không tìm thấy hợp đồng thuê' });
+        }
+
+        // Kiểm tra quyền: chỉ chủ hợp đồng hoặc admin/quản trị viên mới được hủy
+        if (req.user?.sub) {
+            const isOwner = Number(req.user.sub) === Number(rental.ma_nguoi_dung);
+            const isAdmin = ['quan_tri_vien', 'admin'].includes(req.user.role || req.user.vai_tro);
+            if (!isOwner && !isAdmin) {
+                await transaction.rollback();
+                return res.status(403).json({ success: false, message: 'Bạn không có quyền hủy hợp đồng này' });
+            }
+        }
+
+        if (rental.trang_thai_hop_dong === 'da_huy') {
+            await transaction.rollback();
+            return res.status(400).json({ success: false, message: 'Hợp đồng này đã bị hủy trước đó' });
+        }
+
+        // Không cho phép tự hủy nếu đã thanh toán (trừ khi là admin)
+        const isAdmin = ['quan_tri_vien', 'admin'].includes(req.user?.role || req.user?.vai_tro);
+        if (rental.trang_thai_thanh_toan === 'da_thanh_toan' && !isAdmin) {
+            await transaction.rollback();
+            return res.status(400).json({
+                success: false,
+                message: 'Hợp đồng đã được thanh toán và kích hoạt, không thể tự hủy. Vui lòng gửi khiếu nại hoặc liên hệ Ban quản trị PlotFarm để được hỗ trợ hoàn tiền.'
+            });
+        }
+
+        // 1. Cập nhật trạng thái hợp đồng sang 'da_huy'
+        await new sql.Request(transaction)
+            .input('id', sql.Int, id)
+            .query(`
+                UPDATE HopDongThue
+                SET trang_thai_hop_dong = 'da_huy',
+                    trang_thai_thanh_toan = 'da_huy',
+                    ngay_cap_nhat = SYSDATETIME()
+                WHERE ma_hop_dong = @id
+            `);
+
+        // 2. Kiểm tra xem ô đất còn hợp đồng nào khác đang có hiệu lực không
+        const activeCheck = await new sql.Request(transaction)
+            .input('plotId', sql.Int, rental.ma_o_dat)
+            .input('currentId', sql.Int, id)
+            .query(`
+                SELECT COUNT(*) AS active_count
+                FROM HopDongThue
+                WHERE ma_o_dat = @plotId
+                  AND ma_hop_dong <> @currentId
+                  AND trang_thai_hop_dong NOT IN ('da_ket_thuc', 'da_huy')
+            `);
+
+        let plotReleased = false;
+        if (activeCheck.recordset[0]?.active_count === 0) {
+            await new sql.Request(transaction)
+                .input('plotId', sql.Int, rental.ma_o_dat)
+                .query(`
+                    UPDATE ODat
+                    SET trang_thai = 'trong',
+                        trang_thai_vu_mua = 'san_sang',
+                        ngay_cap_nhat = SYSDATETIME()
+                    WHERE ma_o_dat = @plotId
+                `);
+            plotReleased = true;
+        }
+
+        await transaction.commit();
+
+        // 3. Gửi thông báo cho khách hàng và Admin
+        createNotification(
+            rental.ma_nguoi_dung,
+            `Hủy đơn thuê ô ${rental.so_hieu_o} thành công`,
+            `Đơn đặt thuê ô đất ${rental.so_hieu_o} (Mã HĐ: ${rental.so_hop_dong}) đã được hủy thành công. Ô đất đã được giải phóng.`,
+            'thue_dat',
+            '/user?tab=gardens'
+        ).catch(() => {});
+
+        notifyAdmins(
+            `Đơn thuê ô đất ${rental.so_hieu_o} đã bị hủy`,
+            `Hợp đồng ${rental.so_hop_dong} (Khách hàng: ${rental.ten_khach_hang}) đã được hủy. Trạng thái ô đất đã được đưa về trống.`,
+            'thue_dat',
+            '/admin?tab=rentals'
+        ).catch(() => {});
+
+        return res.json({
+            success: true,
+            message: `Hủy đơn thuê đất thành công! Ô đất ${rental.so_hieu_o} đã được giải phóng.`,
+            data: {
+                ma_hop_dong: rental.ma_hop_dong,
+                so_hop_dong: rental.so_hop_dong,
+                so_hieu_o: rental.so_hieu_o,
+                trang_thai_hop_dong: 'da_huy',
+                trang_thai_thanh_toan: 'da_huy',
+                plot_released: plotReleased
+            }
+        });
+    } catch (error) {
+        try { await transaction.rollback(); } catch (_) {}
+        console.error('Lỗi khi hủy đơn thuê đất:', error);
+        return res.status(500).json({ success: false, message: 'Lỗi server khi hủy đơn thuê đất' });
+    }
+};
+
+// API kích hoạt thủ công việc quét và hủy các đơn treo quá hạn
+const expirePendingRentals = async (req, res) => {
+    try {
+        const timeoutMinutes = parseInt(req.body?.timeoutMinutes || req.query?.minutes || 30, 10);
+        const expiredList = await autoExpirePendingRentalsHelper(timeoutMinutes);
+
+        return res.json({
+            success: true,
+            message: `Đã quét và xử lý hủy tự động ${expiredList.length} đơn đặt thuê treo quá hạn (${timeoutMinutes} phút).`,
+            count: expiredList.length,
+            data: expiredList
+        });
+    } catch (error) {
+        console.error('Lỗi khi quét đơn treo quá hạn:', error);
+        return res.status(500).json({ success: false, message: 'Lỗi server khi quét đơn thuê quá hạn' });
+    }
+};
+
 module.exports = {
     createRental,
     getAllRentals,
@@ -1046,5 +1274,8 @@ module.exports = {
     handoverHarvestDelivery,
     generateVietQR,
     extendRental,
-    chooseNewCrop
+    chooseNewCrop,
+    cancelRental,
+    expirePendingRentals,
+    autoExpirePendingRentalsHelper
 };

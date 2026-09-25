@@ -61,6 +61,14 @@ const connectDB = async () => {
             END
         `);
 
+        // Bổ sung cột trang_thai_vu_mua vào ODat nếu chưa có (batch riêng vì được tham chiếu ở batch sau).
+        await activePool.request().query(`
+            IF COL_LENGTH('dbo.ODat', 'trang_thai_vu_mua') IS NULL
+            BEGIN
+                ALTER TABLE dbo.ODat ADD trang_thai_vu_mua VARCHAR(50) NOT NULL CONSTRAINT DF_ODat_TrangThaiVuMua DEFAULT 'san_sang';
+            END
+        `);
+
         // Chạy ở batch mới: SQL Server chỉ nhận diện cột vừa ALTER sau khi batch trước hoàn tất.
         await activePool.request().query(`
             UPDATE dbo.ODat
@@ -192,12 +200,6 @@ const connectDB = async () => {
             BEGIN
                 DROP TABLE dbo.GiaoHang;
             END
-            END
-
-            -- Bổ sung cột trang_thai_vu_mua vào ODat nếu chưa có
-            IF COL_LENGTH('dbo.ODat', 'trang_thai_vu_mua') IS NULL
-            BEGIN
-                ALTER TABLE dbo.ODat ADD trang_thai_vu_mua VARCHAR(50) NOT NULL CONSTRAINT DF_ODat_TrangThaiVuMua DEFAULT 'san_sang';
             END
 
             -- Tự sửa dữ liệu lệch: phân tách rõ Trạng thái Ô đất vs Hợp đồng thuê
