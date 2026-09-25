@@ -13,7 +13,6 @@ import {
   getUserServiceRequests,
   getUserComplaints,
   submitComplaint,
-  registerHarvestDelivery,
   PLOT_PLACEHOLDER_IMAGE,
   resolveImageUrl,
   updateCurrentUser,
@@ -475,39 +474,6 @@ function UserPage({ user, token, onLogout }) {
       showNotice("Đã gửi khiếu nại tới Admin. Chúng tôi sẽ xử lý sớm.");
     } catch (requestError) {
       setError(requestError.message);
-    }
-  };
-
-  const submitHarvestDelivery = async (event) => {
-    event.preventDefault();
-    if (!selectedHarvestRental) {
-      notify("Vui lòng chọn ô đất cần đăng ký nhận nông sản", "error");
-      return;
-    }
-    setHarvestSubmitting(true);
-    try {
-      await registerHarvestDelivery(
-        {
-          rentalId: selectedHarvestRental,
-          hinh_thuc_nhan_hang: shippingMethod,
-          ten_nguoi_nhan: harvestRecipientName || user.name,
-          so_dien_thoai_nguoi_nhan: harvestRecipientPhone || user.phone || "",
-          dia_chi_giao_hang: harvestAddress,
-          tinh_thanh: harvestProvince,
-          quan_huyen: harvestDistrict,
-        },
-        token,
-      );
-      setHarvestSent(true);
-      showNotice("Đăng ký hình thức nhận nông sản thành công!");
-      notify(
-        "Đăng ký nhận nông sản thành công! Nông trại sẽ chuẩn bị bàn giao theo yêu cầu của bạn.",
-      );
-    } catch (err) {
-      setError(err.message || "Không thể đăng ký nhận nông sản");
-      notify(err.message || "Không thể đăng ký nhận nông sản", "error");
-    } finally {
-      setHarvestSubmitting(false);
     }
   };
 
@@ -2025,16 +1991,6 @@ function UserPage({ user, token, onLogout }) {
                     dia_chi_nhan: fullAddress,
                     ghi_chu_khach: harvestForm.note,
                   }, token);
-                  registerHarvestDelivery({
-                    rentalId: selected.ma_hop_dong,
-                    hinh_thuc_nhan_hang: shippingMethod,
-                    ten_nguoi_nhan: harvestForm.name,
-                    so_dien_thoai_nguoi_nhan: harvestForm.phone,
-                    dia_chi_giao_hang: harvestForm.address,
-                    tinh_thanh: harvestProvince,
-                    quan_huyen: harvestDistrict,
-                    ghi_chu: harvestForm.note,
-                  }, token).catch(() => {});
                   setHarvestDeliveries((items) => items.map((item) => item.ma_hop_dong === selected.ma_hop_dong ? { ...item, trang_thai: "cho_thu_hoach_dong_goi" } : item));
                   notify("Đã gửi yêu cầu đóng gói và giao hàng tới Farmer.");
                 } catch (harvestError) {
