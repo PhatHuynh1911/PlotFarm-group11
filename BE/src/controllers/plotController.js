@@ -1,4 +1,5 @@
 const { sql, getPool } = require('../config/db');
+const { autoExpirePendingRentalsHelper } = require('./rentalController');
 
 // Helper chuẩn hóa dữ liệu ô đất
 const formatPlot = (plot) => {
@@ -34,6 +35,7 @@ const formatPlot = (plot) => {
 // Lấy danh sách tất cả các ô đất từ bảng ODat kèm tọa độ bản đồ và ảnh
 const getAllPlots = async (req, res) => {
     try {
+        if (typeof autoExpirePendingRentalsHelper === 'function') await autoExpirePendingRentalsHelper(30).catch(() => {});
         const pool = await getPool();
         const result = await pool.request().query(`
             IF OBJECT_ID('dbo.HopDongThue', 'U') IS NULL
@@ -80,6 +82,7 @@ const getAllPlots = async (req, res) => {
 // Đảm bảo các ô đất còn thời hạn hợp đồng thuê (dù đã thu hoạch xong vụ cũ) không bị lọt vào danh sách "ô đất trống"
 const getAvailablePlots = async (req, res) => {
     try {
+        if (typeof autoExpirePendingRentalsHelper === 'function') await autoExpirePendingRentalsHelper(30).catch(() => {});
         const pool = await getPool();
         const result = await pool.request().query(`
                         IF OBJECT_ID('dbo.HopDongThue', 'U') IS NULL

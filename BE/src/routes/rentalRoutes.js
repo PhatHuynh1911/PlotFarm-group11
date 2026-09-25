@@ -15,7 +15,9 @@ const {
     chooseHarvestDelivery,
     handoverHarvestDelivery,
     extendRental,
-    chooseNewCrop
+    chooseNewCrop,
+    cancelRental,
+    expirePendingRentals
 } = require('../controllers/rentalController');
 const {
     readyToHarvest,
@@ -40,6 +42,7 @@ const softAuth = (req, res, next) => {
 router.post('/', softAuth, createRental);
 router.get('/', softAuth, getAllRentals);
 router.get('/active', softAuth, getActiveRentals);
+router.post('/expire-pending', softAuth, expirePendingRentals);
 router.get('/assignments/mine', authenticate, authorize('nong_dan'), getAssignments);
 router.patch('/assignments/:id/respond', authenticate, authorize('nong_dan'), respondToAssignment);
 router.get('/harvest-deliveries/mine', authenticate, authorize('nong_dan'), getHarvestDeliveriesForFarmer);
@@ -50,6 +53,8 @@ router.patch('/harvest-deliveries/:id/handover', authenticate, authorize('nong_d
 router.get('/:id/payment-info', softAuth, getPaymentInfo);
 router.post('/:id/confirm-payment', softAuth, confirmPayment);
 router.patch('/:id/payment-status', softAuth, confirmPayment);
+router.post('/:id/huy', softAuth, cancelRental);
+router.post('/:id/cancel', softAuth, cancelRental);
 router.patch('/:id/cultivation-status', softAuth, updateCultivationStatus);
 router.post('/:id/ready-to-harvest', softAuth, readyToHarvest);
 router.get('/:id/harvest', softAuth, getHarvestByRental);

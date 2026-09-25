@@ -280,3 +280,18 @@ export async function chooseNewCrop(rentalId, payload, token) {
   })
 }
 
+export async function cancelRental(rentalId, token) {
+  return apiRequest(`/rentals/${rentalId}/huy`, {
+    method: 'POST',
+    token,
+  })
+}
+
+export async function expirePendingRentals(token) {
+  return apiRequest('/rentals/expire-pending', {
+    method: 'POST',
+    token,
+  })
+}
+
+
