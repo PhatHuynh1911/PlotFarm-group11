@@ -21,6 +21,7 @@ import {
   chooseHarvestDelivery,
   extendRental,
   chooseNewCrop,
+  cancelRental,
 } from "../api.js";
 import AccountMenu from "./AccountMenu.jsx";
 import ProfilePanel from "./ProfilePanel.jsx";
@@ -421,6 +422,28 @@ function UserPage({ user, token, onLogout }) {
       setPaymentSubmitting(false);
     }
   };
+
+  const handleCancelRental = async (rentalId) => {
+    if (!window.confirm("Bạn có chắc chắn muốn hủy đơn đặt thuê đất này không? Ô đất sẽ được giải phóng ngay lập tức.")) {
+      return;
+    }
+    setPaymentSubmitting(true);
+    try {
+      await cancelRental(rentalId, token);
+      setRentals(await getUserRentals(user.id, token));
+      try {
+        setAvailablePlots(await getAvailablePlots(token));
+      } catch (_) {}
+      setActivePaymentModal(null);
+      showNotice("Đã hủy đơn đặt thuê và giải phóng ô đất thành công.");
+      notify("Đã hủy đơn đặt thuê và giải phóng ô đất thành công!");
+    } catch (err) {
+      setError(err.message || "Lỗi khi hủy đơn thuê đất");
+      notify(err.message || "Lỗi khi hủy đơn thuê đất", "error");
+    } finally {
+      setPaymentSubmitting(false);
+    }
+  };
   const submitSupport = async (event) => {
     event.preventDefault();
     setError("");
@@ -588,22 +611,33 @@ function UserPage({ user, token, onLogout }) {
           Mở ứng dụng ngân hàng hoặc ví điện tử bất kỳ, chọn <strong>Quét mã QR</strong> để chuyển tiền. Sau khi thanh toán, bấm xác nhận bên dưới để hệ thống kích hoạt hợp đồng ngay lập tức.
         </p>
 
-        <div className="booking-actions" style={{ marginTop: "10px" }}>
+        <div className="booking-actions" style={{ marginTop: "10px", display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "space-between" }}>
           <button
             type="button"
             className="outline-button"
-            onClick={() => setActivePaymentModal(null)}
-          >
-            Đóng / Để sau
-          </button>
-          <button
-            type="button"
-            className="primary-button booking-submit"
+            style={{ color: "#d9534f", borderColor: "#d9534f" }}
             disabled={paymentSubmitting}
-            onClick={() => handleConfirmPayment(activePaymentModal.ma_hop_dong || activePaymentModal.id)}
+            onClick={() => handleCancelRental(activePaymentModal.ma_hop_dong || activePaymentModal.id)}
           >
-            {paymentSubmitting ? "Đang xử lý..." : "Tôi đã chuyển khoản thành công ✓"}
+            ✕ Hủy đơn đặt
           </button>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button
+              type="button"
+              className="outline-button"
+              onClick={() => setActivePaymentModal(null)}
+            >
+              Đóng / Để sau
+            </button>
+            <button
+              type="button"
+              className="primary-button booking-submit"
+              disabled={paymentSubmitting}
+              onClick={() => handleConfirmPayment(activePaymentModal.ma_hop_dong || activePaymentModal.id)}
+            >
+              {paymentSubmitting ? "Đang xử lý..." : "Tôi đã chuyển khoản thành công ✓"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -1114,7 +1148,9 @@ function UserPage({ user, token, onLogout }) {
                 </div>
                 <div className="my-plot-body">
                   <p className="plot-status">
-                    {rental.trang_thai_thanh_toan === "cho_thanh_toan" ? (
+                    {rental.trang_thai_hop_dong === "da_huy" ? (
+                      <span style={{ color: "#dc3545", fontWeight: "700" }}>Đã hủy</span>
+                    ) : rental.trang_thai_thanh_toan === "cho_thanh_toan" ? (
                       <span style={{ color: "#c98b3c", fontWeight: "700" }}>Chờ thanh toán</span>
                     ) : rental.trang_thai_hop_dong === "da_ket_thuc" ? (
                       <span style={{ color: "#6c757d", fontWeight: "700" }}>Hợp đồng đã kết thúc</span>
@@ -1146,14 +1182,28 @@ function UserPage({ user, token, onLogout }) {
                   >
                     Xem chi tiết ô đất →
                   </button>
-                  {rental.trang_thai_thanh_toan === "cho_thanh_toan" ? (
-                    <button
-                      className="primary-button"
-                      style={{ marginTop: "10px", width: "100%", backgroundColor: "#c98b3c", borderColor: "#c98b3c" }}
-                      onClick={() => openRentalPayment(rental)}
-                    >
-                      Thanh toán VietQR →
-                    </button>
+                  {rental.trang_thai_hop_dong === "da_huy" ? (
+                    <div style={{ marginTop: "10px", padding: "8px 10px", background: "#f8d7da", color: "#842029", borderRadius: "6px", fontSize: "12px", textAlign: "center", fontWeight: "500" }}>
+                      Đơn thuê đã bị hủy · Ô đất đã được giải phóng
+                    </div>
+                  ) : rental.trang_thai_thanh_toan === "cho_thanh_toan" ? (
+                    <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
+                      <button
+                        className="primary-button"
+                        style={{ flex: 1, backgroundColor: "#c98b3c", borderColor: "#c98b3c" }}
+                        onClick={() => openRentalPayment(rental)}
+                      >
+                        Thanh toán VietQR →
+                      </button>
+                      <button
+                        className="outline-button"
+                        style={{ color: "#d9534f", borderColor: "#d9534f", padding: "0 14px", fontWeight: "600" }}
+                        title="Hủy đơn đặt thuê đất này"
+                        onClick={() => handleCancelRental(rental.ma_hop_dong)}
+                      >
+                        ✕ Hủy
+                      </button>
+                    </div>
                   ) : (
                     <>
                       {(rental.trang_thai_canh_tac === "cho_chon_cay_moi" || (rental.trang_thai_canh_tac === "da_thu_hoach" && daysRemaining(rental.ngay_ket_thuc) > 0)) && (
