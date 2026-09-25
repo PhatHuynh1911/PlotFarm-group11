@@ -53,6 +53,27 @@ const readyToHarvest = async (req, res) => {
         const customerId = rental.ma_nguoi_dung;
         const plotCode = rental.so_hieu_o;
 
+        // Chỉ nông dân đã nhận phân công của chính hợp đồng này mới được
+        // chuyển vụ mùa sang trạng thái sẵn sàng thu hoạch.
+        if (req.user?.role === 'nong_dan') {
+            const assignment = await pool.request()
+                .input('rentalId', sql.Int, rentalId)
+                .input('farmerId', sql.Int, Number(req.user.sub))
+                .query(`
+                    SELECT TOP 1 ma_phan_cong
+                    FROM PhanCongNongDan
+                    WHERE ma_hop_dong = @rentalId
+                      AND ma_nong_dan = @farmerId
+                      AND trang_thai = 'da_chap_nhan'
+                `);
+            if (!assignment.recordset[0]) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Bạn không được phân công phụ trách ô đất này'
+                });
+            }
+        }
+
         // Xác định nông dân phụ trách (từ bảng PhanCongNongDan hoặc từ req.user nếu là nong_dan, hoặc mặc định)
         let farmerId = req.user && req.user.role === 'nong_dan' ? Number(req.user.sub) : null;
         if (!farmerId) {
@@ -235,6 +256,13 @@ const registerDelivery = async (req, res) => {
                     WHERE h.ma_hop_dong = @rentalId
                 `);
             rental = rentalRes.recordset[0];
+
+            if (!rental) {
+                return res.status(404).json({ success: false, message: 'Không tìm thấy hợp đồng thuê' });
+            }
+            if (req.user?.role === 'khach_hang' && Number(rental.ma_nguoi_dung) !== Number(req.user.sub)) {
+                return res.status(403).json({ success: false, message: 'Bạn không có quyền cập nhật giao nhận của hợp đồng này' });
+            }
             
             if (!harvestId && rental) {
                 const harvestRes = await pool.request()
@@ -401,7 +429,7 @@ const getHarvestByRental = async (req, res) => {
             .query(`
                 SELECT 
                     t.*,
-                    h.trang_thai_canh_tac, h.trang_thai_hop_dong,
+                    h.ma_nguoi_dung, h.trang_thai_canh_tac, h.trang_thai_hop_dong,
                     o.so_hieu_o, o.ten_o_dat,
                     u.ho_va_ten AS ten_khach_hang,
                     f.ho_va_ten AS ten_nong_dan,
@@ -430,9 +458,17 @@ const getHarvestByRental = async (req, res) => {
                 ORDER BY t.ma_thu_hoach DESC
             `);
 
+        const harvest = result.recordset[0] || null;
+        if (harvest && req.user?.role === 'khach_hang' && Number(harvest.ma_nguoi_dung) !== Number(req.user.sub)) {
+            return res.status(403).json({ success: false, message: 'Bạn không có quyền xem đợt thu hoạch này' });
+        }
+        if (harvest && req.user?.role === 'nong_dan' && Number(harvest.ma_nong_dan) !== Number(req.user.sub)) {
+            return res.status(403).json({ success: false, message: 'Bạn không được phân công đợt thu hoạch này' });
+        }
+
         return res.json({
             success: true,
-            data: result.recordset[0] || null
+            data: harvest
         });
     } catch (error) {
         console.error('Lỗi lấy thông tin thu hoạch:', error);
