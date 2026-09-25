@@ -24,7 +24,7 @@ const {
     registerDelivery,
     getHarvestByRental
 } = require('../controllers/harvestController');
-const { authenticate, authorize } = require('../middleware/authMiddleware');
+const { authenticate, authorize, requireSelfOrAdmin } = require('../middleware/authMiddleware');
 const { getAssignments, respondToAssignment } = require('../controllers/assignmentController');
 
 // Soft auth: Nếu có Bearer token thì giải mã vào req.user, nếu không thì vẫn cho qua để test Swagger
@@ -39,10 +39,9 @@ const softAuth = (req, res, next) => {
     next();
 };
 
-router.post('/', softAuth, createRental);
-router.get('/', softAuth, getAllRentals);
-router.get('/active', softAuth, getActiveRentals);
-router.post('/expire-pending', softAuth, expirePendingRentals);
+router.post('/', authenticate, authorize('khach_hang'), createRental);
+router.get('/', authenticate, authorize('quan_tri'), getAllRentals);
+router.get('/active', authenticate, authorize('nong_dan'), getActiveRentals);
 router.get('/assignments/mine', authenticate, authorize('nong_dan'), getAssignments);
 router.patch('/assignments/:id/respond', authenticate, authorize('nong_dan'), respondToAssignment);
 router.get('/harvest-deliveries/mine', authenticate, authorize('nong_dan'), getHarvestDeliveriesForFarmer);
@@ -50,19 +49,17 @@ router.get('/harvest-deliveries/user', authenticate, authorize('khach_hang'), ge
 router.patch('/:id/harvest-ready', authenticate, authorize('nong_dan'), markHarvestReady);
 router.post('/:id/harvest-delivery', authenticate, authorize('khach_hang'), chooseHarvestDelivery);
 router.patch('/harvest-deliveries/:id/handover', authenticate, authorize('nong_dan'), handoverHarvestDelivery);
-router.get('/:id/payment-info', softAuth, getPaymentInfo);
-router.post('/:id/confirm-payment', softAuth, confirmPayment);
-router.patch('/:id/payment-status', softAuth, confirmPayment);
-router.post('/:id/huy', softAuth, cancelRental);
-router.post('/:id/cancel', softAuth, cancelRental);
-router.patch('/:id/cultivation-status', softAuth, updateCultivationStatus);
-router.post('/:id/ready-to-harvest', softAuth, readyToHarvest);
+router.get('/:id/payment-info', authenticate, authorize('khach_hang'), getPaymentInfo);
+router.post('/:id/confirm-payment', authenticate, authorize('khach_hang'), confirmPayment);
+router.patch('/:id/payment-status', authenticate, authorize('khach_hang'), confirmPayment);
+router.patch('/:id/cultivation-status', authenticate, authorize('nong_dan'), updateCultivationStatus);
+router.post('/:id/ready-to-harvest', authenticate, authorize('nong_dan'), readyToHarvest);
 router.get('/:id/harvest', softAuth, getHarvestByRental);
-router.post('/:id/gia-han', softAuth, extendRental);
-router.post('/:id/extend', softAuth, extendRental);
-router.post('/:id/chon-cay-moi', softAuth, chooseNewCrop);
-router.post('/:id/new-crop', softAuth, chooseNewCrop);
-router.get('/user/:userId', softAuth, getRentalsByUser);
+router.post('/:id/gia-han', authenticate, authorize('khach_hang'), extendRental);
+router.post('/:id/extend', authenticate, authorize('khach_hang'), extendRental);
+router.post('/:id/chon-cay-moi', authenticate, authorize('khach_hang'), chooseNewCrop);
+router.post('/:id/new-crop', authenticate, authorize('khach_hang'), chooseNewCrop);
+router.get('/user/:userId', authenticate, requireSelfOrAdmin, getRentalsByUser);
 router.get('/:id', softAuth, getRentalById);
 
 module.exports = router;

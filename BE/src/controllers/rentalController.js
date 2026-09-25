@@ -29,9 +29,8 @@ const createRental = async (req, res) => {
 
     try {
         let { so_hop_dong, ma_nguoi_dung, ma_o_dat, ma_cay_trong, ngay_bat_dau, ngay_ket_thuc, thoi_han_thang } = req.body;
-        if (!ma_nguoi_dung && req.user?.sub) {
-            ma_nguoi_dung = req.user.sub;
-        }
+        // Không tin ma_nguoi_dung từ client: hợp đồng luôn thuộc tài khoản đăng nhập.
+        ma_nguoi_dung = Number(req.user.sub);
 
         if (!ma_nguoi_dung || !ma_o_dat || !thoi_han_thang) {
             return res.status(400).json({ success: false, message: 'Thiếu thông tin bắt buộc để tạo hợp đồng' });
@@ -605,7 +604,7 @@ const getPaymentInfo = async (req, res) => {
         const result = await pool.request()
             .input('id', sql.Int, id)
             .query(`
-                SELECT h.ma_hop_dong, h.so_hop_dong, h.tong_tien, h.trang_thai_thanh_toan, h.trang_thai_hop_dong,
+                SELECT h.ma_hop_dong, h.ma_nguoi_dung, h.so_hop_dong, h.tong_tien, h.trang_thai_thanh_toan, h.trang_thai_hop_dong,
                        o.so_hieu_o, o.ten_o_dat, u.ho_va_ten AS ten_khach_hang, u.email AS email_khach_hang
                 FROM HopDongThue h
                 JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
@@ -616,6 +615,9 @@ const getPaymentInfo = async (req, res) => {
         const rental = result.recordset[0];
         if (!rental) {
             return res.status(404).json({ success: false, message: 'Không tìm thấy hợp đồng' });
+        }
+        if (Number(rental.ma_nguoi_dung) !== Number(req.user.sub)) {
+            return res.status(403).json({ success: false, message: 'Bạn không có quyền xem thanh toán của hợp đồng này' });
         }
 
         const paymentInfo = generateVietQR(rental.so_hop_dong, rental.tong_tien);
@@ -659,6 +661,10 @@ const confirmPayment = async (req, res) => {
         if (!rental) {
             await transaction.rollback();
             return res.status(404).json({ success: false, message: 'Không tìm thấy hợp đồng' });
+        }
+        if (Number(rental.ma_nguoi_dung) !== Number(req.user.sub)) {
+            await transaction.rollback();
+            return res.status(403).json({ success: false, message: 'Bạn không có quyền thanh toán hợp đồng này' });
         }
 
         if (rental.trang_thai_thanh_toan === 'da_thanh_toan') {
@@ -874,12 +880,13 @@ const chooseNewCrop = async (req, res) => {
         const contractReq = new sql.Request(transaction);
         const contractRes = await contractReq
             .input('id', sql.Int, id)
+            .input('userId', sql.Int, Number(req.user.sub))
             .query(`
                 SELECT h.*, o.so_hieu_o, o.ten_o_dat, u.ho_va_ten AS ten_khach_hang
                 FROM HopDongThue h
                 JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
                 JOIN NguoiDung u ON u.ma_nguoi_dung = h.ma_nguoi_dung
-                WHERE h.ma_hop_dong = @id
+                WHERE h.ma_hop_dong = @id AND h.ma_nguoi_dung = @userId
             `);
 
         const contract = contractRes.recordset[0];
@@ -909,7 +916,7 @@ const chooseNewCrop = async (req, res) => {
         const cropReq = new sql.Request(transaction);
         const cropRes = await cropReq
             .input('cropId', sql.Int, newCropId)
-            .query(`SELECT ma_cay_trong, ten_cay_trong, thoi_gian_sinh_truong_ngay, hinh_anh_cay, gia_cay FROM CayTrong WHERE ma_cay_trong = @cropId`);
+            .query(`SELECT ma_cay_trong, ten_cay_trong, thoi_gian_sinh_truong_ngay, hinh_anh_cay, do_kho_cham_soc FROM CayTrong WHERE ma_cay_trong = @cropId`);
 
         const crop = cropRes.recordset[0];
         if (!crop) {
@@ -923,7 +930,7 @@ const chooseNewCrop = async (req, res) => {
             const suggestedCrops = await suggestedReq
                 .input('remainingDays', sql.Int, remainingDays)
                 .query(`
-                    SELECT ma_cay_trong, ten_cay_trong, thoi_gian_sinh_truong_ngay, hinh_anh_cay, gia_cay
+                    SELECT ma_cay_trong, ten_cay_trong, thoi_gian_sinh_truong_ngay, hinh_anh_cay, do_kho_cham_soc
                     FROM CayTrong
                     WHERE thoi_gian_sinh_truong_ngay <= @remainingDays
                     ORDER BY thoi_gian_sinh_truong_ngay DESC
@@ -984,7 +991,7 @@ const chooseNewCrop = async (req, res) => {
             const assign = assignCheck.recordset[0];
             await new sql.Request(transaction)
                 .input('assignId', sql.Int, assign.ma_phan_cong)
-                .query(`UPDATE PhanCongNongDan SET trang_thai = 'dang_thuc_hien', ngay_cap_nhat = SYSDATETIME() WHERE ma_phan_cong = @assignId`);
+                .query(`UPDATE PhanCongNongDan SET trang_thai = 'cho_tiep_nhan', ngay_gui = SYSDATETIME(), ngay_phan_hoi = NULL WHERE ma_phan_cong = @assignId`);
         }
 
         await transaction.commit();
