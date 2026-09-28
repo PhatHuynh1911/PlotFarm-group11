@@ -215,8 +215,12 @@ export async function getRentalPaymentInfo(rentalId, token) {
   return result.data
 }
 
-export async function confirmRentalPayment(rentalId, token) {
-  return apiRequest(`/rentals/${rentalId}/confirm-payment`, { method: 'POST', token })
+export async function confirmRentalPayment(rentalId, token, payload = {}) {
+  return apiRequest(`/rentals/${rentalId}/confirm-payment`, {
+    method: 'POST',
+    body: Object.keys(payload).length ? JSON.stringify(payload) : undefined,
+    token,
+  })
 }
 
 export async function getUserServiceRequests(userId, token) {

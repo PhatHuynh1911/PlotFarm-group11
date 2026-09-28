@@ -341,9 +341,9 @@ function UserPage({ user, token, onLogout }) {
         token
       );
       if (response.success) {
-        notify(response.message || "Gia hạn hợp đồng thành công!");
+        notify(response.message || "Đã tạo yêu cầu gia hạn.");
         showNotice(
-          `Đã gia hạn hợp đồng ${activeExtendModal.so_hop_dong} thêm ${extendMonths} tháng. Vui lòng thanh toán qua VietQR.`
+          `Yêu cầu gia hạn hợp đồng ${activeExtendModal.so_hop_dong} đã được tạo. Thời hạn thuê chỉ được cập nhật sau khi thanh toán.`
         );
         const contractInfo = activeExtendModal;
         setActiveExtendModal(null);
@@ -353,6 +353,8 @@ function UserPage({ user, token, onLogout }) {
             ma_hop_dong: contractInfo.ma_hop_dong,
             so_hop_dong: `${contractInfo.so_hop_dong} (Gia hạn)`,
             tong_tien: response.data.chi_phi_gia_han,
+            extension_payment_id: response.data.extension_payment_id,
+            payment_type: "extension",
             payment_info: response.data.payment_info,
             qr_code_url: response.data.qr_code_url,
           });
@@ -443,11 +445,16 @@ function UserPage({ user, token, onLogout }) {
   const handleConfirmPayment = async (rentalId) => {
     setPaymentSubmitting(true);
     try {
-      await confirmRentalPayment(rentalId, token);
+      const isExtension = Boolean(activePaymentModal?.extension_payment_id);
+      await confirmRentalPayment(
+        rentalId,
+        token,
+        isExtension ? { extension_payment_id: activePaymentModal.extension_payment_id } : {},
+      );
       setRentals(await getUserRentals(user.id, token));
       setActivePaymentModal(null);
-      showNotice("Thanh toán thành công! Hợp đồng thuê đất đã được kích hoạt hiệu lực.");
-      notify("Thanh toán thành công! Hợp đồng đã có hiệu lực.");
+      showNotice(isExtension ? "Thanh toán gia hạn thành công! Thời hạn thuê đã được cập nhật." : "Thanh toán thành công! Hợp đồng thuê đất đã được kích hoạt hiệu lực.");
+      notify(isExtension ? "Thanh toán gia hạn thành công!" : "Thanh toán thành công! Hợp đồng đã có hiệu lực.");
       selectTab("gardens");
     } catch (err) {
       setError(err.message || "Lỗi khi xác nhận thanh toán");
@@ -611,7 +618,7 @@ function UserPage({ user, token, onLogout }) {
         </p>
 
         <div className="booking-actions" style={{ marginTop: "10px", display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "space-between" }}>
-          <button
+          {!activePaymentModal.extension_payment_id && <button
             type="button"
             className="outline-button"
             style={{ color: "#d9534f", borderColor: "#d9534f" }}
@@ -623,7 +630,7 @@ function UserPage({ user, token, onLogout }) {
             })}
           >
             ✕ Hủy đơn đặt
-          </button>
+          </button>}
           <div style={{ display: "flex", gap: "8px" }}>
             <button
               type="button"
