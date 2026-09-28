@@ -28,20 +28,11 @@ const { authenticate, authorize, requireSelfOrAdmin } = require('../middleware/a
 const { getAssignments, respondToAssignment } = require('../controllers/assignmentController');
 
 // Soft auth: Nếu có Bearer token thì giải mã vào req.user, nếu không thì vẫn cho qua để test Swagger
-const softAuth = (req, res, next) => {
-    const authHeader = req.headers.authorization || '';
-    if (authHeader.startsWith('Bearer ')) {
-        try {
-            const jwt = require('jsonwebtoken');
-            req.user = jwt.verify(authHeader.slice(7), process.env.JWT_SECRET || 'plotfarm_jwt_secret_key_2026');
-        } catch (e) {}
-    }
-    next();
-};
 
 router.post('/', authenticate, authorize('khach_hang'), createRental);
 router.get('/', authenticate, authorize('quan_tri'), getAllRentals);
 router.get('/active', authenticate, authorize('nong_dan'), getActiveRentals);
+router.post('/expire-pending', authenticate, authorize('quan_tri'), expirePendingRentals);
 router.get('/assignments/mine', authenticate, authorize('nong_dan'), getAssignments);
 router.patch('/assignments/:id/respond', authenticate, authorize('nong_dan'), respondToAssignment);
 router.get('/harvest-deliveries/mine', authenticate, authorize('nong_dan'), getHarvestDeliveriesForFarmer);
@@ -54,12 +45,14 @@ router.post('/:id/confirm-payment', authenticate, authorize('khach_hang'), confi
 router.patch('/:id/payment-status', authenticate, authorize('khach_hang'), confirmPayment);
 router.patch('/:id/cultivation-status', authenticate, authorize('nong_dan'), updateCultivationStatus);
 router.post('/:id/ready-to-harvest', authenticate, authorize('nong_dan'), readyToHarvest);
-router.get('/:id/harvest', softAuth, getHarvestByRental);
+router.get('/:id/harvest', authenticate, getHarvestByRental);
 router.post('/:id/gia-han', authenticate, authorize('khach_hang'), extendRental);
 router.post('/:id/extend', authenticate, authorize('khach_hang'), extendRental);
 router.post('/:id/chon-cay-moi', authenticate, authorize('khach_hang'), chooseNewCrop);
 router.post('/:id/new-crop', authenticate, authorize('khach_hang'), chooseNewCrop);
+router.post('/:id/huy', authenticate, authorize('khach_hang', 'quan_tri'), cancelRental);
+router.post('/:id/cancel', authenticate, authorize('khach_hang', 'quan_tri'), cancelRental);
 router.get('/user/:userId', authenticate, requireSelfOrAdmin, getRentalsByUser);
-router.get('/:id', softAuth, getRentalById);
+router.get('/:id', authenticate, getRentalById);
 
 module.exports = router;

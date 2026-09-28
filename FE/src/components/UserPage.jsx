@@ -34,6 +34,16 @@ const formatDate = (value) =>
   value ? new Date(value).toLocaleDateString("vi-VN") : "Chưa cập nhật";
 const daysRemaining = (value) =>
   Math.max(0, Math.ceil((new Date(value).getTime() - Date.now()) / 86400000));
+const paymentSecondsLeft = (rental, now) => {
+  const createdAt = new Date(rental.ngay_tao || rental.created_at || rental.createdAt).getTime();
+  if (!Number.isFinite(createdAt)) return null;
+  return Math.max(0, Math.ceil((createdAt + 30 * 60 * 1000 - now) / 1000));
+};
+const formatCountdown = (seconds) => {
+  if (seconds === null) return "Chờ thanh toán";
+  const minutes = Math.floor(seconds / 60);
+  return `${String(minutes).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+};
 const requestStatus = {
   cho_tiep_nhan: "Chờ tiếp nhận",
   da_tiep_nhan: "Đã tiếp nhận",
@@ -55,6 +65,23 @@ function rentalStatusLabel(rental) {
     return "Đã hoàn tất thu hoạch";
   }
   return contractStatusLabels[rental.trang_thai_hop_dong] || rental.trang_thai_hop_dong;
+}
+
+function rentalFlowSteps(rental, deliveries) {
+  const cultivation = rental.trang_thai_canh_tac;
+  const delivery = deliveries.find((item) => String(item.ma_hop_dong) === String(rental.ma_hop_dong));
+  const isCancelled = rental.trang_thai_hop_dong === "da_huy";
+  const isPaid = rental.trang_thai_thanh_toan !== "cho_thanh_toan" && !isCancelled;
+  const isHarvestReady = cultivation === "san_sang_thu_hoach" || Boolean(delivery);
+  const isFinished = cultivation === "da_thu_hoach" || rental.trang_thai_hop_dong === "da_ket_thuc";
+  const deliveryInProgress = delivery && !["cho_khach_chon", "da_ban_giao", "hoan_thanh"].includes(delivery.trang_thai);
+
+  return [
+    { label: "Thanh toán", state: isCancelled ? "cancelled" : isPaid ? "done" : "active" },
+    { label: "Canh tác", state: isCancelled ? "cancelled" : isHarvestReady || isFinished ? "done" : isPaid ? "active" : "pending" },
+    { label: "Thu hoạch", state: isCancelled ? "cancelled" : isFinished ? "done" : isHarvestReady ? "active" : "pending" },
+    { label: "Giao nhận", state: isCancelled ? "cancelled" : isFinished || delivery?.trang_thai === "da_ban_giao" ? "done" : deliveryInProgress ? "active" : "pending" },
+  ];
 }
 
 function journalImages(item) {
@@ -116,6 +143,9 @@ function UserPage({ user, token, onLogout }) {
   const [bookingSubmitting, setBookingSubmitting] = useState(false);
   const [activePaymentModal, setActivePaymentModal] = useState(null);
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [rentalDetail, setRentalDetail] = useState(null);
   const [notice, setNotice] = useState("");
   const [supportSent, setSupportSent] = useState(false);
@@ -148,6 +178,11 @@ function UserPage({ user, token, onLogout }) {
   const [activeExtendModal, setActiveExtendModal] = useState(null);
   const [extendMonths, setExtendMonths] = useState(1);
   const [extendSubmitting, setExtendSubmitting] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentTime(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
   const [activeNewCropModal, setActiveNewCropModal] = useState(null);
   const [newCropSelectedId, setNewCropSelectedId] = useState("");
   const [newCropNote, setNewCropNote] = useState("");
@@ -306,9 +341,9 @@ function UserPage({ user, token, onLogout }) {
         token
       );
       if (response.success) {
-        notify(response.message || "Gia hạn hợp đồng thành công!");
+        notify(response.message || "Đã tạo yêu cầu gia hạn.");
         showNotice(
-          `Đã gia hạn hợp đồng ${activeExtendModal.so_hop_dong} thêm ${extendMonths} tháng. Vui lòng thanh toán qua VietQR.`
+          `Yêu cầu gia hạn hợp đồng ${activeExtendModal.so_hop_dong} đã được tạo. Thời hạn thuê chỉ được cập nhật sau khi thanh toán.`
         );
         const contractInfo = activeExtendModal;
         setActiveExtendModal(null);
@@ -318,6 +353,8 @@ function UserPage({ user, token, onLogout }) {
             ma_hop_dong: contractInfo.ma_hop_dong,
             so_hop_dong: `${contractInfo.so_hop_dong} (Gia hạn)`,
             tong_tien: response.data.chi_phi_gia_han,
+            extension_payment_id: response.data.extension_payment_id,
+            payment_type: "extension",
             payment_info: response.data.payment_info,
             qr_code_url: response.data.qr_code_url,
           });
@@ -408,11 +445,16 @@ function UserPage({ user, token, onLogout }) {
   const handleConfirmPayment = async (rentalId) => {
     setPaymentSubmitting(true);
     try {
-      await confirmRentalPayment(rentalId, token);
+      const isExtension = Boolean(activePaymentModal?.extension_payment_id);
+      await confirmRentalPayment(
+        rentalId,
+        token,
+        isExtension ? { extension_payment_id: activePaymentModal.extension_payment_id } : {},
+      );
       setRentals(await getUserRentals(user.id, token));
       setActivePaymentModal(null);
-      showNotice("Thanh toán thành công! Hợp đồng thuê đất đã được kích hoạt hiệu lực.");
-      notify("Thanh toán thành công! Hợp đồng đã có hiệu lực.");
+      showNotice(isExtension ? "Thanh toán gia hạn thành công! Thời hạn thuê đã được cập nhật." : "Thanh toán thành công! Hợp đồng thuê đất đã được kích hoạt hiệu lực.");
+      notify(isExtension ? "Thanh toán gia hạn thành công!" : "Thanh toán thành công! Hợp đồng đã có hiệu lực.");
       selectTab("gardens");
     } catch (err) {
       setError(err.message || "Lỗi khi xác nhận thanh toán");
@@ -423,10 +465,7 @@ function UserPage({ user, token, onLogout }) {
   };
 
   const handleCancelRental = async (rentalId) => {
-    if (!window.confirm("Bạn có chắc chắn muốn hủy đơn đặt thuê đất này không? Ô đất sẽ được giải phóng ngay lập tức.")) {
-      return;
-    }
-    setPaymentSubmitting(true);
+    setCancelSubmitting(true);
     try {
       await cancelRental(rentalId, token);
       setRentals(await getUserRentals(user.id, token));
@@ -434,13 +473,14 @@ function UserPage({ user, token, onLogout }) {
         setAvailablePlots(await getAvailablePlots(token));
       } catch (_) {}
       setActivePaymentModal(null);
+      setCancelTarget(null);
       showNotice("Đã hủy đơn đặt thuê và giải phóng ô đất thành công.");
       notify("Đã hủy đơn đặt thuê và giải phóng ô đất thành công!");
     } catch (err) {
       setError(err.message || "Lỗi khi hủy đơn thuê đất");
       notify(err.message || "Lỗi khi hủy đơn thuê đất", "error");
     } finally {
-      setPaymentSubmitting(false);
+      setCancelSubmitting(false);
     }
   };
   const submitSupport = async (event) => {
@@ -578,15 +618,19 @@ function UserPage({ user, token, onLogout }) {
         </p>
 
         <div className="booking-actions" style={{ marginTop: "10px", display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "space-between" }}>
-          <button
+          {!activePaymentModal.extension_payment_id && <button
             type="button"
             className="outline-button"
             style={{ color: "#d9534f", borderColor: "#d9534f" }}
-            disabled={paymentSubmitting}
-            onClick={() => handleCancelRental(activePaymentModal.ma_hop_dong || activePaymentModal.id)}
+            disabled={paymentSubmitting || cancelSubmitting}
+            onClick={() => setCancelTarget({
+              id: activePaymentModal.ma_hop_dong || activePaymentModal.id,
+              code: activePaymentModal.so_hop_dong,
+              plot: activePaymentModal.so_hieu_o,
+            })}
           >
             ✕ Hủy đơn đặt
-          </button>
+          </button>}
           <div style={{ display: "flex", gap: "8px" }}>
             <button
               type="button"
@@ -604,6 +648,29 @@ function UserPage({ user, token, onLogout }) {
               {paymentSubmitting ? "Đang xử lý..." : "Tôi đã chuyển khoản thành công ✓"}
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const cancelModal = cancelTarget && (
+    <div className="booking-backdrop" onClick={() => !cancelSubmitting && setCancelTarget(null)}>
+      <div className="booking-modal cancel-rental-modal" onClick={(event) => event.stopPropagation()}>
+        <div className="cancel-rental-icon" aria-hidden="true">!</div>
+        <p className="eyebrow">XÁC NHẬN HỦY ĐƠN</p>
+        <h2>Hủy đơn đặt thuê?</h2>
+        <p>
+          Hợp đồng <strong>{cancelTarget.code || `#${cancelTarget.id}`}</strong>
+          {cancelTarget.plot ? ` · Ô đất ${cancelTarget.plot}` : ""} chưa thanh toán sẽ bị hủy và ô đất được mở lại cho khách khác.
+        </p>
+        <p className="cancel-rental-warning">Thao tác này không thể hoàn tác.</p>
+        <div className="booking-actions cancel-rental-actions">
+          <button type="button" className="outline-button" disabled={cancelSubmitting} onClick={() => setCancelTarget(null)}>
+            Giữ đơn
+          </button>
+          <button type="button" className="danger-button" disabled={cancelSubmitting} onClick={() => handleCancelRental(cancelTarget.id)}>
+            {cancelSubmitting ? "Đang hủy đơn..." : "Xác nhận hủy đơn"}
+          </button>
         </div>
       </div>
     </div>
@@ -1051,6 +1118,7 @@ function UserPage({ user, token, onLogout }) {
         {content}
       </section>
       {paymentModal}
+      {cancelModal}
       {rentalDetailModal}
       {extendModal}
       {newCropModal}
@@ -1141,6 +1209,21 @@ function UserPage({ user, token, onLogout }) {
                     <b>{daysRemaining(rental.ngay_ket_thuc)}</b>
                     <span>ngày còn lại</span>
                   </div>
+                  {rental.trang_thai_thanh_toan === "cho_thanh_toan" && (
+                    <div className="payment-countdown" role="status">
+                      <span>Thanh toán giữ chỗ còn</span>
+                      <strong>{formatCountdown(paymentSecondsLeft(rental, currentTime))}</strong>
+                      {paymentSecondsLeft(rental, currentTime) === 0 && <small>Đơn đang chờ hệ thống giải phóng.</small>}
+                    </div>
+                  )}
+                  <div className="rental-flow" aria-label="Tiến trình hợp đồng">
+                    {rentalFlowSteps(rental, harvestDeliveries).map((step, index) => (
+                      <div className={`rental-flow-step ${step.state}`} key={step.label}>
+                        <span>{step.state === "done" ? "✓" : index + 1}</span>
+                        <small>{step.label}</small>
+                      </div>
+                    ))}
+                  </div>
                   <button
                     className="outline-button"
                     style={{ marginTop: "10px" }}
@@ -1165,7 +1248,12 @@ function UserPage({ user, token, onLogout }) {
                         className="outline-button"
                         style={{ color: "#d9534f", borderColor: "#d9534f", padding: "0 14px", fontWeight: "600" }}
                         title="Hủy đơn đặt thuê đất này"
-                        onClick={() => handleCancelRental(rental.ma_hop_dong)}
+                        disabled={cancelSubmitting}
+                        onClick={() => setCancelTarget({
+                          id: rental.ma_hop_dong,
+                          code: rental.so_hop_dong,
+                          plot: rental.so_hieu_o,
+                        })}
                       >
                         ✕ Hủy
                       </button>
@@ -2330,6 +2418,7 @@ function UserPage({ user, token, onLogout }) {
       )}
 
       {paymentModal}
+      {cancelModal}
       {rentalDetailModal}
     </main>
   );

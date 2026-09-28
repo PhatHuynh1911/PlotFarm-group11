@@ -80,3 +80,149 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+
+.payment-countdown {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+  align-items: center;
+  margin-top: 12px;
+  padding: 9px 10px;
+  border: 1px solid #efd7a5;
+  border-radius: 8px;
+  background: #fff8e8;
+  color: #775010;
+  font-size: 12px;
+}
+
+.payment-countdown strong {
+  font-family: var(--mono);
+  font-size: 16px;
+  letter-spacing: .4px;
+}
+
+.payment-countdown small {
+  grid-column: 1 / -1;
+  color: #9b3f32;
+}
+
+.rental-flow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 14px;
+}
+
+.rental-flow-step {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  color: #8a968d;
+  font-size: 10px;
+  text-align: center;
+}
+
+.rental-flow-step:not(:last-child)::after {
+  position: absolute;
+  top: 10px;
+  left: calc(50% + 12px);
+  width: calc(100% - 24px);
+  height: 2px;
+  background: #dce4dd;
+  content: "";
+}
+
+.rental-flow-step span {
+  z-index: 1;
+  display: grid;
+  width: 21px;
+  height: 21px;
+  place-items: center;
+  border: 2px solid #dce4dd;
+  border-radius: 50%;
+  background: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.rental-flow-step.done,
+.rental-flow-step.active {
+  color: #1f6a38;
+}
+
+.rental-flow-step.done span {
+  border-color: #2b8a3e;
+  background: #2b8a3e;
+  color: #fff;
+}
+
+.rental-flow-step.done:not(:last-child)::after {
+  background: #2b8a3e;
+}
+
+.rental-flow-step.active span {
+  border-color: #c98b3c;
+  box-shadow: 0 0 0 3px #fff1d7;
+}
+
+.rental-flow-step.cancelled {
+  color: #9a4a4a;
+}
+
+.rental-flow-step.cancelled span {
+  border-color: #e4b4b4;
+  background: #fff2f2;
+}
+
+.cancel-rental-modal {
+  width: min(100% - 32px, 430px);
+  padding: 30px;
+  text-align: center;
+}
+
+.cancel-rental-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 12px;
+  place-items: center;
+  border-radius: 50%;
+  background: #fff0ef;
+  color: #c64842;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.cancel-rental-modal > p:not(.eyebrow) {
+  margin: 12px 0;
+  color: #526658;
+  line-height: 1.6;
+}
+
+.cancel-rental-warning {
+  color: #b5453f !important;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cancel-rental-actions {
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.danger-button {
+  border: 1px solid #c64842;
+  border-radius: 7px;
+  background: #c64842;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 10px 14px;
+}
+
+.danger-button:disabled {
+  cursor: not-allowed;
+  opacity: .65;
+}

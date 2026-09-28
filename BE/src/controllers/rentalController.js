@@ -573,10 +573,17 @@ const getRentalById = async (req, res) => {
         const pool = await getPool();
         const result = await pool.request()
             .input('id', sql.Int, parseInt(req.params.id, 10))
+            .input('viewerId', sql.Int, Number(req.user.sub))
             .query(`
                 SELECT h.*, u.ho_va_ten AS ten_khach_hang, u.email AS email_khach_hang, u.so_dien_thoai AS sdt_khach_hang,
                        o.so_hieu_o, o.ten_o_dat, o.dien_tich_m2, o.gia_thue_thang,
-                       c.ten_cay_trong, c.thoi_gian_sinh_truong_ngay
+                       c.ten_cay_trong, c.thoi_gian_sinh_truong_ngay,
+                       CASE WHEN EXISTS (
+                           SELECT 1 FROM PhanCongNongDan p
+                           WHERE p.ma_hop_dong = h.ma_hop_dong
+                             AND p.ma_nong_dan = @viewerId
+                             AND p.trang_thai = 'da_chap_nhan'
+                       ) THEN 1 ELSE 0 END AS is_assigned_farmer
                 FROM HopDongThue h
                 JOIN NguoiDung u ON u.ma_nguoi_dung = h.ma_nguoi_dung
                 JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
@@ -587,6 +594,13 @@ const getRentalById = async (req, res) => {
         const rental = result.recordset[0];
         if (!rental) {
             return res.status(404).json({ success: false, message: 'Không tìm thấy hợp đồng' });
+        }
+
+        const canView = req.user.role === 'quan_tri'
+            || Number(rental.ma_nguoi_dung) === Number(req.user.sub)
+            || (req.user.role === 'nong_dan' && rental.is_assigned_farmer === 1);
+        if (!canView) {
+            return res.status(403).json({ success: false, message: 'Khong co quyen xem hop dong nay' });
         }
 
         return res.json({ success: true, data: rental });
@@ -645,7 +659,60 @@ const confirmPayment = async (req, res) => {
 
     try {
         const id = parseInt(req.params.id, 10);
+        const extensionPaymentId = Number(req.body?.extension_payment_id || req.body?.extensionPaymentId || 0);
         await transaction.begin();
+
+        if (extensionPaymentId) {
+            const extensionResult = await new sql.Request(transaction)
+                .input('extensionPaymentId', sql.Int, extensionPaymentId)
+                .input('contractId', sql.Int, id)
+                .input('userId', sql.Int, Number(req.user.sub))
+                .query(`
+                    SELECT p.*, h.ma_nguoi_dung, h.so_hop_dong, h.thoi_han_thang, h.tong_tien
+                    FROM dbo.ThanhToanGiaHan p
+                    JOIN dbo.HopDongThue h ON h.ma_hop_dong = p.ma_hop_dong
+                    WHERE p.ma_thanh_toan_gia_han = @extensionPaymentId
+                      AND p.ma_hop_dong = @contractId
+                      AND h.ma_nguoi_dung = @userId
+                `);
+            const extension = extensionResult.recordset[0];
+            if (!extension) {
+                await transaction.rollback();
+                return res.status(404).json({ success: false, message: 'Không tìm thấy yêu cầu gia hạn hợp lệ' });
+            }
+            if (extension.trang_thai === 'da_thanh_toan') {
+                await transaction.rollback();
+                return res.json({ success: true, message: 'Yêu cầu gia hạn này đã được thanh toán' });
+            }
+            if (extension.trang_thai !== 'cho_thanh_toan') {
+                await transaction.rollback();
+                return res.status(400).json({ success: false, message: 'Yêu cầu gia hạn không còn hiệu lực thanh toán' });
+            }
+
+            const updatedContract = await new sql.Request(transaction)
+                .input('contractId', sql.Int, id)
+                .input('newEndDate', sql.Date, extension.ngay_ket_thuc_moi)
+                .input('months', sql.Int, extension.so_thang_gia_han)
+                .input('cost', sql.Decimal(14, 2), extension.chi_phi)
+                .query(`
+                    UPDATE dbo.HopDongThue
+                    SET ngay_ket_thuc = @newEndDate,
+                        thoi_han_thang = thoi_han_thang + @months,
+                        tong_tien = tong_tien + @cost,
+                        ngay_cap_nhat = SYSDATETIME()
+                    OUTPUT INSERTED.*
+                    WHERE ma_hop_dong = @contractId
+                `);
+            await new sql.Request(transaction)
+                .input('extensionPaymentId', sql.Int, extensionPaymentId)
+                .query(`UPDATE dbo.ThanhToanGiaHan SET trang_thai = 'da_thanh_toan', ngay_thanh_toan = SYSDATETIME() WHERE ma_thanh_toan_gia_han = @extensionPaymentId`);
+            await transaction.commit();
+            return res.json({
+                success: true,
+                message: 'Thanh toán gia hạn thành công. Thời hạn thuê đã được cập nhật.',
+                data: updatedContract.recordset[0],
+            });
+        }
 
         const rentalCheck = await new sql.Request(transaction)
             .input('id', sql.Int, id)
@@ -793,20 +860,29 @@ const extendRental = async (req, res) => {
         const newEndDateStr = newEndDate.toISOString().split('T')[0];
         const newTotalAmount = Number(contract.tong_tien) + extensionCost;
 
-        // 3. Cập nhật ngày kết thúc, thời hạn và tổng tiền trong HopDongThue
-        const updateReq = new sql.Request(transaction);
-        await updateReq
-            .input('id', sql.Int, id)
+        const pendingCheck = await new sql.Request(transaction)
+            .input('contractId', sql.Int, id)
+            .query(`SELECT TOP 1 ma_thanh_toan_gia_han FROM dbo.ThanhToanGiaHan WHERE ma_hop_dong = @contractId AND trang_thai = 'cho_thanh_toan'`);
+        if (pendingCheck.recordset[0]) {
+            await transaction.rollback();
+            return res.status(409).json({ success: false, message: 'Hợp đồng đang có một yêu cầu gia hạn chờ thanh toán' });
+        }
+
+        // Store a pending extension. Do not change the contract before payment.
+        const extensionPayment = await new sql.Request(transaction)
+            .input('contractId', sql.Int, id)
+            .input('months', sql.Int, additionalMonths)
+            .input('days', sql.Int, additionalDays)
+            .input('cost', sql.Decimal(14, 2), extensionCost)
+            .input('oldEndDate', sql.Date, contract.ngay_ket_thuc)
             .input('newEndDate', sql.Date, newEndDateStr)
-            .input('newTotalMonths', sql.Int, newTotalMonths)
-            .input('newTotalAmount', sql.Decimal(14, 2), newTotalAmount)
             .query(`
-                UPDATE HopDongThue
-                SET ngay_ket_thuc = @newEndDate,
-                    thoi_han_thang = @newTotalMonths,
-                    tong_tien = @newTotalAmount,
-                    ngay_cap_nhat = SYSDATETIME()
-                WHERE ma_hop_dong = @id
+                INSERT INTO dbo.ThanhToanGiaHan (
+                    ma_hop_dong, so_thang_gia_han, so_ngay_gia_han, chi_phi,
+                    ngay_ket_thuc_cu, ngay_ket_thuc_moi, trang_thai
+                )
+                OUTPUT INSERTED.*
+                VALUES (@contractId, @months, @days, @cost, @oldEndDate, @newEndDate, 'cho_thanh_toan')
             `);
 
         await transaction.commit();
@@ -846,6 +922,8 @@ const extendRental = async (req, res) => {
                 ngay_ket_thuc_cu: contract.ngay_ket_thuc,
                 ngay_ket_thuc_moi: newEndDateStr,
                 tong_tien_moi: newTotalAmount,
+                extension_payment_id: extensionPayment.recordset[0].ma_thanh_toan_gia_han,
+                payment_type: 'extension',
                 payment_info: paymentInfo,
                 qr_code_url: paymentInfo.qr_code_url
             }
@@ -1144,7 +1222,7 @@ const cancelRental = async (req, res) => {
         // Kiểm tra quyền: chỉ chủ hợp đồng hoặc admin/quản trị viên mới được hủy
         if (req.user?.sub) {
             const isOwner = Number(req.user.sub) === Number(rental.ma_nguoi_dung);
-            const isAdmin = ['quan_tri_vien', 'admin'].includes(req.user.role || req.user.vai_tro);
+            const isAdmin = ['quan_tri', 'quan_tri_vien', 'admin'].includes(req.user.role || req.user.vai_tro);
             if (!isOwner && !isAdmin) {
                 await transaction.rollback();
                 return res.status(403).json({ success: false, message: 'Bạn không có quyền hủy hợp đồng này' });
@@ -1157,7 +1235,7 @@ const cancelRental = async (req, res) => {
         }
 
         // Không cho phép tự hủy nếu đã thanh toán (trừ khi là admin)
-        const isAdmin = ['quan_tri_vien', 'admin'].includes(req.user?.role || req.user?.vai_tro);
+        const isAdmin = ['quan_tri', 'quan_tri_vien', 'admin'].includes(req.user?.role || req.user?.vai_tro);
         if (rental.trang_thai_thanh_toan === 'da_thanh_toan' && !isAdmin) {
             await transaction.rollback();
             return res.status(400).json({
