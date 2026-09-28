@@ -262,6 +262,23 @@ const connectDB = async () => {
                 END
             END
         `);
+        await activePool.request().query(`
+            IF OBJECT_ID('dbo.ThanhToanGiaHan', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.ThanhToanGiaHan (
+                    ma_thanh_toan_gia_han INT IDENTITY(1,1) PRIMARY KEY,
+                    ma_hop_dong INT NOT NULL FOREIGN KEY REFERENCES dbo.HopDongThue(ma_hop_dong),
+                    so_thang_gia_han INT NOT NULL DEFAULT 0,
+                    so_ngay_gia_han INT NOT NULL DEFAULT 0,
+                    chi_phi DECIMAL(14,2) NOT NULL,
+                    ngay_ket_thuc_cu DATE NOT NULL,
+                    ngay_ket_thuc_moi DATE NOT NULL,
+                    trang_thai VARCHAR(30) NOT NULL DEFAULT 'cho_thanh_toan',
+                    ngay_tao DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+                    ngay_thanh_toan DATETIME2 NULL
+                );
+            END
+        `);
         console.log(`✅ Kết nối SQL Server thành công: [${process.env.DB_NAME || 'PlotFarmDB'}] tại ${serverVal}`);
     } catch (error) {
         console.error('❌ Kết nối SQL Server thất bại:', error.message || error);
