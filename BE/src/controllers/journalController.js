@@ -157,6 +157,30 @@ const getJournalsByRental = async (req, res) => {
     try {
         const { rentalId } = req.params;
         const pool = await getPool();
+        const access = await pool.request()
+            .input('ma_hop_dong', sql.Int, parseInt(rentalId, 10))
+            .input('viewerId', sql.Int, Number(req.user.sub))
+            .query(`
+                SELECT TOP 1 h.ma_nguoi_dung,
+                    CASE WHEN EXISTS (
+                        SELECT 1 FROM PhanCongNongDan p
+                        WHERE p.ma_hop_dong = h.ma_hop_dong
+                          AND p.ma_nong_dan = @viewerId
+                          AND p.trang_thai = 'da_chap_nhan'
+                    ) THEN 1 ELSE 0 END AS is_assigned_farmer
+                FROM HopDongThue h
+                WHERE h.ma_hop_dong = @ma_hop_dong
+            `);
+        const contract = access.recordset[0];
+        if (!contract) {
+            return res.status(404).json({ success: false, message: 'Khong tim thay hop dong' });
+        }
+        const canView = req.user.role === 'quan_tri'
+            || Number(contract.ma_nguoi_dung) === Number(req.user.sub)
+            || (req.user.role === 'nong_dan' && contract.is_assigned_farmer === 1);
+        if (!canView) {
+            return res.status(403).json({ success: false, message: 'Khong co quyen xem nhat ky cua hop dong nay' });
+        }
         const result = await pool.request()
             .input('ma_hop_dong', sql.Int, parseInt(rentalId, 10))
             .query(`

@@ -573,10 +573,17 @@ const getRentalById = async (req, res) => {
         const pool = await getPool();
         const result = await pool.request()
             .input('id', sql.Int, parseInt(req.params.id, 10))
+            .input('viewerId', sql.Int, Number(req.user.sub))
             .query(`
                 SELECT h.*, u.ho_va_ten AS ten_khach_hang, u.email AS email_khach_hang, u.so_dien_thoai AS sdt_khach_hang,
                        o.so_hieu_o, o.ten_o_dat, o.dien_tich_m2, o.gia_thue_thang,
-                       c.ten_cay_trong, c.thoi_gian_sinh_truong_ngay
+                       c.ten_cay_trong, c.thoi_gian_sinh_truong_ngay,
+                       CASE WHEN EXISTS (
+                           SELECT 1 FROM PhanCongNongDan p
+                           WHERE p.ma_hop_dong = h.ma_hop_dong
+                             AND p.ma_nong_dan = @viewerId
+                             AND p.trang_thai = 'da_chap_nhan'
+                       ) THEN 1 ELSE 0 END AS is_assigned_farmer
                 FROM HopDongThue h
                 JOIN NguoiDung u ON u.ma_nguoi_dung = h.ma_nguoi_dung
                 JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
@@ -587,6 +594,13 @@ const getRentalById = async (req, res) => {
         const rental = result.recordset[0];
         if (!rental) {
             return res.status(404).json({ success: false, message: 'Không tìm thấy hợp đồng' });
+        }
+
+        const canView = req.user.role === 'quan_tri'
+            || Number(rental.ma_nguoi_dung) === Number(req.user.sub)
+            || (req.user.role === 'nong_dan' && rental.is_assigned_farmer === 1);
+        if (!canView) {
+            return res.status(403).json({ success: false, message: 'Khong co quyen xem hop dong nay' });
         }
 
         return res.json({ success: true, data: rental });
@@ -1144,7 +1158,7 @@ const cancelRental = async (req, res) => {
         // Kiểm tra quyền: chỉ chủ hợp đồng hoặc admin/quản trị viên mới được hủy
         if (req.user?.sub) {
             const isOwner = Number(req.user.sub) === Number(rental.ma_nguoi_dung);
-            const isAdmin = ['quan_tri_vien', 'admin'].includes(req.user.role || req.user.vai_tro);
+            const isAdmin = ['quan_tri', 'quan_tri_vien', 'admin'].includes(req.user.role || req.user.vai_tro);
             if (!isOwner && !isAdmin) {
                 await transaction.rollback();
                 return res.status(403).json({ success: false, message: 'Bạn không có quyền hủy hợp đồng này' });
@@ -1157,7 +1171,7 @@ const cancelRental = async (req, res) => {
         }
 
         // Không cho phép tự hủy nếu đã thanh toán (trừ khi là admin)
-        const isAdmin = ['quan_tri_vien', 'admin'].includes(req.user?.role || req.user?.vai_tro);
+        const isAdmin = ['quan_tri', 'quan_tri_vien', 'admin'].includes(req.user?.role || req.user?.vai_tro);
         if (rental.trang_thai_thanh_toan === 'da_thanh_toan' && !isAdmin) {
             await transaction.rollback();
             return res.status(400).json({
