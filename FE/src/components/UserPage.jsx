@@ -149,6 +149,7 @@ function UserPage({ user, token, onLogout }) {
   const [rentalDetail, setRentalDetail] = useState(null);
   const [notice, setNotice] = useState("");
   const [supportSent, setSupportSent] = useState(false);
+  const [supportSubmitting, setSupportSubmitting] = useState(false);
   const [harvestDeliveries, setHarvestDeliveries] = useState([]);
   const [selectedCareRental, setSelectedCareRental] = useState("");
   const [selectedHarvestRental, setSelectedHarvestRental] = useState("");
@@ -486,6 +487,7 @@ function UserPage({ user, token, onLogout }) {
   const submitSupport = async (event) => {
     event.preventDefault();
     setError("");
+    setSupportSubmitting(true);
     const form = new FormData(event.currentTarget);
     const rental = rentals.find(
       (item) => String(item.ma_hop_dong) === String(selectedCareRental),
@@ -505,9 +507,15 @@ function UserPage({ user, token, onLogout }) {
       );
       setServiceRequests(await getUserServiceRequests(user.id, token));
       setSupportSent(true);
+      setSelectedCareRental("");
+      event.currentTarget.reset();
       showNotice("Đã gửi yêu cầu chăm sóc tới đội ngũ PlotFarm.");
+      notify("Gửi yêu cầu thành công! Farmer phụ trách sẽ tiếp nhận sớm.");
     } catch (requestError) {
       setError(requestError.message);
+      notify(requestError.message || "Không thể gửi yêu cầu chăm sóc", "error");
+    } finally {
+      setSupportSubmitting(false);
     }
   };
 
@@ -1457,10 +1465,22 @@ function UserPage({ user, token, onLogout }) {
                 required
                 placeholder="Mô tả tình trạng hoặc ghi chú cho nông dân"
               />
-              <button className="primary-button" type="submit">
-                Gửi yêu cầu <span>→</span>
+              <button className="primary-button" type="submit" disabled={supportSubmitting}>
+                {supportSubmitting ? "Đang gửi..." : "Gửi yêu cầu"} <span>→</span>
               </button>
             </form>
+          )}
+          {supportSent && (
+            <div className="support-submit-success" role="status">
+              <div className="support-success-icon" aria-hidden="true">✓</div>
+              <div>
+                <strong>Yêu cầu đã được gửi thành công</strong>
+                <p>Yêu cầu đã chuyển tới Farmer phụ trách. Bạn có thể theo dõi trạng thái ở lịch sử bên dưới.</p>
+              </div>
+              <button type="button" className="outline-button" onClick={() => setSupportSent(false)}>
+                Gửi yêu cầu khác
+              </button>
+            </div>
           )}
           <div className="service-history">
             <div className="panel-heading">

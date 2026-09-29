@@ -1,4 +1,5 @@
 const { sql, getPool } = require('../config/db');
+const { createNotification } = require('./notificationController');
 
 // Lấy danh mục các loại dịch vụ chăm sóc
 const getServiceTypes = async (req, res) => {
@@ -61,6 +62,14 @@ const createServiceRequest = async (req, res) => {
                 OUTPUT INSERTED.*
                 VALUES (@so_phieu, @ma_hop_dong, @ma_khach_hang, @ma_loai_dich_vu, @farmerId, @ngay_thuc_hien, @ghi_chu, 'cho_tiep_nhan')
             `);
+
+        createNotification(
+            contract.ma_nong_dan,
+            `Yêu cầu chăm sóc mới: Hợp đồng #${ma_hop_dong}`,
+            `Khách hàng vừa gửi một yêu cầu chăm sóc. Vui lòng mở mục “Yêu cầu từ khách hàng” để tiếp nhận và xử lý.`,
+            'yeu_cau_dich_vu',
+            '/farmer?tab=requests',
+        ).catch(() => {});
 
         res.status(201).json({
             success: true,
