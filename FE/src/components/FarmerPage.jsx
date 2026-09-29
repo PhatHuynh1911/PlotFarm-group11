@@ -38,6 +38,17 @@ const cultivationLabels = {
 };
 const formatDate = (value) =>
   value ? new Date(value).toLocaleDateString("vi-VN") : "Chưa cập nhật";
+const mapServiceRequests = (serviceRequests) =>
+  serviceRequests.map((request) => ({
+    id: request.ma_yeu_cau,
+    plot: request.so_hieu_o,
+    customer: request.ten_khach_hang,
+    text: request.ghi_chu_cua_khach || "Không có ghi chú",
+    status: request.trang_thai_xu_ly,
+    time: request.ngay_gui_yeu_cau,
+    reply: request.phan_hoi_cua_nha_vuon || "",
+    photo: request.hinh_anh_nghiem_thu || "",
+  }));
 
 function FarmerPage({ user, onLogout }) {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -47,6 +58,7 @@ function FarmerPage({ user, onLogout }) {
   const activeTab = searchParams.get("tab") || "plots";
   const [plots, setPlots] = useState([]);
   const [requests, setRequests] = useState([]);
+  const [refreshingRequests, setRefreshingRequests] = useState(false);
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -133,18 +145,7 @@ function FarmerPage({ user, onLogout }) {
         if (mappedPlots[0]?.id) {
           setJournalForm((prev) => ({ ...prev, plot: mappedPlots[0].id }));
         }
-        setRequests(
-          serviceRequests.map((request) => ({
-            id: request.ma_yeu_cau,
-            plot: request.so_hieu_o,
-            customer: request.ten_khach_hang,
-            text: request.ghi_chu_cua_khach || "Không có ghi chú",
-            status: request.trang_thai_xu_ly,
-            time: request.ngay_gui_yeu_cau,
-            reply: request.phan_hoi_cua_nha_vuon || "",
-            photo: request.hinh_anh_nghiem_thu || "",
-          })),
-        );
+        setRequests(mapServiceRequests(serviceRequests));
 
         // Lấy lịch sử nhật ký từ DB
         const journalGroups = await Promise.all(
@@ -174,6 +175,25 @@ function FarmerPage({ user, onLogout }) {
       })
       .catch((requestError) => setError(requestError.message))
       .finally(() => setLoading(false));
+  }, [token]);
+
+  const refreshRequests = async (showToast = false) => {
+    setRefreshingRequests(true);
+    try {
+      const serviceRequests = await getServiceRequests(token);
+      setRequests(mapServiceRequests(serviceRequests));
+      if (showToast) notify("Đã cập nhật yêu cầu chăm sóc mới nhất.");
+    } catch (requestError) {
+      setError(requestError.message);
+      if (showToast) notify(requestError.message, "error");
+    } finally {
+      setRefreshingRequests(false);
+    }
+  };
+
+  useEffect(() => {
+    const interval = window.setInterval(() => refreshRequests(false), 15000);
+    return () => window.clearInterval(interval);
   }, [token]);
 
   const respondAssignment = async (assignment, status, reason = "") => {
@@ -928,6 +948,14 @@ function FarmerPage({ user, onLogout }) {
               <span className="result-count">
                 Tiếp nhận · thực hiện · hoàn thành
               </span>
+              <button
+                type="button"
+                className="outline-button"
+                disabled={refreshingRequests}
+                onClick={() => refreshRequests(true)}
+              >
+                {refreshingRequests ? "Đang tải..." : "↻ Làm mới"}
+              </button>
             </div>
             <div className="request-list">
               {requests.map((request) => (
