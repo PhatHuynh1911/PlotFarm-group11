@@ -449,6 +449,9 @@ function FarmerPage({ user, onLogout }) {
   const activeRequests = requests.filter(
     (request) => request.status !== "hoan_thanh",
   ).length;
+  const newRequests = requests.filter(
+    (request) => request.status === "cho_tiep_nhan",
+  ).length;
   const saveProfile = async (nextUser) => {
     try {
       const currentAuth = JSON.parse(sessionStorage.getItem("plotfarm_auth") || "{}");
@@ -495,6 +498,11 @@ function FarmerPage({ user, onLogout }) {
               onClick={() => selectTab(id)}
             >
               {label}
+              {id === "requests" && newRequests > 0 && (
+                <span className="farmer-request-badge" aria-label={`${newRequests} yêu cầu mới`}>
+                  {newRequests > 9 ? "9+" : newRequests}
+                </span>
+              )}
             </button>
           ))}
         </nav>
