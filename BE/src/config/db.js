@@ -263,6 +263,20 @@ const connectDB = async () => {
             END
         `);
         await activePool.request().query(`
+            IF OBJECT_ID('dbo.ThongBao', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.ThongBao (
+                    ma_thong_bao INT IDENTITY(1,1) PRIMARY KEY,
+                    ma_nguoi_dung INT NOT NULL FOREIGN KEY REFERENCES dbo.NguoiDung(ma_nguoi_dung) ON DELETE CASCADE,
+                    tieu_de NVARCHAR(150) NOT NULL,
+                    noi_dung NVARCHAR(500) NOT NULL,
+                    loai_thong_bao VARCHAR(50) NOT NULL DEFAULT 'he_thong',
+                    lien_ket VARCHAR(255) NULL,
+                    da_doc BIT NOT NULL DEFAULT 0,
+                    ngay_tao DATETIME2 NOT NULL DEFAULT SYSDATETIME()
+                );
+            END
+
             IF OBJECT_ID('dbo.ThanhToanGiaHan', 'U') IS NULL
             BEGIN
                 CREATE TABLE dbo.ThanhToanGiaHan (
