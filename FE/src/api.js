@@ -91,6 +91,18 @@ export async function createServiceRequest(payload, token) {
   return apiRequest('/services', { method: 'POST', body: JSON.stringify(payload), token })
 }
 
+export async function getNotifications(token) {
+  return apiRequest('/notifications', { token })
+}
+
+export async function markNotificationRead(id, token) {
+  return apiRequest(`/notifications/${id}/read`, { method: 'PATCH', token })
+}
+
+export async function markAllNotificationsRead(token) {
+  return apiRequest('/notifications/read-all', { method: 'PATCH', token })
+}
+
 export async function getActiveRentals(token) {
   const result = await apiRequest('/rentals/active', { token })
   return result.data
