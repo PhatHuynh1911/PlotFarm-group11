@@ -510,6 +510,10 @@ function FarmerPage({ user, onLogout }) {
           user={user}
           roleLabel="Nông dân PlotFarm"
           onProfile={() => selectTab("profile")}
+          onNotificationNavigate={(link) => {
+            const tab = new URLSearchParams((link || "").split("?")[1] || "").get("tab");
+            if (tab) selectTab(tab);
+          }}
           onLogout={onLogout}
         />
       </header>
