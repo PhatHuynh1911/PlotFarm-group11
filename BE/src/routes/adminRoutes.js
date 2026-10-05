@@ -15,6 +15,7 @@ router.post('/plots', uploadPlotImage.single('image'), admin.createPlot);
 router.patch('/plots/:id', uploadPlotImage.single('image'), admin.updatePlot);
 router.delete('/plots/:id', admin.deletePlot);
 router.get('/rentals', admin.rentals);
+router.get('/payments', admin.payments);
 router.get('/requests', admin.requests);
 router.get('/requests/services', admin.serviceRequests);
 router.get('/requests/complaints', admin.complaintRequests);

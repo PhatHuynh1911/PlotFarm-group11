@@ -164,7 +164,14 @@ const updateRequestStatus = async (req, res) => {
         const access = await pool.request()
             .input('id', sql.Int, parseInt(id, 10))
             .input('farmerId', sql.Int, Number(req.user?.sub))
-            .query(`SELECT ma_nong_dan_phu_trach FROM YeuCauDichVu WHERE ma_yeu_cau = @id`);
+            .query(`
+                SELECT y.ma_nong_dan_phu_trach, y.ma_khach_hang,
+                       h.so_hop_dong, o.so_hieu_o
+                FROM YeuCauDichVu y
+                JOIN HopDongThue h ON h.ma_hop_dong = y.ma_hop_dong
+                JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+                WHERE y.ma_yeu_cau = @id
+            `);
         if (!access.recordset[0]) return res.status(404).json({ success: false, message: 'Không tìm thấy yêu cầu chăm sóc' });
         if (req.user?.role === 'nong_dan' && access.recordset[0].ma_nong_dan_phu_trach !== Number(req.user.sub)) return res.status(403).json({ success: false, message: 'Bạn không được xử lý yêu cầu này' });
         await pool.request()
@@ -182,6 +189,22 @@ const updateRequestStatus = async (req, res) => {
                     ngay_hoan_thanh = CASE WHEN @status = 'hoan_thanh' THEN SYSDATETIME() ELSE ngay_hoan_thanh END
                 WHERE ma_yeu_cau = @id
             `);
+
+        const statusLabels = {
+            cho_tiep_nhan: 'Cho tiep nhan',
+            da_tiep_nhan: 'Da tiep nhan',
+            dang_thuc_hien: 'Dang thuc hien',
+            hoan_thanh: 'Hoan thanh',
+            tu_choi: 'Tu choi'
+        };
+        const requestInfo = access.recordset[0];
+        createNotification(
+            requestInfo.ma_khach_hang,
+            `Yeu cau cham soc o ${requestInfo.so_hieu_o} da duoc cap nhat`,
+            `Trang thai moi: ${statusLabels[status] || status}. Hop dong ${requestInfo.so_hop_dong}.`,
+            'yeu_cau_dich_vu',
+            '/user?tab=support'
+        ).catch((notificationError) => console.error('Khong the tao thong bao yeu cau:', notificationError));
 
         res.status(200).json({
             success: true,

@@ -255,6 +255,43 @@ const rentals = async (req, res) => {
     } catch (error) { return res.status(500).json({ success: false, message: 'Không thể tải đơn thuê' }); }
 };
 
+// Lich su thanh toan gom tien thue ban dau va cac phieu gia han.
+const payments = async (req, res) => {
+    try {
+        const pool = await getPool();
+        const [rentalPayments, extensionPayments] = await Promise.all([
+            pool.request().query(`
+                SELECT CONCAT('rental-', h.ma_hop_dong) AS id, 'thue_moi' AS kind,
+                       h.so_hop_dong AS contractCode, o.so_hieu_o AS plot,
+                       u.ho_va_ten AS customer, h.tong_tien AS amount,
+                       h.trang_thai_thanh_toan AS status, h.ngay_tao AS createdAt,
+                       CASE WHEN h.trang_thai_thanh_toan = 'da_thanh_toan'
+                            THEN h.ngay_cap_nhat ELSE NULL END AS paidAt
+                FROM HopDongThue h
+                JOIN NguoiDung u ON u.ma_nguoi_dung = h.ma_nguoi_dung
+                JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+            `),
+            pool.request().query(`
+                SELECT CONCAT('extension-', p.ma_thanh_toan_gia_han) AS id, 'gia_han' AS kind,
+                       h.so_hop_dong AS contractCode, o.so_hieu_o AS plot,
+                       u.ho_va_ten AS customer, p.chi_phi AS amount, p.trang_thai AS status,
+                       p.ngay_tao AS createdAt, p.ngay_thanh_toan AS paidAt,
+                       p.so_thang_gia_han AS extensionMonths, p.so_ngay_gia_han AS extensionDays
+                FROM dbo.ThanhToanGiaHan p
+                JOIN HopDongThue h ON h.ma_hop_dong = p.ma_hop_dong
+                JOIN NguoiDung u ON u.ma_nguoi_dung = h.ma_nguoi_dung
+                JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+            `)
+        ]);
+        const data = [...rentalPayments.recordset, ...extensionPayments.recordset]
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        return res.json({ success: true, data });
+    } catch (error) {
+        console.error('Loi tai lich su thanh toan:', error);
+        return res.status(500).json({ success: false, message: 'Khong the tai lich su thanh toan' });
+    }
+};
+
 const requests = async (req, res) => {
     try {
         const { type, category } = req.query;
@@ -459,4 +496,4 @@ const updateRequest = async (req, res) => {
     }
 };
 
-module.exports = { dashboard, users, updateUser, plots, createPlot, updatePlot, deletePlot, rentals, requests, serviceRequests, complaintRequests, consultationRequests, updateRequest };
+module.exports = { dashboard, users, updateUser, plots, createPlot, updatePlot, deletePlot, rentals, payments, requests, serviceRequests, complaintRequests, consultationRequests, updateRequest };

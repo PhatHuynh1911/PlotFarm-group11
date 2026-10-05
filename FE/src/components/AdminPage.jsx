@@ -10,6 +10,7 @@ const tabs = [
   ["assignments", "Phân công nhân sự"],
   ["rentals", "Đơn thuê & giao dịch"],
   ["requests", "Yêu cầu & khiếu nại"],
+  ["payments", "Thanh toán & gia hạn"],
 ];
 const labels = {
   role: { khach_hang: "Khách hàng", nong_dan: "Nông dân", quan_tri: "Admin" },
@@ -64,6 +65,7 @@ function AdminPage({ user, token, onLogout }) {
     users: [],
     plots: [],
     rentals: [],
+    payments: [],
     serviceRequests: [],
     complaintRequests: [],
     consultationRequests: [],
@@ -91,6 +93,7 @@ function AdminPage({ user, token, onLogout }) {
         "users",
         "plots",
         "rentals",
+        "payments",
         "requests/services",
         "requests/complaints",
         "requests/consultations",
@@ -117,11 +120,12 @@ function AdminPage({ user, token, onLogout }) {
         users: results[1],
         plots: results[2],
         rentals: results[3],
-        serviceRequests: results[4],
-        complaintRequests: results[5],
-        consultationRequests: results[6],
-        farmers: results[7],
-        assignments: results[8],
+        payments: results[4],
+        serviceRequests: results[5],
+        complaintRequests: results[6],
+        consultationRequests: results[7],
+        farmers: results[8],
+        assignments: results[9],
       });
       setError("");
     } catch (requestError) {
@@ -280,6 +284,7 @@ function AdminPage({ user, token, onLogout }) {
         {activeTab === "rentals" && (
           <Rentals items={data.rentals} assignments={data.assignments} />
         )}
+        {activeTab === "payments" && <Payments items={data.payments} />}
         {activeTab === "requests" && (
           <Requests groups={{ service: data.serviceRequests, complaint: data.complaintRequests, contact: data.consultationRequests }} onUpdate={updateRequest} />
         )}
@@ -870,6 +875,88 @@ function Rentals({ items, assignments }) {
                 </tr>
               );
             })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function Payments({ items }) {
+  const pending = items.filter((item) => item.status === "cho_thanh_toan");
+  const paid = items.filter((item) => item.status === "da_thanh_toan");
+  const totalPaid = paid.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  const paymentLabel = (status) => labels.paymentStatus[status] || status;
+
+  return (
+    <section className="admin-card">
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">ĐỐI SOÁT GIAO DỊCH</p>
+          <h2>Thanh toán và gia hạn</h2>
+        </div>
+        <span className="result-count">{items.length} giao dịch</span>
+      </div>
+      <div className="dashboard-stat-grid payment-summary-grid">
+        <article className="dashboard-stat">
+          <span>Chờ thanh toán</span>
+          <strong>{pending.length}</strong>
+          <small>Cần theo dõi xác nhận</small>
+        </article>
+        <article className="dashboard-stat">
+          <span>Đã thanh toán</span>
+          <strong>{paid.length}</strong>
+          <small>Giao dịch đã hoàn tất</small>
+        </article>
+        <article className="dashboard-stat">
+          <span>Doanh thu đã ghi nhận</span>
+          <strong>{money(totalPaid)}</strong>
+          <small>Tổng của các giao dịch đã thanh toán</small>
+        </article>
+      </div>
+      <div className="admin-table-wrap">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>Loại giao dịch</th>
+              <th>Hợp đồng / Ô đất</th>
+              <th>Khách hàng</th>
+              <th>Số tiền</th>
+              <th>Trạng thái</th>
+              <th>Thời gian</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item) => (
+              <tr key={item.id}>
+                <td>
+                  <strong>{item.kind === "gia_han" ? "Gia hạn" : "Thuê mới"}</strong>
+                  {item.kind === "gia_han" && (
+                    <small>
+                      +{item.extensionMonths || 0} tháng {item.extensionDays ? `(${item.extensionDays} ngày)` : ""}
+                    </small>
+                  )}
+                </td>
+                <td>
+                  <strong>{item.contractCode}</strong>
+                  <small>Ô đất: {item.plot}</small>
+                </td>
+                <td>{item.customer}</td>
+                <td><strong>{money(item.amount)}</strong></td>
+                <td>
+                  <span className="status-pill">
+                    {paymentLabel(item.status)}
+                  </span>
+                </td>
+                <td>
+                  {date(item.paidAt || item.createdAt)}
+                  <small>{item.paidAt ? "Đã xác nhận" : "Ngày tạo phiếu"}</small>
+                </td>
+              </tr>
+            ))}
+            {!items.length && (
+              <tr><td colSpan="6" className="empty-state">Chưa có giao dịch thanh toán.</td></tr>
+            )}
           </tbody>
         </table>
       </div>
