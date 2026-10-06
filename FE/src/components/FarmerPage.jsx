@@ -23,6 +23,7 @@ import {
   resolveImageUrl,
   updateCurrentUser,
 } from "../api.js";
+import ImageLightbox from "./ImageLightbox.jsx";
 
 const requestLabels = {
   cho_tiep_nhan: "Chờ tiếp nhận",
@@ -84,6 +85,7 @@ function FarmerPage({ user, onLogout }) {
   const [rejectingAssignment, setRejectingAssignment] = useState(null);
   const [rejectionReasonType, setRejectionReasonType] = useState("busy");
   const [rejectionReasonText, setRejectionReasonText] = useState("");
+  const [previewImage, setPreviewImage] = useState(null);
 
   const selectTab = (tab) => {
     setSearchParams((current) => {
@@ -939,6 +941,11 @@ function FarmerPage({ user, onLogout }) {
                     </div>
                     {entry.photo && (
                       <img
+                        className="image-previewable"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setPreviewImage({ src: resolveImageUrl(entry.photo), alt: "Ảnh nhật ký canh tác" })}
+                        onKeyDown={(event) => event.key === "Enter" && setPreviewImage({ src: resolveImageUrl(entry.photo), alt: "Ảnh nhật ký canh tác" })}
                         src={resolveImageUrl(entry.photo)}
                         alt="Ảnh cây trồng trong nhật ký"
                       />
@@ -1255,6 +1262,7 @@ function FarmerPage({ user, onLogout }) {
           </form>
         </div>
       )}
+      {previewImage && <ImageLightbox {...previewImage} onClose={() => setPreviewImage(null)} />}
     </main>
   );
 }
