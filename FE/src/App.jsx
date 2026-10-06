@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import './App.css'
 import Header from './components/Header.jsx'
 import LandingSections from './components/LandingSections.jsx'
@@ -29,9 +29,27 @@ const readStoredAuth = () => {
 }
 
 function ProtectedRoute({ auth, allowedRoles, children }) {
+  const location = useLocation()
   if (!auth) return <Navigate to="/" replace />
-  if (!allowedRoles.includes(auth.user.role)) return <Navigate to={dashboardPath(auth.user.role)} replace />
+  if (!allowedRoles.includes(auth.user.role)) return <Navigate to="/403" replace state={{ from: location.pathname }} />
   return children
+}
+
+function StatusPage({ code, auth }) {
+  const navigate = useNavigate()
+  const isForbidden = code === '403'
+  return <main className="status-page">
+    <section className="status-card">
+      <p className="eyebrow">PLOTFARM · {code}</p>
+      <strong>{code}</strong>
+      <h1>{isForbidden ? 'Bạn không có quyền truy cập trang này' : 'Không tìm thấy trang bạn đang tìm'}</h1>
+      <p>{isForbidden ? 'Hãy trở về không gian làm việc đúng với vai trò tài khoản của bạn.' : 'Đường dẫn có thể đã thay đổi hoặc không còn tồn tại.'}</p>
+      <div>
+        <button className="primary-button" onClick={() => navigate(auth ? dashboardPath(auth.user.role) : '/')}>Về trang phù hợp</button>
+        <button className="outline-button" onClick={() => navigate(-1)}>Quay lại</button>
+      </div>
+    </section>
+  </main>
 }
 
 function HomePage({ authMode, setAuthMode, onAuthenticated }) {
@@ -93,7 +111,8 @@ function App() {
     <Route path="/admin" element={<ProtectedRoute auth={auth} allowedRoles={['quan_tri']}><AdminPage user={auth?.user} token={auth?.token} onLogout={logout} /></ProtectedRoute>} />
     <Route path="/farmer" element={<ProtectedRoute auth={auth} allowedRoles={['nong_dan']}><FarmerPage user={auth?.user} onLogout={logout} /></ProtectedRoute>} />
     <Route path="/dashboard" element={<ProtectedRoute auth={auth} allowedRoles={['khach_hang']}><UserPage user={auth?.user} token={auth?.token} onLogout={logout} /></ProtectedRoute>} />
-    <Route path="*" element={<Navigate to={auth ? dashboardPath(auth.user.role) : '/'} replace />} />
+    <Route path="/403" element={<StatusPage code="403" auth={auth} />} />
+    <Route path="*" element={<StatusPage code="404" auth={auth} />} />
   </Routes></ToastProvider>
 }
 

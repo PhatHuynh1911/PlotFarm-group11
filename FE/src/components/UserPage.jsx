@@ -27,6 +27,7 @@ import ProfilePanel from "./ProfilePanel.jsx";
 import { notify } from "./ToastProvider.jsx";
 import { COMPLAINT_CATEGORIES, OTHER_COMPLAINT_OPTION } from "../data/complaintCategories.js";
 import { vietnamProvinces } from "../data/vietnamAddress.js";
+import ImageLightbox from "./ImageLightbox.jsx";
 
 const formatMoney = (value) =>
   `${new Intl.NumberFormat("vi-VN").format(value)}đ`;
@@ -142,6 +143,7 @@ function UserPage({ user, token, onLogout }) {
   const [bookingStep, setBookingStep] = useState("details");
   const [bookingSubmitting, setBookingSubmitting] = useState(false);
   const [activePaymentModal, setActivePaymentModal] = useState(null);
+  const [previewImage, setPreviewImage] = useState(null);
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const [cancelTarget, setCancelTarget] = useState(null);
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
@@ -1404,6 +1406,11 @@ function UserPage({ user, token, onLogout }) {
                     </div>
                     {images[0] && (
                       <img
+                        className="image-previewable"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setPreviewImage({ src: resolveImageUrl(images[0]), alt: "Ảnh nhật ký" })}
+                        onKeyDown={(event) => event.key === "Enter" && setPreviewImage({ src: resolveImageUrl(images[0]), alt: "Ảnh nhật ký" })}
                         src={resolveImageUrl(images[0])}
                         alt={`Nhật ký ${item.tieu_de || ""}`}
                       />
@@ -1524,7 +1531,11 @@ function UserPage({ user, token, onLogout }) {
                   )}
                   {request.hinh_anh_nghiem_thu && (
                     <img
-                      className="service-reply-image"
+                      className="service-reply-image image-previewable"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setPreviewImage({ src: resolveImageUrl(request.hinh_anh_nghiem_thu), alt: "Ảnh phản hồi yêu cầu" })}
+                      onKeyDown={(event) => event.key === "Enter" && setPreviewImage({ src: resolveImageUrl(request.hinh_anh_nghiem_thu), alt: "Ảnh phản hồi yêu cầu" })}
                       src={resolveImageUrl(request.hinh_anh_nghiem_thu)}
                       alt="Ảnh phản hồi yêu cầu"
                     />
@@ -2444,6 +2455,7 @@ function UserPage({ user, token, onLogout }) {
       {paymentModal}
       {cancelModal}
       {rentalDetailModal}
+      {previewImage && <ImageLightbox {...previewImage} onClose={() => setPreviewImage(null)} />}
     </main>
   );
 }
