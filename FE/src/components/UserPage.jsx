@@ -626,6 +626,9 @@ function UserPage({ user, token, onLogout }) {
         <p className="payment-note" style={{ textAlign: "left", marginBottom: "14px" }}>
           Mở ứng dụng ngân hàng hoặc ví điện tử bất kỳ, chọn <strong>Quét mã QR</strong> để chuyển tiền. Sau khi thanh toán, bấm xác nhận bên dưới để hệ thống kích hoạt hợp đồng ngay lập tức.
         </p>
+        <p className="payment-demo-note">
+          Môi trường demo: nút xác nhận bên dưới mô phỏng phản hồi từ ngân hàng. Bản production cần nhận callback thanh toán để tự động đối soát.
+        </p>
 
         <div className="booking-actions" style={{ marginTop: "10px", display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "space-between" }}>
           {!activePaymentModal.extension_payment_id && <button
@@ -655,7 +658,7 @@ function UserPage({ user, token, onLogout }) {
               disabled={paymentSubmitting}
               onClick={() => handleConfirmPayment(activePaymentModal.ma_hop_dong || activePaymentModal.id)}
             >
-              {paymentSubmitting ? "Đang xử lý..." : "Tôi đã chuyển khoản thành công ✓"}
+              {paymentSubmitting ? "Đang xử lý..." : "Xác nhận thanh toán (demo) ✓"}
             </button>
           </div>
         </div>
