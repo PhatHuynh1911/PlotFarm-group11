@@ -444,6 +444,7 @@ h1 em, h2 em { font-family: inherit; font-style: normal; font-weight: 700; }
 .result-count { color: #718176; font-size: 13px; font-weight: 600; }
 .admin-table-wrap { overflow-x: auto; }
 .payment-summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0 0 24px; }
+.payment-demo-note { margin: -4px 0 12px; padding: 9px 11px; border-left: 3px solid #c98b3c; background: #fff8e9; color: #77613c; font-size: 11px; line-height: 1.5; text-align: left; }
 .image-previewable { cursor: zoom-in; transition: opacity .18s ease, transform .18s ease; }
 .image-previewable:hover, .image-previewable:focus-visible { opacity: .82; outline: 3px solid rgba(201,139,60,.45); outline-offset: 3px; transform: scale(1.02); }
 .image-lightbox { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 42px 24px 68px; box-sizing: border-box; background: rgba(10,26,18,.88); cursor: zoom-out; }
