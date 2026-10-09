@@ -1,4 +1,5 @@
 const { sql, getPool } = require('../config/db');
+const { createNotification } = require('./notificationController');
 
 const dashboard = async (req, res) => {
     try {
@@ -247,7 +248,7 @@ const rentals = async (req, res) => {
             SELECT h.ma_hop_dong AS id, h.so_hop_dong AS code, h.tong_tien AS total,
                    h.trang_thai_hop_dong AS status, h.trang_thai_thanh_toan AS paymentStatus,
                    h.trang_thai_canh_tac AS cultivationStatus,
-                   h.ngay_tao AS createdAt, u.ho_va_ten AS customer, o.so_hieu_o AS plot
+                   h.ngay_tao AS createdAt, u.ho_va_ten AS customer, u.email AS email, o.so_hieu_o AS plot
             FROM HopDongThue h JOIN NguoiDung u ON u.ma_nguoi_dung = h.ma_nguoi_dung
             JOIN ODat o ON o.ma_o_dat = h.ma_o_dat ORDER BY h.ngay_tao DESC
         `);
@@ -263,7 +264,7 @@ const payments = async (req, res) => {
             pool.request().query(`
                 SELECT CONCAT('rental-', h.ma_hop_dong) AS id, 'thue_moi' AS kind,
                        h.so_hop_dong AS contractCode, o.so_hieu_o AS plot,
-                       u.ho_va_ten AS customer, h.tong_tien AS amount,
+                       u.ho_va_ten AS customer, u.email AS email, h.tong_tien AS amount,
                        h.trang_thai_thanh_toan AS status, h.ngay_tao AS createdAt,
                        CASE WHEN h.trang_thai_thanh_toan = 'da_thanh_toan'
                             THEN h.ngay_cap_nhat ELSE NULL END AS paidAt
@@ -274,7 +275,7 @@ const payments = async (req, res) => {
             pool.request().query(`
                 SELECT CONCAT('extension-', p.ma_thanh_toan_gia_han) AS id, 'gia_han' AS kind,
                        h.so_hop_dong AS contractCode, o.so_hieu_o AS plot,
-                       u.ho_va_ten AS customer, p.chi_phi AS amount, p.trang_thai AS status,
+                       u.ho_va_ten AS customer, u.email AS email, p.chi_phi AS amount, p.trang_thai AS status,
                        p.ngay_tao AS createdAt, p.ngay_thanh_toan AS paidAt,
                        p.so_thang_gia_han AS extensionMonths, p.so_ngay_gia_han AS extensionDays
                 FROM dbo.ThanhToanGiaHan p
@@ -289,6 +290,72 @@ const payments = async (req, res) => {
     } catch (error) {
         console.error('Loi tai lich su thanh toan:', error);
         return res.status(500).json({ success: false, message: 'Khong the tai lich su thanh toan' });
+    }
+};
+
+// Duyet thanh toan trong moi truong demo khi Admin doi soat giao dich.
+const approvePayment = async (req, res) => {
+    const pool = await getPool();
+    const transaction = new sql.Transaction(pool);
+    try {
+        const id = Number(req.params.id);
+        const { kind } = req.params;
+        if (!Number.isInteger(id) || !['rental', 'extension'].includes(kind)) {
+            return res.status(400).json({ success: false, message: 'Giao dich khong hop le' });
+        }
+        await transaction.begin();
+
+        if (kind === 'rental') {
+            const result = await new sql.Request(transaction).input('id', sql.Int, id).query(`
+                SELECT h.ma_hop_dong, h.ma_nguoi_dung, h.so_hop_dong, h.ma_o_dat, h.trang_thai_thanh_toan,
+                       o.so_hieu_o
+                FROM HopDongThue h JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+                WHERE h.ma_hop_dong = @id
+            `);
+            const rental = result.recordset[0];
+            if (!rental) throw Object.assign(new Error('Khong tim thay hop dong'), { status: 404 });
+            if (rental.trang_thai_thanh_toan === 'da_thanh_toan') throw Object.assign(new Error('Giao dich nay da duoc xac nhan'), { status: 409 });
+            if (rental.trang_thai_thanh_toan !== 'cho_thanh_toan') throw Object.assign(new Error('Giao dich khong con co the xac nhan'), { status: 400 });
+
+            await new sql.Request(transaction).input('id', sql.Int, id).query(`
+                UPDATE HopDongThue
+                SET trang_thai_thanh_toan = 'da_thanh_toan', trang_thai_hop_dong = 'hieu_luc', ngay_cap_nhat = SYSDATETIME()
+                WHERE ma_hop_dong = @id
+            `);
+            await new sql.Request(transaction).input('plotId', sql.Int, rental.ma_o_dat).query(`
+                UPDATE ODat SET trang_thai = 'da_thue', ngay_cap_nhat = SYSDATETIME() WHERE ma_o_dat = @plotId
+            `);
+            await transaction.commit();
+            createNotification(rental.ma_nguoi_dung, `Thanh toan hop dong ${rental.so_hop_dong} da duoc xac nhan`, `Admin da doi soat thanh toan cho o dat ${rental.so_hieu_o}. Hop dong cua ban da co hieu luc.`, 'thanh_toan', '/dashboard?tab=gardens').catch(() => {});
+            return res.json({ success: true, message: 'Da xac nhan thanh toan hop dong' });
+        }
+
+        const result = await new sql.Request(transaction).input('id', sql.Int, id).query(`
+            SELECT p.*, h.ma_nguoi_dung, h.so_hop_dong, h.ma_hop_dong, o.so_hieu_o
+            FROM dbo.ThanhToanGiaHan p
+            JOIN HopDongThue h ON h.ma_hop_dong = p.ma_hop_dong
+            JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+            WHERE p.ma_thanh_toan_gia_han = @id
+        `);
+        const extension = result.recordset[0];
+        if (!extension) throw Object.assign(new Error('Khong tim thay phieu gia han'), { status: 404 });
+        if (extension.trang_thai === 'da_thanh_toan') throw Object.assign(new Error('Phieu gia han nay da duoc xac nhan'), { status: 409 });
+        if (extension.trang_thai !== 'cho_thanh_toan') throw Object.assign(new Error('Phieu gia han khong con co the xac nhan'), { status: 400 });
+
+        await new sql.Request(transaction)
+            .input('contractId', sql.Int, extension.ma_hop_dong)
+            .input('newEndDate', sql.Date, extension.ngay_ket_thuc_moi)
+            .input('months', sql.Int, extension.so_thang_gia_han)
+            .input('cost', sql.Decimal(14, 2), extension.chi_phi)
+            .query(`UPDATE HopDongThue SET ngay_ket_thuc = @newEndDate, thoi_han_thang = thoi_han_thang + @months, tong_tien = tong_tien + @cost, ngay_cap_nhat = SYSDATETIME() WHERE ma_hop_dong = @contractId`);
+        await new sql.Request(transaction).input('id', sql.Int, id).query(`UPDATE dbo.ThanhToanGiaHan SET trang_thai = 'da_thanh_toan', ngay_thanh_toan = SYSDATETIME() WHERE ma_thanh_toan_gia_han = @id`);
+        await transaction.commit();
+        createNotification(extension.ma_nguoi_dung, `Gia han hop dong ${extension.so_hop_dong} da duoc xac nhan`, `Admin da doi soat phi gia han. Thoi han thue o dat ${extension.so_hieu_o} da duoc cap nhat.`, 'thanh_toan', '/dashboard?tab=gardens').catch(() => {});
+        return res.json({ success: true, message: 'Da xac nhan thanh toan gia han' });
+    } catch (error) {
+        try { await transaction.rollback(); } catch (_) {}
+        console.error('Loi duyet thanh toan admin:', error);
+        return res.status(error.status || 500).json({ success: false, message: error.message || 'Khong the xac nhan thanh toan' });
     }
 };
 
@@ -496,4 +563,4 @@ const updateRequest = async (req, res) => {
     }
 };
 
-module.exports = { dashboard, users, updateUser, plots, createPlot, updatePlot, deletePlot, rentals, payments, requests, serviceRequests, complaintRequests, consultationRequests, updateRequest };
+module.exports = { dashboard, users, updateUser, plots, createPlot, updatePlot, deletePlot, rentals, payments, approvePayment, requests, serviceRequests, complaintRequests, consultationRequests, updateRequest };
