@@ -10,6 +10,7 @@ import {
   getAvailablePlots,
   getServiceTypes,
   getUserRentals,
+  getRentalDetail,
   getUserServiceRequests,
   getUserComplaints,
   submitComplaint,
@@ -520,6 +521,14 @@ function UserPage({ user, token, onLogout }) {
       setSupportSubmitting(false);
     }
   };
+  const openRentalDetail = async (rental) => {
+    try {
+      setRentalDetail(await getRentalDetail(rental.ma_hop_dong, token));
+    } catch (detailError) {
+      setError(detailError.message || "Không thể tải chi tiết hợp đồng");
+      notify(detailError.message || "Không thể tải chi tiết hợp đồng", "error");
+    }
+  };
 
   const handleComplaintSubmit = async (event) => {
     event.preventDefault();
@@ -774,6 +783,26 @@ function UserPage({ user, token, onLogout }) {
               <strong>{formatMoney(rentalDetail.tong_tien)}</strong>
             </div>
           </div>
+
+          {Array.isArray(rentalDetail.paymentHistory) && (
+            <div className="contract-payment-history">
+              <p>Trạng thái & lịch sử thanh toán</p>
+              {rentalDetail.paymentHistory.map((payment) => (
+                <div key={payment.id}>
+                  <span>
+                    {payment.kind === "gia_han"
+                      ? `Gia hạn ${payment.extensionMonths || 0} tháng`
+                      : "Thanh toán thuê đất"}
+                  </span>
+                  <strong>{formatMoney(payment.amount)}</strong>
+                  <small>
+                    {payment.status === "da_thanh_toan" ? "Đã thanh toán" : "Chờ thanh toán"}
+                    {` · ${formatDate(payment.paidAt || payment.createdAt)}`}
+                  </small>
+                </div>
+              ))}
+            </div>
+          )}
 
           {rentalDetail.mo_ta_chi_tiet && (
             <div style={{ marginBottom: "16px" }}>
@@ -1244,7 +1273,7 @@ function UserPage({ user, token, onLogout }) {
                   <button
                     className="outline-button"
                     style={{ marginTop: "10px" }}
-                    onClick={() => setRentalDetail(rental)}
+                    onClick={() => openRentalDetail(rental)}
                   >
                     Xem chi tiết ô đất →
                   </button>
@@ -1855,7 +1884,7 @@ function UserPage({ user, token, onLogout }) {
                               Nhận nông sản →
                             </button>
                           ) : rental.trang_thai_canh_tac === "da_thu_hoach" || rental.trang_thai_hop_dong === "da_ket_thuc" ? (
-                            <button onClick={() => setRentalDetail(rental)}>
+                            <button onClick={() => openRentalDetail(rental)}>
                               Xem chi tiết →
                             </button>
                           ) : (

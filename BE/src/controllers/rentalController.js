@@ -603,7 +603,25 @@ const getRentalById = async (req, res) => {
             return res.status(403).json({ success: false, message: 'Khong co quyen xem hop dong nay' });
         }
 
-        return res.json({ success: true, data: rental });
+        const extensionPayments = await pool.request()
+            .input('contractId', sql.Int, Number(rental.ma_hop_dong))
+            .query(`
+                SELECT ma_thanh_toan_gia_han AS id, 'gia_han' AS kind, chi_phi AS amount,
+                       trang_thai AS status, ngay_tao AS createdAt, ngay_thanh_toan AS paidAt,
+                       so_thang_gia_han AS extensionMonths, so_ngay_gia_han AS extensionDays
+                FROM dbo.ThanhToanGiaHan
+                WHERE ma_hop_dong = @contractId
+                ORDER BY ngay_tao DESC
+            `);
+        const paymentHistory = [{
+            id: `rental-${rental.ma_hop_dong}`,
+            kind: 'thue_moi',
+            amount: rental.tong_tien,
+            status: rental.trang_thai_thanh_toan,
+            createdAt: rental.ngay_tao,
+            paidAt: rental.trang_thai_thanh_toan === 'da_thanh_toan' ? rental.ngay_cap_nhat : null
+        }, ...extensionPayments.recordset];
+        return res.json({ success: true, data: { ...rental, paymentHistory } });
     } catch (error) {
         console.error('Lỗi khi lấy chi tiết hợp đồng:', error);
         return res.status(500).json({ success: false, message: 'Lỗi server nội bộ' });

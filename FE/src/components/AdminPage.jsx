@@ -161,6 +161,11 @@ function AdminPage({ user, token, onLogout }) {
     update(`requests/${item.id}`, "PATCH", { status: value, source: item.source }).catch((e) =>
       setError(e.message),
     );
+  const approvePayment = (item) => {
+    const kind = item.kind === "gia_han" ? "extension" : "rental";
+    const id = String(item.id).split("-").pop();
+    update(`payments/${kind}/${id}/approve`, "PATCH", {}).catch((e) => setError(e.message));
+  };
   const deletePlot = (item) => {
     if (!window.confirm(`Xóa ô đất "${item.code}"? Hành động này không thể hoàn tác.`)) return;
     setError("");
@@ -284,7 +289,7 @@ function AdminPage({ user, token, onLogout }) {
         {activeTab === "rentals" && (
           <Rentals items={data.rentals} assignments={data.assignments} />
         )}
-        {activeTab === "payments" && <Payments items={data.payments} />}
+        {activeTab === "payments" && <Payments items={data.payments} onApprove={approvePayment} />}
         {activeTab === "requests" && (
           <Requests groups={{ service: data.serviceRequests, complaint: data.complaintRequests, contact: data.consultationRequests }} onUpdate={updateRequest} />
         )}
@@ -882,7 +887,7 @@ function Rentals({ items, assignments }) {
   );
 }
 
-function Payments({ items }) {
+function Payments({ items, onApprove }) {
   const pending = items.filter((item) => item.status === "cho_thanh_toan");
   const paid = items.filter((item) => item.status === "da_thanh_toan");
   const totalPaid = paid.reduce((sum, item) => sum + Number(item.amount || 0), 0);
@@ -950,6 +955,11 @@ function Payments({ items }) {
                 </td>
                 <td>
                   {date(item.paidAt || item.createdAt)}
+                  {item.status === "cho_thanh_toan" && (
+                    <button type="button" className="outline-button payment-approve-button" onClick={() => onApprove(item)}>
+                      Duyệt thanh toán
+                    </button>
+                  )}
                   <small>{item.paidAt ? "Đã xác nhận" : "Ngày tạo phiếu"}</small>
                 </td>
               </tr>
