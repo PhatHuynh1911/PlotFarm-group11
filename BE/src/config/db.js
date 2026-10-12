@@ -292,6 +292,21 @@ const connectDB = async () => {
                     ngay_thanh_toan DATETIME2 NULL
                 );
             END
+
+            IF OBJECT_ID('dbo.YeuCauDatLaiMatKhau', 'U') IS NULL
+            BEGIN
+                CREATE TABLE dbo.YeuCauDatLaiMatKhau (
+                    ma_yeu_cau INT IDENTITY(1,1) PRIMARY KEY,
+                    ma_nguoi_dung INT NOT NULL FOREIGN KEY REFERENCES dbo.NguoiDung(ma_nguoi_dung) ON DELETE CASCADE,
+                    ma_code_hash VARCHAR(100) NOT NULL,
+                    ngay_het_han DATETIME2 NOT NULL,
+                    da_su_dung BIT NOT NULL DEFAULT 0,
+                    ngay_tao DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+                    ngay_su_dung DATETIME2 NULL
+                );
+                CREATE INDEX IX_YeuCauDatLaiMatKhau_User_Expiry
+                ON dbo.YeuCauDatLaiMatKhau(ma_nguoi_dung, ngay_het_han DESC);
+            END
         `);
         console.log(`✅ Kết nối SQL Server thành công: [${process.env.DB_NAME || 'PlotFarmDB'}] tại ${serverVal}`);
     } catch (error) {

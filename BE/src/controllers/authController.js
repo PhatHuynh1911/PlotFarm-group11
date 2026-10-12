@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { sql, getPool } = require('../config/db');
 
 const publicUser = (user) => ({
@@ -90,6 +91,78 @@ const register = async (req, res) => {
         }
         console.error('Lỗi đăng ký:', error);
         return res.status(500).json({ success: false, message: 'Không thể tạo tài khoản' });
+    }
+};
+
+// Demo reset flow: production should send this code through email/SMS instead of returning it.
+const forgotPassword = async (req, res) => {
+    try {
+        const email = String(req.body?.email || '').trim().toLowerCase();
+        if (!email) return res.status(400).json({ success: false, message: 'Vui lòng nhập email' });
+
+        const pool = await getPool();
+        const userResult = await pool.request().input('email', sql.VarChar(150), email)
+            .query(`SELECT ma_nguoi_dung FROM NguoiDung WHERE email = @email AND trang_thai = 'hoat_dong'`);
+        const user = userResult.recordset[0];
+        const message = 'Nếu email tồn tại, mã đặt lại mật khẩu đã được tạo. Mã có hiệu lực trong 10 phút.';
+        if (!user) return res.json({ success: true, message });
+
+        const resetCode = crypto.randomInt(100000, 1000000).toString();
+        const codeHash = await bcrypt.hash(resetCode, 10);
+        await pool.request()
+            .input('userId', sql.Int, user.ma_nguoi_dung)
+            .input('codeHash', sql.VarChar(100), codeHash)
+            .query(`
+                UPDATE dbo.YeuCauDatLaiMatKhau SET da_su_dung = 1 WHERE ma_nguoi_dung = @userId AND da_su_dung = 0;
+                INSERT INTO dbo.YeuCauDatLaiMatKhau (ma_nguoi_dung, ma_code_hash, ngay_het_han)
+                VALUES (@userId, @codeHash, DATEADD(minute, 10, SYSDATETIME()));
+            `);
+
+        const data = process.env.NODE_ENV === 'production' ? undefined : { demoCode: resetCode };
+        return res.json({ success: true, message, ...(data ? { data } : {}) });
+    } catch (error) {
+        console.error('Lỗi tạo yêu cầu đặt lại mật khẩu:', error);
+        return res.status(500).json({ success: false, message: 'Không thể tạo yêu cầu đặt lại mật khẩu' });
+    }
+};
+
+const resetPassword = async (req, res) => {
+    const { email: rawEmail, code, newPassword } = req.body || {};
+    const email = String(rawEmail || '').trim().toLowerCase();
+    if (!email || !/^\d{6}$/.test(String(code || '')) || String(newPassword || '').length < 6) {
+        return res.status(400).json({ success: false, message: 'Email, mã 6 số và mật khẩu mới tối thiểu 6 ký tự là bắt buộc' });
+    }
+
+    const pool = await getPool();
+    const transaction = new sql.Transaction(pool);
+    try {
+        await transaction.begin();
+        const request = new sql.Request(transaction);
+        const result = await request.input('email', sql.VarChar(150), email).query(`
+            SELECT TOP 1 u.ma_nguoi_dung, y.ma_yeu_cau, y.ma_code_hash
+            FROM NguoiDung u
+            JOIN dbo.YeuCauDatLaiMatKhau y ON y.ma_nguoi_dung = u.ma_nguoi_dung
+            WHERE u.email = @email AND u.trang_thai = 'hoat_dong'
+              AND y.da_su_dung = 0 AND y.ngay_het_han >= SYSDATETIME()
+            ORDER BY y.ngay_tao DESC
+        `);
+        const resetRequest = result.recordset[0];
+        if (!resetRequest || !(await bcrypt.compare(String(code), resetRequest.ma_code_hash))) {
+            await transaction.rollback();
+            return res.status(400).json({ success: false, message: 'Mã xác nhận không đúng hoặc đã hết hạn' });
+        }
+
+        const passwordHash = await bcrypt.hash(String(newPassword), 10);
+        await new sql.Request(transaction).input('userId', sql.Int, resetRequest.ma_nguoi_dung).input('password', sql.VarChar(100), passwordHash)
+            .query(`UPDATE NguoiDung SET mat_khau = @password, ngay_cap_nhat = SYSDATETIME() WHERE ma_nguoi_dung = @userId`);
+        await new sql.Request(transaction).input('requestId', sql.Int, resetRequest.ma_yeu_cau)
+            .query(`UPDATE dbo.YeuCauDatLaiMatKhau SET da_su_dung = 1, ngay_su_dung = SYSDATETIME() WHERE ma_yeu_cau = @requestId`);
+        await transaction.commit();
+        return res.json({ success: true, message: 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.' });
+    } catch (error) {
+        try { await transaction.rollback(); } catch (_) {}
+        console.error('Lỗi đặt lại mật khẩu:', error);
+        return res.status(500).json({ success: false, message: 'Không thể đặt lại mật khẩu' });
     }
 };
 
@@ -192,4 +265,4 @@ const getAdminDashboard = async (req, res) => {
     }
 };
 
-module.exports = { login, register, getMe, updateMe, getAdminDashboard };
+module.exports = { login, register, forgotPassword, resetPassword, getMe, updateMe, getAdminDashboard };
