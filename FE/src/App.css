@@ -45,6 +45,7 @@ h1 em, h2 em { font-family: 'Playfair Display', serif; font-weight: 500; color: 
 @media (max-width: 460px) { .header-actions { gap: 10px; }.login-link { display: none; }.auth-modal { padding: 36px 24px 28px; }.auth-heading h2 { font-size: 34px; } }
 
 .auth-error, .dashboard-error { margin: 0; color: #b54b35; font-size: 12px; line-height: 1.5; }
+.forgot-password-link { width: fit-content; padding: 0; border: 0; background: transparent; color: #a96c29; font: 600 12px var(--sans); cursor: pointer; text-align: left; }.auth-demo-code { margin: 0; padding: 10px 12px; border-left: 3px solid #c98b3c; background: #fff7e9; color: #77613c; font-size: 12px; line-height: 1.5; }.auth-demo-code strong { color: #173525; letter-spacing: .08em; }
 .auth-submit:disabled { cursor: wait; opacity: .7; }
 .dashboard-page { min-height: 100vh; background: #f7f6f2; color: #173525; }
 .dashboard-header { height: 72px; padding: 0 max(24px, calc((100% - 1180px) / 2)); display: flex; align-items: center; justify-content: space-between; background: #fff; border-bottom: 1px solid #dfe1da; }
