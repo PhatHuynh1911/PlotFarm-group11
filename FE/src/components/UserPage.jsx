@@ -29,6 +29,7 @@ import { notify } from "./ToastProvider.jsx";
 import { COMPLAINT_CATEGORIES, OTHER_COMPLAINT_OPTION } from "../data/complaintCategories.js";
 import { vietnamProvinces } from "../data/vietnamAddress.js";
 import ImageLightbox from "./ImageLightbox.jsx";
+import FarmWeatherWidget from "./FarmWeatherWidget.jsx";
 
 const formatMoney = (value) =>
   `${new Intl.NumberFormat("vi-VN").format(value)}đ`;
@@ -1161,6 +1162,7 @@ function UserPage({ user, token, onLogout }) {
             {notice}
           </p>
         )}
+        <FarmWeatherWidget />
         {content}
       </section>
       {paymentModal}

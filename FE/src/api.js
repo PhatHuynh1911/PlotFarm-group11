@@ -315,4 +315,15 @@ export async function expirePendingRentals(token) {
   })
 }
 
+export async function getFarmWeather() {
+  const result = await apiRequest('/weather/current')
+  return result.data
+}
+
+export async function getYieldEstimate(cropId, areaM2 = 24) {
+  const result = await apiRequest(`/weather/yield-estimate?cropId=${cropId}&areaM2=${areaM2}`)
+  return result.data
+}
+
+
 
