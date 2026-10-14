@@ -24,6 +24,7 @@ import {
   updateCurrentUser,
 } from "../api.js";
 import ImageLightbox from "./ImageLightbox.jsx";
+import FarmWeatherWidget from "./FarmWeatherWidget.jsx";
 
 const requestLabels = {
   cho_tiep_nhan: "Chờ tiếp nhận",
@@ -541,6 +542,7 @@ function FarmerPage({ user, onLogout }) {
           Theo dõi mùa vụ, chăm sóc những ô đất và cập nhật tiến độ canh tác của
           bạn.
         </p>
+        <FarmWeatherWidget showYieldModal={false} />
         <div className="dashboard-stat-grid">
           <div className="dashboard-stat">
             <span>Ô đất được phân công</span>
