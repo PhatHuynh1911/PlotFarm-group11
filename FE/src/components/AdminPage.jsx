@@ -57,6 +57,20 @@ const money = (value) => `${Number(value || 0).toLocaleString("vi-VN")} đ`;
 const date = (value) =>
   value ? new Date(value).toLocaleDateString("vi-VN") : "—";
 
+const matchesText = (item, query, fields) => {
+  if (!query.trim()) return true;
+  const needle = query.trim().toLowerCase();
+  return fields.some((field) => String(item[field] || "").toLowerCase().includes(needle));
+};
+const downloadCsv = (filename, headers, rows) => {
+  const escape = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+  const csv = [headers, ...rows].map((row) => row.map(escape).join(",")).join("\r\n");
+  const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url; link.download = filename; link.click();
+  URL.revokeObjectURL(url);
+};
+
 function AdminPage({ user, token, onLogout }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "overview";
@@ -814,6 +828,13 @@ function AssignmentPanel({ items, farmers, assignments, onAssign }) {
 }
 
 function Rentals({ items, assignments }) {
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("all");
+  const filteredItems = items.filter((item) => {
+    const matchesStatus = status === "all" || item.paymentStatus === status || item.status === status;
+    return matchesStatus && matchesText(item, query, ["code", "customer", "plot"]);
+  });
+
   return (
     <section className="admin-card">
       <div className="panel-heading">
@@ -822,6 +843,21 @@ function Rentals({ items, assignments }) {
           <h2>Đơn thuê đất & giao dịch</h2>
         </div>
         <span className="result-count">{items.length} hợp đồng</span>
+      </div>
+      <div className="admin-filter-bar">
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Tìm mã hợp đồng, khách hàng hoặc ô đất"
+          aria-label="Tìm hợp đồng"
+        />
+        <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Lọc trạng thái thanh toán">
+          <option value="all">Tất cả trạng thái</option>
+          <option value="cho_thanh_toan">Chờ thanh toán</option>
+          <option value="da_thanh_toan">Đã thanh toán</option>
+          <option value="da_huy">Đã hủy</option>
+        </select>
       </div>
       <div className="admin-table-wrap">
         <table className="admin-table">
@@ -836,7 +872,7 @@ function Rentals({ items, assignments }) {
             </tr>
           </thead>
           <tbody>
-            {items.map((item) => {
+            {filteredItems.map((item) => {
               const assignment = assignments.find(
                 (entry) => entry.ma_hop_dong === item.id,
               );
@@ -888,10 +924,32 @@ function Rentals({ items, assignments }) {
 }
 
 function Payments({ items, onApprove }) {
-  const pending = items.filter((item) => item.status === "cho_thanh_toan");
-  const paid = items.filter((item) => item.status === "da_thanh_toan");
+  const [query, setQuery] = useState("");
+  const [kind, setKind] = useState("all");
+  const [status, setStatus] = useState("all");
+  const filteredItems = items.filter((item) => {
+    const matchesKind = kind === "all" || item.kind === kind;
+    const matchesStatus = status === "all" || item.status === status;
+    return matchesKind && matchesStatus && matchesText(item, query, ["contractCode", "customer", "plot"]);
+  });
+  const pending = filteredItems.filter((item) => item.status === "cho_thanh_toan");
+  const paid = filteredItems.filter((item) => item.status === "da_thanh_toan");
   const totalPaid = paid.reduce((sum, item) => sum + Number(item.amount || 0), 0);
   const paymentLabel = (status) => labels.paymentStatus[status] || status;
+  const exportCsv = () => downloadCsv(
+    `plotfarm-giao-dich-${new Date().toISOString().slice(0, 10)}.csv`,
+    ["Loại giao dịch", "Mã hợp đồng", "Ô đất", "Khách hàng", "Số tiền", "Trạng thái", "Ngày tạo", "Ngày thanh toán"],
+    filteredItems.map((item) => [
+      item.kind === "gia_han" ? "Gia hạn" : "Thuê mới",
+      item.contractCode,
+      item.plot,
+      item.customer,
+      item.amount,
+      paymentLabel(item.status),
+      date(item.createdAt),
+      item.paidAt ? date(item.paidAt) : "",
+    ]),
+  );
 
   return (
     <section className="admin-card">
@@ -919,6 +977,29 @@ function Payments({ items, onApprove }) {
           <small>Tổng của các giao dịch đã thanh toán</small>
         </article>
       </div>
+      <div className="admin-filter-bar">
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Tìm hợp đồng, khách hàng hoặc ô đất"
+          aria-label="Tìm giao dịch"
+        />
+        <select value={kind} onChange={(event) => setKind(event.target.value)} aria-label="Lọc loại giao dịch">
+          <option value="all">Tất cả giao dịch</option>
+          <option value="thue_moi">Thuê mới</option>
+          <option value="gia_han">Gia hạn</option>
+        </select>
+        <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Lọc trạng thái giao dịch">
+          <option value="all">Tất cả trạng thái</option>
+          <option value="cho_thanh_toan">Chờ thanh toán</option>
+          <option value="da_thanh_toan">Đã thanh toán</option>
+          <option value="da_huy">Đã hủy</option>
+        </select>
+        <button type="button" className="outline-button admin-export-button" onClick={exportCsv}>
+          Xuất CSV
+        </button>
+      </div>
       <div className="admin-table-wrap">
         <table className="admin-table">
           <thead>
@@ -932,7 +1013,7 @@ function Payments({ items, onApprove }) {
             </tr>
           </thead>
           <tbody>
-            {items.map((item) => (
+            {filteredItems.map((item) => (
               <tr key={item.id}>
                 <td>
                   <strong>{item.kind === "gia_han" ? "Gia hạn" : "Thuê mới"}</strong>
@@ -964,7 +1045,7 @@ function Payments({ items, onApprove }) {
                 </td>
               </tr>
             ))}
-            {!items.length && (
+            {!filteredItems.length && (
               <tr><td colSpan="6" className="empty-state">Chưa có giao dịch thanh toán.</td></tr>
             )}
           </tbody>
