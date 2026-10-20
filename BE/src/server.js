@@ -23,6 +23,7 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const harvestRoutes = require('./routes/harvestRoutes');
 const weatherRoutes = require('./routes/weatherRoutes');
+const publicRoutes = require('./routes/publicRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -57,6 +58,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/harvest', harvestRoutes);
 app.use('/api/weather', weatherRoutes);
+app.use('/api/public', publicRoutes);
 
 // Route kiểm tra trạng thái máy chủ
 app.get('/', (req, res) => {
