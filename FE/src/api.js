@@ -63,8 +63,8 @@ export async function getPlots() {
   return result.data.map(normalizePlot)
 }
 
-export async function getDashboardStats() {
-  const result = await apiRequest('/auth/admin-dashboard')
+export async function getLandingStats() {
+  const result = await apiRequest('/public/stats')
   return result.data
 }
 

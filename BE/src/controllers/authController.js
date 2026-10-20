@@ -265,4 +265,20 @@ const getAdminDashboard = async (req, res) => {
     }
 };
 
-module.exports = { login, register, forgotPassword, resetPassword, getMe, updateMe, getAdminDashboard };
+const getPublicStats = async (req, res) => {
+    try {
+        const pool = await getPool();
+        const result = await pool.request().query(`
+            SELECT
+                (SELECT COUNT(*) FROM NguoiDung WHERE vai_tro = 'khach_hang' AND trang_thai = 'hoat_dong') AS totalUsers,
+                (SELECT COUNT(*) FROM ODAT WHERE trang_thai = 'trong') AS availablePlots,
+                (SELECT COALESCE(SUM(tong_dien_tich_ha), 0) FROM NongTrai WHERE trang_thai = 'hoat_dong') AS greenAreaHa
+        `);
+        return res.json({ success: true, data: result.recordset[0] });
+    } catch (error) {
+        console.error('Lỗi tải số liệu công khai:', error);
+        return res.status(500).json({ success: false, message: 'Không thể tải số liệu trang chủ' });
+    }
+};
+
+module.exports = { login, register, forgotPassword, resetPassword, getMe, updateMe, getAdminDashboard, getPublicStats };

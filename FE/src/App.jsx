@@ -11,7 +11,7 @@ import AdminPage from './components/AdminPage.jsx'
 import UserPage from './components/UserPage.jsx'
 import FarmerPage from './components/FarmerPage.jsx'
 import { ToastProvider } from './components/ToastProvider.jsx'
-import { getDashboardStats, getPlots } from './api.js'
+import { getLandingStats, getPlots } from './api.js'
 
 const dashboardPath = (role) => ({ quan_tri: '/admin', nong_dan: '/farmer', khach_hang: '/dashboard' }[role] || '/')
 
@@ -61,7 +61,7 @@ function HomePage({ authMode, setAuthMode, onAuthenticated }) {
   const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
 
   useEffect(() => {
-    Promise.all([getPlots(), getDashboardStats()])
+    Promise.all([getPlots(), getLandingStats()])
       .then(([nextPlots, nextStats]) => {
         setPlots(nextPlots)
         setStats(nextStats)
