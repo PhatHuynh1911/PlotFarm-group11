@@ -31,6 +31,7 @@ const swaggerSpec = {
         { bearerAuth: [] }
     ],
     tags: [
+        { name: '0. Public', description: 'Số liệu tổng hợp an toàn để hiển thị tại Homepage' },
         { name: '1. Auth', description: 'Đăng nhập, đăng ký tài khoản và thông tin người dùng' },
         { name: '2. Plots', description: 'Danh sách và thông tin chi tiết ô đất canh tác' },
         { name: '3. Crops', description: 'Danh mục và thông tin giống cây trồng' },
@@ -46,6 +47,17 @@ const swaggerSpec = {
         { name: '13. Complaints', description: 'Gửi và tiếp nhận khiếu nại, tranh chấp liên quan đến ô đất và hợp đồng' }
     ],
     paths: {
+        '/api/public/stats': {
+            get: {
+                tags: ['0. Public'],
+                summary: 'Lấy số liệu tổng hợp cho Homepage',
+                description: 'Không yêu cầu đăng nhập. Chỉ trả số lượng khách hàng hoạt động, ô đất trống và diện tích xanh.',
+                security: [],
+                responses: {
+                    200: { description: 'Số liệu Homepage' }
+                }
+            }
+        },
         // --- 1. AUTH ---
         '/api/auth/login': {
             post: {
@@ -234,6 +246,18 @@ const swaggerSpec = {
                 ],
                 responses: {
                     200: { description: 'Hợp đồng của khách hàng' }
+                }
+            }
+        },
+        '/api/rentals/payments/mine': {
+            get: {
+                tags: ['4. Rentals'],
+                summary: 'Lấy lịch sử giao dịch của khách hàng đăng nhập',
+                description: 'Trả về các giao dịch thuê mới và gia hạn thuộc chính tài khoản trong Bearer token.',
+                responses: {
+                    200: { description: 'Danh sách giao dịch của khách hàng' },
+                    401: { description: 'Chưa đăng nhập' },
+                    403: { description: 'Không phải tài khoản khách hàng' }
                 }
             }
         },

@@ -4,6 +4,7 @@ const {
     createRental,
     getAllRentals,
     getRentalsByUser,
+    getUserPayments,
     getActiveRentals,
     getRentalById,
     updateCultivationStatus,
@@ -37,6 +38,7 @@ router.get('/assignments/mine', authenticate, authorize('nong_dan'), getAssignme
 router.patch('/assignments/:id/respond', authenticate, authorize('nong_dan'), respondToAssignment);
 router.get('/harvest-deliveries/mine', authenticate, authorize('nong_dan'), getHarvestDeliveriesForFarmer);
 router.get('/harvest-deliveries/user', authenticate, authorize('khach_hang'), getHarvestDeliveriesForUser);
+router.get('/payments/mine', authenticate, authorize('khach_hang'), getUserPayments);
 router.patch('/:id/harvest-ready', authenticate, authorize('nong_dan'), markHarvestReady);
 router.post('/:id/harvest-delivery', authenticate, authorize('khach_hang'), chooseHarvestDelivery);
 router.patch('/harvest-deliveries/:id/handover', authenticate, authorize('nong_dan'), handoverHarvestDelivery);

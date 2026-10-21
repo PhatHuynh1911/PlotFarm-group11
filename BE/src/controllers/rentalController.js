@@ -254,6 +254,43 @@ const getRentalsByUser = async (req, res) => {
     }
 };
 
+// Lịch sử thanh toán chỉ của tài khoản đang đăng nhập (thuê mới và gia hạn).
+const getUserPayments = async (req, res) => {
+    try {
+        const pool = await getPool();
+        const userId = Number(req.user.sub);
+        const [rentalPayments, extensionPayments] = await Promise.all([
+            pool.request().input('userId', sql.Int, userId).query(`
+                SELECT CONCAT('rental-', h.ma_hop_dong) AS id, 'thue_moi' AS kind,
+                       h.ma_hop_dong AS contractId, h.so_hop_dong AS contractCode,
+                       o.so_hieu_o AS plot, h.tong_tien AS amount,
+                       h.trang_thai_thanh_toan AS status, h.ngay_tao AS createdAt,
+                       CASE WHEN h.trang_thai_thanh_toan = 'da_thanh_toan' THEN h.ngay_cap_nhat ELSE NULL END AS paidAt
+                FROM HopDongThue h
+                JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+                WHERE h.ma_nguoi_dung = @userId
+            `),
+            pool.request().input('userId', sql.Int, userId).query(`
+                SELECT CONCAT('extension-', p.ma_thanh_toan_gia_han) AS id, 'gia_han' AS kind,
+                       h.ma_hop_dong AS contractId, h.so_hop_dong AS contractCode,
+                       o.so_hieu_o AS plot, p.chi_phi AS amount, p.trang_thai AS status,
+                       p.ngay_tao AS createdAt, p.ngay_thanh_toan AS paidAt,
+                       p.so_thang_gia_han AS extensionMonths, p.so_ngay_gia_han AS extensionDays
+                FROM dbo.ThanhToanGiaHan p
+                JOIN HopDongThue h ON h.ma_hop_dong = p.ma_hop_dong
+                JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+                WHERE h.ma_nguoi_dung = @userId
+            `),
+        ]);
+        const data = [...rentalPayments.recordset, ...extensionPayments.recordset]
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        return res.json({ success: true, data });
+    } catch (error) {
+        console.error('Lỗi lấy lịch sử giao dịch khách hàng:', error);
+        return res.status(500).json({ success: false, message: 'Không thể tải lịch sử giao dịch' });
+    }
+};
+
 // Lấy danh sách ô đất đang canh tác hiệu lực (Dành cho Nông dân)
 const getActiveRentals = async (req, res) => {
     try {
@@ -1358,6 +1395,7 @@ module.exports = {
     createRental,
     getAllRentals,
     getRentalsByUser,
+    getUserPayments,
     getActiveRentals,
     getRentalById,
     updateCultivationStatus,
