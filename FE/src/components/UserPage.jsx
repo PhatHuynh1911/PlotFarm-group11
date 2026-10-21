@@ -10,6 +10,7 @@ import {
   getAvailablePlots,
   getServiceTypes,
   getUserRentals,
+  getUserPayments,
   getRentalDetail,
   getUserServiceRequests,
   getUserComplaints,
@@ -58,6 +59,12 @@ const contractStatusLabels = {
   hieu_luc: "Đang thuê",
   da_ket_thuc: "Đã kết thúc",
   da_huy: "Đã hủy",
+};
+const paymentStatusLabels = {
+  cho_thanh_toan: "Chờ thanh toán",
+  da_thanh_toan: "Đã thanh toán",
+  da_huy: "Đã hủy",
+  hoan_tien: "Hoàn tiền",
 };
 // Nguồn sự thật cho trạng thái sau thu hoạch là trang_thai_canh_tac === "da_thu_hoach" hoặc trang_thai_hop_dong === "da_ket_thuc" (do BE trả về sau khi bàn giao)
 function rentalStatusLabel(rental) {
@@ -121,6 +128,7 @@ function journalImages(item) {
 function UserPage({ user, token, onLogout }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [rentals, setRentals] = useState([]);
+  const [payments, setPayments] = useState([]);
   const [availablePlots, setAvailablePlots] = useState([]);
   const [crops, setCrops] = useState([]);
   const [serviceTypes, setServiceTypes] = useState([]);
@@ -207,6 +215,7 @@ function UserPage({ user, token, onLogout }) {
   useEffect(() => {
     Promise.all([
       getUserRentals(user.id, token),
+      getUserPayments(token),
       getAvailablePlots(token),
       getCrops(),
       getServiceTypes(),
@@ -217,6 +226,7 @@ function UserPage({ user, token, onLogout }) {
       .then(
         async ([
           nextRentals,
+          nextPayments,
           nextPlots,
           nextCrops,
           nextServiceTypes,
@@ -225,6 +235,7 @@ function UserPage({ user, token, onLogout }) {
           nextHarvestDeliveries,
         ]) => {
           setRentals(nextRentals);
+          setPayments(nextPayments);
           const assignedRentals = nextRentals.filter(
             (rental) => rental.trang_thai_phan_cong === "da_chap_nhan",
           );
@@ -299,6 +310,7 @@ function UserPage({ user, token, onLogout }) {
     ["live", "Camera trực tiếp"],
     ["support", "Yêu cầu chăm sóc"],
     ["harvest", "Quản lý thu hoạch"],
+    ["payments", "Lịch sử giao dịch"],
   ];
   const showNotice = (message) => {
     setNotice(message);
@@ -2277,6 +2289,53 @@ function UserPage({ user, token, onLogout }) {
                   {harvestSubmitting ? "Đang xử lý..." : "Đăng ký nhận hàng"} <span>→</span>
                 </button>
               </form>
+            )}
+          </section>
+        )}
+        {activeTab === "payments" && (
+          <section className="dashboard-panel payment-history-panel">
+            <div className="panel-heading">
+              <div>
+                <p className="eyebrow">PAYMENT HISTORY</p>
+                <h2>Lịch sử giao dịch</h2>
+              </div>
+              <span className="result-count">{payments.length} giao dịch</span>
+            </div>
+            {!payments.length ? (
+              <p className="empty-state">Bạn chưa có giao dịch thuê đất hoặc gia hạn nào.</p>
+            ) : (
+              <div className="user-payment-list">
+                {payments.map((payment) => {
+                  const relatedRental = rentals.find(
+                    (rental) => String(rental.ma_hop_dong) === String(payment.contractId),
+                  );
+                  return (
+                    <article key={payment.id} className="user-payment-item">
+                      <div>
+                        <strong>{payment.kind === "gia_han" ? "Gia hạn hợp đồng" : "Thuê ô đất"}</strong>
+                        <p>{payment.contractCode} · Ô đất {payment.plot}</p>
+                        <small>
+                          Tạo ngày {formatDate(payment.createdAt)}
+                          {payment.kind === "gia_han" && payment.extensionMonths
+                            ? ` · +${payment.extensionMonths} tháng`
+                            : ""}
+                        </small>
+                      </div>
+                      <div className="user-payment-meta">
+                        <strong>{formatMoney(payment.amount)}</strong>
+                        <span className={`status-pill payment-${payment.status}`}>
+                          {paymentStatusLabels[payment.status] || payment.status}
+                        </span>
+                        {relatedRental && (
+                          <button type="button" className="dashboard-link-button" onClick={() => openRentalDetail(relatedRental)}>
+                            Xem hợp đồng
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
             )}
           </section>
         )}
