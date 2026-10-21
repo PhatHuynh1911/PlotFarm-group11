@@ -73,6 +73,11 @@ export async function getUserRentals(userId, token) {
   return result.data
 }
 
+export async function getUserPayments(token) {
+  const result = await apiRequest('/rentals/payments/mine', { token })
+  return result.data
+}
+
 export async function getRentalDetail(rentalId, token) {
   const result = await apiRequest(`/rentals/${rentalId}`, { token })
   return result.data

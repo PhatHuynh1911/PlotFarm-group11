@@ -457,6 +457,11 @@ h1 em, h2 em { font-family: inherit; font-style: normal; font-weight: 700; }
 .contract-payment-history > p { margin: 0 0 8px; color: #173525; font-size: 12px; font-weight: 700; }
 .contract-payment-history > div { display: grid; grid-template-columns: 1fr auto; gap: 3px 12px; padding: 9px 0; border-top: 1px solid #e5e9e3; color: #526658; font-size: 12px; }
 .contract-payment-history strong { color: #a96c29; }.contract-payment-history small { grid-column: 1 / -1; color: #87938b; font-size: 10px; }
+.user-payment-list { display: grid; gap: 10px; }
+.user-payment-item { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 16px; border: 1px solid #e0e6dc; border-radius: 9px; background: #fbfcfa; }
+.user-payment-item > div:first-child { min-width: 0; }.user-payment-item p { margin: 5px 0 3px; color: #526658; font-size: 13px; }.user-payment-item small { color: #87938b; font-size: 11px; }
+.user-payment-meta { display: grid; justify-items: end; gap: 7px; text-align: right; }.user-payment-meta > strong { color: #173525; font-size: 15px; }.user-payment-meta .dashboard-link-button { padding: 0; font-size: 11px; }
+.payment-da_thanh_toan { background: #e8f5e9; color: #26713a; }.payment-cho_thanh_toan { background: #fff4dc; color: #9a681b; }.payment-da_huy { background: #fde8e8; color: #b54646; }
 .image-previewable { cursor: zoom-in; transition: opacity .18s ease, transform .18s ease; }
 .image-previewable:hover, .image-previewable:focus-visible { opacity: .82; outline: 3px solid rgba(201,139,60,.45); outline-offset: 3px; transform: scale(1.02); }
 .image-lightbox { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 42px 24px 68px; box-sizing: border-box; background: rgba(10,26,18,.88); cursor: zoom-out; }
