@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   createRental,
@@ -129,6 +129,9 @@ function UserPage({ user, token, onLogout }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [rentals, setRentals] = useState([]);
   const [payments, setPayments] = useState([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(true);
+  const [paymentsError, setPaymentsError] = useState("");
+  const [paymentFilter, setPaymentFilter] = useState("all");
   const [availablePlots, setAvailablePlots] = useState([]);
   const [crops, setCrops] = useState([]);
   const [serviceTypes, setServiceTypes] = useState([]);
@@ -215,7 +218,6 @@ function UserPage({ user, token, onLogout }) {
   useEffect(() => {
     Promise.all([
       getUserRentals(user.id, token),
-      getUserPayments(token),
       getAvailablePlots(token),
       getCrops(),
       getServiceTypes(),
@@ -226,7 +228,6 @@ function UserPage({ user, token, onLogout }) {
       .then(
         async ([
           nextRentals,
-          nextPayments,
           nextPlots,
           nextCrops,
           nextServiceTypes,
@@ -235,7 +236,6 @@ function UserPage({ user, token, onLogout }) {
           nextHarvestDeliveries,
         ]) => {
           setRentals(nextRentals);
-          setPayments(nextPayments);
           const assignedRentals = nextRentals.filter(
             (rental) => rental.trang_thai_phan_cong === "da_chap_nhan",
           );
@@ -287,6 +287,22 @@ function UserPage({ user, token, onLogout }) {
       .finally(() => setLoading(false));
   }, [user.id, token]);
 
+  const loadPayments = useCallback(async () => {
+    setPaymentsLoading(true);
+    setPaymentsError("");
+    try {
+      setPayments(await getUserPayments(token));
+    } catch (paymentError) {
+      setPaymentsError(paymentError.message || "Không thể tải lịch sử giao dịch");
+    } finally {
+      setPaymentsLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    loadPayments();
+  }, [loadPayments]);
+
   const filteredPlots = useMemo(
     () =>
       availablePlots.filter((plot) => {
@@ -302,6 +318,10 @@ function UserPage({ user, token, onLogout }) {
         );
       }),
     [availablePlots, filters],
+  );
+  const visiblePayments = useMemo(
+    () => paymentFilter === "all" ? payments : payments.filter((payment) => payment.status === paymentFilter),
+    [payments, paymentFilter],
   );
   const tabs = [
     ["gardens", "Khu vườn của tôi"],
@@ -2299,13 +2319,29 @@ function UserPage({ user, token, onLogout }) {
                 <p className="eyebrow">PAYMENT HISTORY</p>
                 <h2>Lịch sử giao dịch</h2>
               </div>
-              <span className="result-count">{payments.length} giao dịch</span>
+              <span className="result-count">{visiblePayments.length} giao dịch</span>
             </div>
-            {!payments.length ? (
+            <div className="payment-filter-bar">
+              <label htmlFor="payment-status-filter">Lọc trạng thái</label>
+              <select id="payment-status-filter" value={paymentFilter} onChange={(event) => setPaymentFilter(event.target.value)}>
+                <option value="all">Tất cả</option>
+                <option value="cho_thanh_toan">Chờ thanh toán</option>
+                <option value="da_thanh_toan">Đã thanh toán</option>
+                <option value="da_huy">Đã hủy</option>
+              </select>
+            </div>
+            {paymentsLoading ? (
+              <p className="loading-state" role="status">Đang tải lịch sử giao dịch...</p>
+            ) : paymentsError ? (
+              <div className="payment-history-error" role="alert">
+                <p>{paymentsError}</p>
+                <button type="button" className="outline-button" onClick={loadPayments}>Thử lại</button>
+              </div>
+            ) : !visiblePayments.length ? (
               <p className="empty-state">Bạn chưa có giao dịch thuê đất hoặc gia hạn nào.</p>
             ) : (
               <div className="user-payment-list">
-                {payments.map((payment) => {
+                {visiblePayments.map((payment) => {
                   const relatedRental = rentals.find(
                     (rental) => String(rental.ma_hop_dong) === String(payment.contractId),
                   );
