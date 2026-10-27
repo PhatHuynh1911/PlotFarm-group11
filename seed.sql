@@ -39,7 +39,7 @@ INSERT INTO dbo.NguoiDung (
 )
 VALUES 
 (
-    1, N'Quản trị viên PlotFarm', 'admin@plotfarm.vn', '12345', '0988888888',
+    1, N'Quản trị viên PlotFarm', 'admin.test@plotfarm.vn', 'Admin123!', '0988888888',
     'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80',
     N'Hòa Cường Bắc, Hải Châu, Đà Nẵng', N'Nam', '1990-01-15', 'quan_tri', 'hoat_dong', 1
 ),
