@@ -49,6 +49,8 @@ Backend chạy tại `http://localhost:5000` và Swagger UI tại `http://localh
 
 Điền thông tin SQL Server của máy vào `BE/.env`. Không commit file `.env` vì đây là cấu hình riêng của từng máy.
 
+Nếu dùng database đã được tạo từ phiên bản cũ, chạy thêm file `migrations/20261023_feature_compat.sql` trong SSMS sau khi chọn database `PlotFarmDB`. Migration này bổ sung các bảng/cột phục vụ thông báo, gia hạn, thu hoạch/giao nhận, quên mật khẩu và bản đồ; không xóa dữ liệu hiện có.
+
 ### Frontend
 
 ```bash
