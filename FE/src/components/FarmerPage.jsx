@@ -22,6 +22,7 @@ import {
   uploadJournalMedia,
   resolveImageUrl,
   updateCurrentUser,
+  changeCurrentPassword,
 } from "../api.js";
 import ImageLightbox from "./ImageLightbox.jsx";
 import FarmWeatherWidget from "./FarmWeatherWidget.jsx";
@@ -1183,7 +1184,11 @@ function FarmerPage({ user, onLogout }) {
           </section>
         )}
         {activeTab === "profile" && (
-          <ProfilePanel user={user} onSave={saveProfile} />
+          <ProfilePanel
+            user={user}
+            onSave={saveProfile}
+            onChangePassword={(payload) => changeCurrentPassword(payload, token)}
+          />
         )}
       </section>
 

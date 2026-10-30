@@ -259,6 +259,14 @@ export async function updateCurrentUser(payload, token) {
   return result
 }
 
+export async function changeCurrentPassword(payload, token) {
+  return apiRequest('/auth/change-password', {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+    token,
+  })
+}
+
 export async function readyToHarvest(rentalOrPlotId, payload = {}, token) {
   return apiRequest(`/rentals/${rentalOrPlotId}/ready-to-harvest`, {
     method: 'POST',
