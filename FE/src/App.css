@@ -518,6 +518,7 @@ h1 em, h2 em { font-family: inherit; font-style: normal; font-weight: 700; }
 .profile-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .profile-form-actions { display: flex; align-items: center; gap: 16px; margin-top: 5px; }
 .profile-form-actions .form-success { margin: 0; }
+.profile-password-form { margin-top: 30px; padding-top: 24px; border-top: 1px solid #dfe1da; }.profile-password-form .panel-heading { margin-bottom: 14px; }.profile-password-form .panel-heading h2 { font-size: 20px; }.form-error { margin: 0; color: #bd4141; font-size: 12px; }
 @media (max-width: 800px) { .workspace-kicker { display: block; }.workspace-date { display: block; margin-top: 9px; }.profile-layout { display: block; }.profile-identity { min-height: 0; margin-bottom: 16px; }.profile-form-row { grid-template-columns: 1fr; } }
 .admin-workspace .dashboard-shell { padding-top: 62px; }
 .admin-workspace .admin-card, .admin-workspace .dashboard-stat { box-shadow: 0 8px 24px rgba(23,53,37,.04); }

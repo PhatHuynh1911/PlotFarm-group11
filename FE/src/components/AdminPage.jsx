@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { getComplaintTagByTitle } from "../data/complaintCategories.js";
+import { changeCurrentPassword, updateCurrentUser } from "../api.js";
+import ProfilePanel from "./ProfilePanel.jsx";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const tabs = [
@@ -11,6 +13,7 @@ const tabs = [
   ["rentals", "Đơn thuê & giao dịch"],
   ["requests", "Yêu cầu & khiếu nại"],
   ["payments", "Thanh toán & gia hạn"],
+  ["profile", "Hồ sơ cá nhân"],
 ];
 const labels = {
   role: { khach_hang: "Khách hàng", nong_dan: "Nông dân", quan_tri: "Admin" },
@@ -207,6 +210,18 @@ function AdminPage({ user, token, onLogout }) {
     }
   };
 
+  const saveProfile = async (nextUser) => {
+    const currentAuth = JSON.parse(sessionStorage.getItem("plotfarm_auth") || "{}");
+    const updated = await updateCurrentUser(
+      { name: nextUser.name, email: nextUser.email, phone: nextUser.phone },
+      token,
+    );
+    const mergedUser = { ...currentAuth.user, ...updated.data, ...nextUser };
+    sessionStorage.setItem("plotfarm_auth", JSON.stringify({ ...currentAuth, user: mergedUser }));
+    sessionStorage.setItem("plotfarm_user", JSON.stringify(mergedUser));
+    setNotice("Đã cập nhật hồ sơ. Tải lại trang để áp dụng tên hiển thị mới.");
+  };
+
   const stats = data.stats || {};
   return (
     <main className="dashboard-page admin-workspace">
@@ -306,6 +321,13 @@ function AdminPage({ user, token, onLogout }) {
         {activeTab === "payments" && <Payments items={data.payments} onApprove={approvePayment} />}
         {activeTab === "requests" && (
           <Requests groups={{ service: data.serviceRequests, complaint: data.complaintRequests, contact: data.consultationRequests }} onUpdate={updateRequest} />
+        )}
+        {activeTab === "profile" && (
+          <ProfilePanel
+            user={user}
+            onSave={(nextUser) => saveProfile(nextUser).catch((saveError) => setError(saveError.message))}
+            onChangePassword={(payload) => changeCurrentPassword(payload, token)}
+          />
         )}
       </section>
     </main>

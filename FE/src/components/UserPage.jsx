@@ -18,6 +18,7 @@ import {
   PLOT_PLACEHOLDER_IMAGE,
   resolveImageUrl,
   updateCurrentUser,
+  changeCurrentPassword,
   getUserHarvestDeliveries,
   chooseHarvestDelivery,
   extendRental,
@@ -2401,6 +2402,7 @@ function UserPage({ user, token, onLogout }) {
                 notify(saveError.message, "error");
               }
             }}
+            onChangePassword={(payload) => changeCurrentPassword(payload, token)}
           />
         )}
       </section>
