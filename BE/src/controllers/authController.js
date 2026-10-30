@@ -166,6 +166,39 @@ const resetPassword = async (req, res) => {
     }
 };
 
+const changePassword = async (req, res) => {
+    try {
+        const userId = Number(req.user?.sub);
+        const { currentPassword, newPassword } = req.body || {};
+        if (!userId) return res.status(401).json({ success: false, message: 'Phiên đăng nhập không hợp lệ' });
+        if (!currentPassword || typeof newPassword !== 'string' || newPassword.length < 6) {
+            return res.status(400).json({ success: false, message: 'Nhập mật khẩu hiện tại và mật khẩu mới tối thiểu 6 ký tự' });
+        }
+        if (currentPassword === newPassword) {
+            return res.status(400).json({ success: false, message: 'Mật khẩu mới phải khác mật khẩu hiện tại' });
+        }
+
+        const pool = await getPool();
+        const result = await pool.request().input('userId', sql.Int, userId)
+            .query('SELECT mat_khau FROM NguoiDung WHERE ma_nguoi_dung = @userId AND trang_thai = \'hoat_dong\'');
+        const user = result.recordset[0];
+        const passwordMatches = user && (user.mat_khau.startsWith('$2')
+            ? await bcrypt.compare(currentPassword, user.mat_khau)
+            : user.mat_khau === currentPassword);
+        if (!passwordMatches) {
+            return res.status(400).json({ success: false, message: 'Mật khẩu hiện tại không đúng' });
+        }
+
+        const passwordHash = await bcrypt.hash(newPassword, 10);
+        await pool.request().input('userId', sql.Int, userId).input('password', sql.VarChar(100), passwordHash)
+            .query('UPDATE NguoiDung SET mat_khau = @password, ngay_cap_nhat = SYSDATETIME() WHERE ma_nguoi_dung = @userId');
+        return res.json({ success: true, message: 'Đổi mật khẩu thành công. Vui lòng dùng mật khẩu mới ở lần đăng nhập sau.' });
+    } catch (error) {
+        console.error('Lỗi đổi mật khẩu:', error);
+        return res.status(500).json({ success: false, message: 'Không thể đổi mật khẩu' });
+    }
+};
+
 const getMe = async (req, res) => {
     try {
         const userId = req.user?.sub || req.query.userId || req.params.id;
@@ -281,4 +314,4 @@ const getPublicStats = async (req, res) => {
     }
 };
 
-module.exports = { login, register, forgotPassword, resetPassword, getMe, updateMe, getAdminDashboard, getPublicStats };
+module.exports = { login, register, forgotPassword, resetPassword, changePassword, getMe, updateMe, getAdminDashboard, getPublicStats };
