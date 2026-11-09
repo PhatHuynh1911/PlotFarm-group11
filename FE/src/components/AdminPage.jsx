@@ -51,6 +51,7 @@ const labels = {
     hoan_thanh: "Đã hoàn thành thu hoạch",
   },
   paymentStatus: {
+    da_huy: "Đã hủy",
     cho_thanh_toan: "Chờ thanh toán",
     da_thanh_toan: "Đã thanh toán",
     hoan_tien: "Hoàn tiền",
@@ -325,7 +326,7 @@ function AdminPage({ user, token, onLogout }) {
         {activeTab === "profile" && (
           <ProfilePanel
             user={user}
-            onSave={(nextUser) => saveProfile(nextUser).catch((saveError) => setError(saveError.message))}
+            onSave={saveProfile}
             onChangePassword={(payload) => changeCurrentPassword(payload, token)}
           />
         )}

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { PLOT_PLACEHOLDER_IMAGE, resolveImageUrl } from '../api.js';
+import { PLOT_PLACEHOLDER_IMAGE, resolveImageUrl, plotBackground } from '../api.js';
 
 function GardenMapView({ plots, occupiedPlots, onSelectPlot, onClose }) {
   const [query, setQuery] = useState('');
@@ -79,7 +79,7 @@ function GardenMapView({ plots, occupiedPlots, onSelectPlot, onClose }) {
             {visiblePlots.map((plot, index) => {
               const isOccupied = occupiedPlots.some((occupiedPlot) => occupiedPlot.id === plot.id);
               const plotImage = resolveImageUrl(plot.image || plot.image_url || plot.hinh_anh_o_dat || PLOT_PLACEHOLDER_IMAGE);
-              const bgStyle = { backgroundImage: `url("${plotImage}")` };
+              const bgStyle = { backgroundImage: plotBackground(plotImage) };
 
               return (
                 <article

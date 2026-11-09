@@ -11,15 +11,22 @@ export const resolveImageUrl = (image) => {
   return `${API_ORIGIN}${image.startsWith('/') ? image : `/${image}`}`
 }
 
+export const plotBackground = (image) => `url("${resolveImageUrl(image || PLOT_PLACEHOLDER_IMAGE)}"), url("${PLOT_PLACEHOLDER_IMAGE}")`
+
 export async function apiRequest(path, options = {}) {
   const { token: providedToken, ...requestOptions } = options
   const token = providedToken || getStoredToken()
-  const response = await fetch(`${API_URL}${path}`, {
-    ...requestOptions,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(requestOptions.headers || {}) },
-  })
-  const result = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(result.message || 'Không thể kết nối đến máy chủ')
+  let response
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      ...requestOptions,
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(requestOptions.headers || {}) },
+    })
+  } catch {
+    throw new Error('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối và thử lại.')
+  }
+  const result = await response.json().catch(() => null)
+  if (!response.ok || !result || result.success === false) throw new Error(result?.message || 'Máy chủ chưa trả về dữ liệu hợp lệ. Vui lòng thử lại.')
   return result
 }
 

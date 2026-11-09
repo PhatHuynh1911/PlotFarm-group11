@@ -7,6 +7,7 @@ function AccountMenu({ user, roleLabel, onProfile, onLogout, onNotificationNavig
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [loadingNotifications, setLoadingNotifications] = useState(false)
+  const [notificationError, setNotificationError] = useState('')
   const initials = user.name?.slice(0, 1).toUpperCase() || 'P'
 
   const loadNotifications = async () => {
@@ -15,6 +16,9 @@ function AccountMenu({ user, roleLabel, onProfile, onLogout, onNotificationNavig
       const result = await getNotifications()
       setNotifications(result.data || [])
       setUnreadCount(Number(result.unreadCount || 0))
+      setNotificationError('')
+    } catch (error) {
+      setNotificationError(error.message || 'Không thể tải thông báo.')
     } finally {
       setLoadingNotifications(false)
     }
@@ -55,7 +59,8 @@ function AccountMenu({ user, roleLabel, onProfile, onLogout, onNotificationNavig
           {unreadCount > 0 && <button onClick={() => markAllNotificationsRead().then(() => { setNotifications((items) => items.map((item) => ({ ...item, da_doc: true }))); setUnreadCount(0) }).catch(() => {})}>Đọc tất cả</button>}
         </div>
         {loadingNotifications && <p>Đang tải...</p>}
-        {!loadingNotifications && notifications.length === 0 && <p>Chưa có thông báo mới.</p>}
+        {notificationError && <p role="alert">{notificationError}</p>}
+        {!loadingNotifications && !notificationError && notifications.length === 0 && <p>Chưa có thông báo mới.</p>}
         {notifications.slice(0, 6).map((item) => <button className={`notification-item ${item.da_doc ? '' : 'unread'}`} key={item.ma_thong_bao} onClick={() => openNotification(item)}><strong>{item.tieu_de}</strong><small>{item.noi_dung}</small></button>)}
       </div>}
     </div>}
