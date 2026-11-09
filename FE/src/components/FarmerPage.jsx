@@ -476,6 +476,7 @@ function FarmerPage({ user, onLogout }) {
       window.location.reload();
     } catch (saveError) {
       notify(saveError.message, "error");
+      throw saveError;
     }
   };
 

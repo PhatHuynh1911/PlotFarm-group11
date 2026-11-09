@@ -133,9 +133,10 @@ const resetPassword = async (req, res) => {
         return res.status(400).json({ success: false, message: 'Email, mã 6 số và mật khẩu mới tối thiểu 6 ký tự là bắt buộc' });
     }
 
-    const pool = await getPool();
-    const transaction = new sql.Transaction(pool);
+    let transaction;
     try {
+        const pool = await getPool();
+        transaction = new sql.Transaction(pool);
         await transaction.begin();
         const request = new sql.Request(transaction);
         const result = await request.input('email', sql.VarChar(150), email).query(`
@@ -160,7 +161,7 @@ const resetPassword = async (req, res) => {
         await transaction.commit();
         return res.json({ success: true, message: 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.' });
     } catch (error) {
-        try { await transaction.rollback(); } catch (_) {}
+        try { if (transaction) await transaction.rollback(); } catch (_) {}
         console.error('Lỗi đặt lại mật khẩu:', error);
         return res.status(500).json({ success: false, message: 'Không thể đặt lại mật khẩu' });
     }

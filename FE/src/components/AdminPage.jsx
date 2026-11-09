@@ -325,7 +325,7 @@ function AdminPage({ user, token, onLogout }) {
         {activeTab === "profile" && (
           <ProfilePanel
             user={user}
-            onSave={(nextUser) => saveProfile(nextUser).catch((saveError) => setError(saveError.message))}
+            onSave={saveProfile}
             onChangePassword={(payload) => changeCurrentPassword(payload, token)}
           />
         )}

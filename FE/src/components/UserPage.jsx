@@ -2400,6 +2400,7 @@ function UserPage({ user, token, onLogout }) {
                 window.location.reload();
               } catch (saveError) {
                 notify(saveError.message, "error");
+                throw saveError;
               }
             }}
             onChangePassword={(payload) => changeCurrentPassword(payload, token)}
