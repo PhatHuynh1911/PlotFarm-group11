@@ -10,6 +10,8 @@ const readyToHarvest = async (req, res) => {
         const pool = await getPool();
         const body = req.body || {};
         const paramId = req.params.id || body.rentalId || body.plotId || body.ma_hop_dong || body.ma_o_dat;
+        const lookupMode = /\/(rentals|hop-dong-thue)$/.test(req.baseUrl || '') || body.rentalId || body.ma_hop_dong
+            ? 'contract' : (/\/plots$/.test(req.baseUrl || '') || body.plotId || body.ma_o_dat ? 'plot' : 'any');
         
         if (!paramId) {
             return res.status(400).json({
@@ -21,6 +23,7 @@ const readyToHarvest = async (req, res) => {
         // Tìm hợp đồng đang hiệu lực dựa trên ID (có thể là ma_hop_dong hoặc ma_o_dat hoặc so_hieu_o)
         let rentalQuery = await pool.request()
             .input('paramId', sql.VarChar(50), String(paramId))
+            .input('lookupMode', sql.VarChar(10), lookupMode)
             .query(`
                 SELECT TOP 1 
                     h.ma_hop_dong, h.ma_o_dat, h.ma_nguoi_dung, h.trang_thai_hop_dong, 
@@ -33,9 +36,9 @@ const readyToHarvest = async (req, res) => {
                 JOIN NguoiDung u ON u.ma_nguoi_dung = h.ma_nguoi_dung
                 LEFT JOIN CayTrong c ON c.ma_cay_trong = h.ma_cay_trong
                 WHERE (
-                    h.ma_hop_dong = TRY_CAST(@paramId AS INT) 
-                    OR h.ma_o_dat = TRY_CAST(@paramId AS INT)
-                    OR o.so_hieu_o = @paramId
+                    (@lookupMode IN ('contract', 'any') AND h.ma_hop_dong = TRY_CAST(@paramId AS INT))
+                    OR (@lookupMode IN ('plot', 'any') AND h.ma_o_dat = TRY_CAST(@paramId AS INT))
+                    OR (@lookupMode = 'any' AND o.so_hieu_o = @paramId)
                 )
                 AND h.trang_thai_hop_dong = 'hieu_luc'
                 ORDER BY h.ngay_tao DESC
@@ -132,7 +135,8 @@ const readyToHarvest = async (req, res) => {
                     UPDATE dbo.ThuHoach
                     SET ma_nong_dan = @farmerId,
                         san_luong_thuc_te_kg = @yield,
-                        trang_thai = CASE WHEN trang_thai = 'da_thu_hoach' THEN trang_thai ELSE 'cho_thu_hoach' END
+                        trang_thai = 'cho_thu_hoach',
+                        ngay_thu_hoach = CAST(SYSDATETIME() AS DATE)
                     OUTPUT INSERTED.*
                     WHERE ma_thu_hoach = @harvestId
                 `);
@@ -179,6 +183,15 @@ const readyToHarvest = async (req, res) => {
                     .input('rentalId', sql.Int, rentalId)
                     .input('farmerId', sql.Int, farmerId)
                     .query(`INSERT INTO GiaoNhanThuHoach (ma_hop_dong, ma_nong_dan) VALUES (@rentalId, @farmerId)`);
+            } else {
+                // The previous season's delivery must not block choosing delivery for this one.
+                await pool.request().input('rentalId', sql.Int, rentalId).input('farmerId', sql.Int, farmerId)
+                    .query(`UPDATE GiaoNhanThuHoach
+                        SET ma_nong_dan = @farmerId, trang_thai = 'cho_khach_chon',
+                            hinh_thuc_nhan = NULL, ten_nguoi_nhan = NULL, so_dien_thoai_nhan = NULL,
+                            dia_chi_nhan = NULL, ghi_chu_khach = NULL, ngay_khach_chon = NULL,
+                            ngay_ban_giao = NULL, ngay_san_sang = SYSDATETIME()
+                        WHERE ma_hop_dong = @rentalId AND trang_thai = 'da_ban_giao_van_chuyen'`);
             }
         } catch (_) {}
 

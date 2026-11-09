@@ -307,13 +307,14 @@ const approvePayment = async (req, res) => {
 
         if (kind === 'rental') {
             const result = await new sql.Request(transaction).input('id', sql.Int, id).query(`
-                SELECT h.ma_hop_dong, h.ma_nguoi_dung, h.so_hop_dong, h.ma_o_dat, h.trang_thai_thanh_toan,
+                SELECT h.ma_hop_dong, h.ma_nguoi_dung, h.so_hop_dong, h.ma_o_dat, h.trang_thai_thanh_toan, h.trang_thai_hop_dong,
                        o.so_hieu_o
-                FROM HopDongThue h JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
+                FROM HopDongThue h WITH (UPDLOCK, HOLDLOCK) JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
                 WHERE h.ma_hop_dong = @id
             `);
             const rental = result.recordset[0];
             if (!rental) throw Object.assign(new Error('Khong tim thay hop dong'), { status: 404 });
+            if (rental.trang_thai_hop_dong !== 'cho_thanh_toan') throw Object.assign(new Error('Hợp đồng không còn chờ thanh toán'), { status: 409 });
             if (rental.trang_thai_thanh_toan === 'da_thanh_toan') throw Object.assign(new Error('Giao dich nay da duoc xac nhan'), { status: 409 });
             if (rental.trang_thai_thanh_toan !== 'cho_thanh_toan') throw Object.assign(new Error('Giao dich khong con co the xac nhan'), { status: 400 });
 
@@ -331,14 +332,17 @@ const approvePayment = async (req, res) => {
         }
 
         const result = await new sql.Request(transaction).input('id', sql.Int, id).query(`
-            SELECT p.*, h.ma_nguoi_dung, h.so_hop_dong, h.ma_hop_dong, o.so_hieu_o
-            FROM dbo.ThanhToanGiaHan p
-            JOIN HopDongThue h ON h.ma_hop_dong = p.ma_hop_dong
+            SELECT p.*, h.ma_nguoi_dung, h.so_hop_dong, h.trang_thai_hop_dong, h.trang_thai_thanh_toan, o.so_hieu_o
+            FROM dbo.ThanhToanGiaHan p WITH (UPDLOCK, HOLDLOCK)
+            JOIN HopDongThue h WITH (UPDLOCK, HOLDLOCK) ON h.ma_hop_dong = p.ma_hop_dong
             JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
             WHERE p.ma_thanh_toan_gia_han = @id
         `);
         const extension = result.recordset[0];
         if (!extension) throw Object.assign(new Error('Khong tim thay phieu gia han'), { status: 404 });
+        if (extension.trang_thai_hop_dong !== 'hieu_luc' || extension.trang_thai_thanh_toan !== 'da_thanh_toan') {
+            throw Object.assign(new Error('Hợp đồng không còn hiệu lực để thanh toán gia hạn'), { status: 409 });
+        }
         if (extension.trang_thai === 'da_thanh_toan') throw Object.assign(new Error('Phieu gia han nay da duoc xac nhan'), { status: 409 });
         if (extension.trang_thai !== 'cho_thanh_toan') throw Object.assign(new Error('Phieu gia han khong con co the xac nhan'), { status: 400 });
 

@@ -241,6 +241,7 @@ const connectDB = async () => {
                 FROM dbo.ODat o
                 INNER JOIN dbo.HopDongThue h ON h.ma_o_dat = o.ma_o_dat
                 WHERE h.trang_thai_hop_dong NOT IN ('da_ket_thuc', 'da_huy')
+                  AND h.trang_thai_canh_tac = 'cho_chon_cay_moi'
                   AND h.ngay_ket_thuc > CAST(SYSDATETIME() AS DATE);
 
                 IF OBJECT_ID('dbo.PhanCongNongDan', 'U') IS NOT NULL
@@ -249,7 +250,10 @@ const connectDB = async () => {
                     SET p.trang_thai = 'hoan_thanh'
                     FROM dbo.PhanCongNongDan p
                     INNER JOIN dbo.GiaoNhanThuHoach g ON g.ma_hop_dong = p.ma_hop_dong
-                    WHERE g.trang_thai = 'da_ban_giao_van_chuyen' AND p.trang_thai NOT IN ('hoan_thanh', 'tu_choi', 'da_huy');
+                    INNER JOIN dbo.HopDongThue h ON h.ma_hop_dong = p.ma_hop_dong
+                    WHERE g.trang_thai = 'da_ban_giao_van_chuyen'
+                      AND h.trang_thai_canh_tac IN ('cho_chon_cay_moi', 'da_thu_hoach')
+                      AND p.trang_thai NOT IN ('hoan_thanh', 'tu_choi', 'da_huy');
                 END
 
                 IF OBJECT_ID('dbo.ThuHoach', 'U') IS NOT NULL

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import GardenMapView from "./GardenMapView.jsx";
 import GardenDetailView from "./GardenDetailView.jsx";
-import { PLOT_PLACEHOLDER_IMAGE, resolveImageUrl } from "../api.js";
+import { plotBackground } from "../api.js";
 
 function PlotSelector({
   plots = [],
@@ -60,7 +60,7 @@ function PlotSelector({
               <div
                 className={`listing-image listing-image-${index + 1}`}
                 style={
-                  { backgroundImage: `url("${resolveImageUrl(plot.image || PLOT_PLACEHOLDER_IMAGE)}")` }
+                  { backgroundImage: plotBackground(plot.image) }
                 }
               >
                 <span className="listing-status">

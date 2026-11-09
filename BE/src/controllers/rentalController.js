@@ -723,9 +723,10 @@ const confirmPayment = async (req, res) => {
                 .input('contractId', sql.Int, id)
                 .input('userId', sql.Int, Number(req.user.sub))
                 .query(`
-                    SELECT p.*, h.ma_nguoi_dung, h.so_hop_dong, h.thoi_han_thang, h.tong_tien
-                    FROM dbo.ThanhToanGiaHan p
-                    JOIN dbo.HopDongThue h ON h.ma_hop_dong = p.ma_hop_dong
+                    SELECT p.*, h.ma_nguoi_dung, h.so_hop_dong, h.thoi_han_thang, h.tong_tien,
+                           h.trang_thai_hop_dong, h.trang_thai_thanh_toan
+                    FROM dbo.ThanhToanGiaHan p WITH (UPDLOCK, HOLDLOCK)
+                    JOIN dbo.HopDongThue h WITH (UPDLOCK, HOLDLOCK) ON h.ma_hop_dong = p.ma_hop_dong
                     WHERE p.ma_thanh_toan_gia_han = @extensionPaymentId
                       AND p.ma_hop_dong = @contractId
                       AND h.ma_nguoi_dung = @userId
@@ -734,6 +735,10 @@ const confirmPayment = async (req, res) => {
             if (!extension) {
                 await transaction.rollback();
                 return res.status(404).json({ success: false, message: 'Không tìm thấy yêu cầu gia hạn hợp lệ' });
+            }
+            if (extension.trang_thai_hop_dong !== 'hieu_luc' || extension.trang_thai_thanh_toan !== 'da_thanh_toan') {
+                await transaction.rollback();
+                return res.status(409).json({ success: false, message: 'Hợp đồng không còn hiệu lực để thanh toán gia hạn' });
             }
             if (extension.trang_thai === 'da_thanh_toan') {
                 await transaction.rollback();
@@ -774,7 +779,7 @@ const confirmPayment = async (req, res) => {
             .query(`
                 SELECT h.ma_hop_dong, h.so_hop_dong, h.ma_nguoi_dung, h.ma_o_dat, h.tong_tien,
                        h.trang_thai_thanh_toan, h.trang_thai_hop_dong, o.so_hieu_o, o.ten_o_dat
-                FROM HopDongThue h
+                FROM HopDongThue h WITH (UPDLOCK, HOLDLOCK)
                 JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
                 WHERE h.ma_hop_dong = @id
             `);
@@ -789,6 +794,10 @@ const confirmPayment = async (req, res) => {
             return res.status(403).json({ success: false, message: 'Bạn không có quyền thanh toán hợp đồng này' });
         }
 
+        if (['da_huy', 'da_ket_thuc'].includes(rental.trang_thai_hop_dong)) {
+            await transaction.rollback();
+            return res.status(409).json({ success: false, message: 'Hợp đồng đã hủy hoặc kết thúc, không thể xác nhận thanh toán' });
+        }
         if (rental.trang_thai_thanh_toan === 'da_thanh_toan') {
             await transaction.rollback();
             return res.status(200).json({
@@ -796,6 +805,11 @@ const confirmPayment = async (req, res) => {
                 message: 'Hợp đồng này đã được thanh toán trước đó',
                 data: rental
             });
+        }
+
+        if (rental.trang_thai_hop_dong !== 'cho_thanh_toan' || rental.trang_thai_thanh_toan !== 'cho_thanh_toan') {
+            await transaction.rollback();
+            return res.status(409).json({ success: false, message: 'Hợp đồng không còn chờ thanh toán. Vui lòng tải lại danh sách.' });
         }
 
         // 1. Cập nhật hợp đồng sang da_thanh_toan & hieu_luc
@@ -860,11 +874,11 @@ const extendRental = async (req, res) => {
 
     try {
         const id = parseInt(req.params.id, 10);
-        let additionalMonths = parseInt(req.body.so_thang_gia_han || req.body.additional_months || req.body.months || 0, 10);
-        let additionalDays = parseInt(req.body.so_ngay_gia_han || req.body.additional_days || 0, 10);
-
-        if (additionalMonths <= 0 && additionalDays <= 0) {
-            additionalMonths = 1;
+        const additionalMonths = Number(req.body.so_thang_gia_han ?? req.body.additional_months ?? req.body.months ?? 0);
+        const additionalDays = Number(req.body.so_ngay_gia_han ?? req.body.additional_days ?? 0);
+        if (!Number.isInteger(additionalMonths) || !Number.isInteger(additionalDays)
+            || additionalMonths < 0 || additionalDays < 0 || (additionalMonths > 0) === (additionalDays > 0)) {
+            return res.status(400).json({ success: false, message: 'Chọn số tháng hoặc số ngày gia hạn là số nguyên dương' });
         }
 
         await transaction.begin();
@@ -876,7 +890,7 @@ const extendRental = async (req, res) => {
             .input('userId', sql.Int, Number(req.user.sub))
             .query(`
                 SELECT h.*, o.so_hieu_o, o.ten_o_dat, o.gia_thue_thang, u.ho_va_ten AS ten_khach_hang, u.email AS email_khach_hang
-                FROM HopDongThue h
+                FROM HopDongThue h WITH (UPDLOCK, HOLDLOCK)
                 JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
                 JOIN NguoiDung u ON u.ma_nguoi_dung = h.ma_nguoi_dung
                 WHERE h.ma_hop_dong = @id AND h.ma_nguoi_dung = @userId
@@ -888,9 +902,9 @@ const extendRental = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Không tìm thấy hợp đồng' });
         }
 
-        if (contract.trang_thai_hop_dong === 'da_ket_thuc' || contract.trang_thai_hop_dong === 'da_huy') {
+        if (contract.trang_thai_hop_dong !== 'hieu_luc' || contract.trang_thai_thanh_toan !== 'da_thanh_toan') {
             await transaction.rollback();
-            return res.status(400).json({ success: false, message: 'Hợp đồng đã kết thúc hoặc bị hủy, không thể gia hạn' });
+            return res.status(409).json({ success: false, message: 'Chỉ có thể gia hạn hợp đồng đã thanh toán và đang có hiệu lực' });
         }
 
         // 2. Tính toán chi phí gia hạn & ngày kết thúc mới
@@ -950,14 +964,14 @@ const extendRental = async (req, res) => {
         try {
             await createNotification(
                 contract.ma_nguoi_dung,
-                'Gia hạn hợp đồng thành công',
-                `Hợp đồng ${contract.so_hop_dong} (${contract.so_hieu_o}) đã được gia hạn thêm ${additionalMonths > 0 ? additionalMonths + ' tháng' : additionalDays + ' ngày'} đến ngày ${newEndDate.toLocaleDateString('vi-VN')}. Chi phí gia hạn: ${extensionCost.toLocaleString('vi-VN')} đ.`,
+                'Yêu cầu gia hạn đang chờ thanh toán',
+                `Hợp đồng ${contract.so_hop_dong} (${contract.so_hieu_o}) sẽ được gia hạn đến ngày ${newEndDate.toLocaleDateString('vi-VN')} sau khi thanh toán ${extensionCost.toLocaleString('vi-VN')} đ.`,
                 'thue_dat',
                 '/user'
             );
             await notifyAdmins(
                 `Yêu cầu gia hạn hợp đồng: ${contract.so_hop_dong}`,
-                `Khách hàng ${contract.ten_khach_hang} vừa gia hạn hợp đồng ${contract.so_hop_dong} (${contract.so_hieu_o}) thêm ${additionalMonths > 0 ? additionalMonths + ' tháng' : additionalDays + ' ngày'}. Phí gia hạn: ${extensionCost.toLocaleString('vi-VN')} đ.`,
+                `Khách hàng ${contract.ten_khach_hang} vừa tạo yêu cầu gia hạn hợp đồng ${contract.so_hop_dong} (${contract.so_hieu_o}), đang chờ thanh toán ${extensionCost.toLocaleString('vi-VN')} đ.`,
                 'thue_dat',
                 '/admin?tab=rentals'
             );
@@ -967,7 +981,7 @@ const extendRental = async (req, res) => {
 
         return res.json({
             success: true,
-            message: `Gia hạn hợp đồng thành công thêm ${additionalMonths > 0 ? additionalMonths + ' tháng' : additionalDays + ' ngày'}`,
+            message: 'Đã tạo yêu cầu gia hạn. Thời hạn thuê sẽ được cập nhật sau khi thanh toán.',
             data: {
                 ma_hop_dong: contract.ma_hop_dong,
                 so_hop_dong: contract.so_hop_dong,
@@ -1016,7 +1030,7 @@ const chooseNewCrop = async (req, res) => {
             .input('userId', sql.Int, Number(req.user.sub))
             .query(`
                 SELECT h.*, o.so_hieu_o, o.ten_o_dat, u.ho_va_ten AS ten_khach_hang
-                FROM HopDongThue h
+                FROM HopDongThue h WITH (UPDLOCK, HOLDLOCK)
                 JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
                 JOIN NguoiDung u ON u.ma_nguoi_dung = h.ma_nguoi_dung
                 WHERE h.ma_hop_dong = @id AND h.ma_nguoi_dung = @userId
@@ -1028,9 +1042,13 @@ const chooseNewCrop = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Không tìm thấy hợp đồng thuê' });
         }
 
-        if (contract.trang_thai_hop_dong === 'da_ket_thuc' || contract.trang_thai_hop_dong === 'da_huy') {
+        if (contract.trang_thai_hop_dong !== 'hieu_luc' || contract.trang_thai_thanh_toan !== 'da_thanh_toan') {
             await transaction.rollback();
-            return res.status(400).json({ success: false, message: 'Hợp đồng đã kết thúc hoặc bị hủy, không thể trồng vụ mới' });
+            return res.status(409).json({ success: false, message: 'Hợp đồng chưa thanh toán hoặc không còn hiệu lực để trồng vụ mới' });
+        }
+        if (contract.trang_thai_canh_tac !== 'cho_chon_cay_moi') {
+            await transaction.rollback();
+            return res.status(409).json({ success: false, message: 'Vụ hiện tại chưa hoàn tất giao nhận, chưa thể chọn vụ mới' });
         }
 
         const now = new Date();
@@ -1189,15 +1207,20 @@ const autoExpirePendingRentalsHelper = async (timeoutMinutes = 30) => {
             const trans = new sql.Transaction(pool);
             try {
                 await trans.begin();
-                await new sql.Request(trans)
+                const expired = await new sql.Request(trans)
                     .input('id', sql.Int, item.ma_hop_dong)
                     .query(`
                         UPDATE HopDongThue
                         SET trang_thai_hop_dong = 'da_huy',
                             trang_thai_thanh_toan = 'da_huy',
                             ngay_cap_nhat = SYSDATETIME()
-                        WHERE ma_hop_dong = @id
+                        WHERE ma_hop_dong = @id AND trang_thai_hop_dong = 'cho_thanh_toan'
+                          AND trang_thai_thanh_toan = 'cho_thanh_toan'
                     `);
+                if (!expired.rowsAffected[0]) {
+                    await trans.rollback();
+                    continue;
+                }
 
                 const activeCheck = await new sql.Request(trans)
                     .input('plotId', sql.Int, item.ma_o_dat)
@@ -1262,7 +1285,7 @@ const cancelRental = async (req, res) => {
                 SELECT h.ma_hop_dong, h.so_hop_dong, h.ma_nguoi_dung, h.ma_o_dat,
                        h.trang_thai_thanh_toan, h.trang_thai_hop_dong,
                        o.so_hieu_o, o.ten_o_dat, u.ho_va_ten AS ten_khach_hang
-                FROM HopDongThue h
+                FROM HopDongThue h WITH (UPDLOCK, HOLDLOCK)
                 JOIN ODat o ON o.ma_o_dat = h.ma_o_dat
                 JOIN NguoiDung u ON u.ma_nguoi_dung = h.ma_nguoi_dung
                 WHERE h.ma_hop_dong = @id

@@ -15,7 +15,6 @@ import {
   getUserServiceRequests,
   getUserComplaints,
   submitComplaint,
-  PLOT_PLACEHOLDER_IMAGE,
   resolveImageUrl,
   updateCurrentUser,
   changeCurrentPassword,
@@ -32,6 +31,8 @@ import { COMPLAINT_CATEGORIES, OTHER_COMPLAINT_OPTION } from "../data/complaintC
 import { vietnamProvinces } from "../data/vietnamAddress.js";
 import ImageLightbox from "./ImageLightbox.jsx";
 import FarmWeatherWidget from "./FarmWeatherWidget.jsx";
+import SafeImage from "./SafeImage.jsx";
+import { plotBackground } from "../api.js";
 
 const formatMoney = (value) =>
   `${new Intl.NumberFormat("vi-VN").format(value)}đ`;
@@ -57,6 +58,7 @@ const requestStatus = {
   tu_choi: "Từ chối",
 };
 const contractStatusLabels = {
+  cho_thanh_toan: "Chờ thanh toán",
   hieu_luc: "Đang thuê",
   da_ket_thuc: "Đã kết thúc",
   da_huy: "Đã hủy",
@@ -69,6 +71,8 @@ const paymentStatusLabels = {
 };
 // Nguồn sự thật cho trạng thái sau thu hoạch là trang_thai_canh_tac === "da_thu_hoach" hoặc trang_thai_hop_dong === "da_ket_thuc" (do BE trả về sau khi bàn giao)
 function rentalStatusLabel(rental) {
+  if (rental.trang_thai_hop_dong === 'da_huy') return 'Đã hủy';
+  if (rental.trang_thai_canh_tac === 'cho_chon_cay_moi') return 'Đã giao nhận · Chờ chọn vụ mới';
   if (
     rental.trang_thai_canh_tac === "da_thu_hoach" ||
     rental.trang_thai_hop_dong === "da_ket_thuc"
@@ -80,12 +84,13 @@ function rentalStatusLabel(rental) {
 
 function rentalFlowSteps(rental, deliveries) {
   const cultivation = rental.trang_thai_canh_tac;
-  const delivery = deliveries.find((item) => String(item.ma_hop_dong) === String(rental.ma_hop_dong));
+  const delivery = ['cho_gieo_trong', 'dang_canh_tac'].includes(cultivation) ? null
+    : deliveries.find((item) => String(item.ma_hop_dong) === String(rental.ma_hop_dong));
   const isCancelled = rental.trang_thai_hop_dong === "da_huy";
-  const isPaid = rental.trang_thai_thanh_toan !== "cho_thanh_toan" && !isCancelled;
+  const isPaid = rental.trang_thai_thanh_toan === "da_thanh_toan" && !isCancelled;
   const isHarvestReady = cultivation === "san_sang_thu_hoach" || Boolean(delivery);
-  const isFinished = cultivation === "da_thu_hoach" || rental.trang_thai_hop_dong === "da_ket_thuc";
-  const deliveryInProgress = delivery && !["cho_khach_chon", "da_ban_giao", "hoan_thanh"].includes(delivery.trang_thai);
+  const isFinished = cultivation === "da_thu_hoach" || rental.trang_thai_hop_dong === "da_ket_thuc" || delivery?.trang_thai === "da_ban_giao_van_chuyen";
+  const deliveryInProgress = delivery && !["cho_khach_chon", "da_ban_giao", "da_ban_giao_van_chuyen", "hoan_thanh"].includes(delivery.trang_thai);
 
   return [
     { label: "Thanh toán", state: isCancelled ? "cancelled" : isPaid ? "done" : "active" },
@@ -471,6 +476,7 @@ function UserPage({ user, token, onLogout }) {
   };
 
   const openRentalPayment = async (rental) => {
+    setError("");
     try {
       const paymentData = await getRentalPaymentInfo(rental.ma_hop_dong, token);
       setActivePaymentModal(paymentData);
@@ -481,6 +487,8 @@ function UserPage({ user, token, onLogout }) {
   };
 
   const handleConfirmPayment = async (rentalId) => {
+    if (paymentSubmitting) return;
+    setError("");
     setPaymentSubmitting(true);
     try {
       const isExtension = Boolean(activePaymentModal?.extension_payment_id);
@@ -492,7 +500,6 @@ function UserPage({ user, token, onLogout }) {
       setRentals(await getUserRentals(user.id, token));
       setActivePaymentModal(null);
       showNotice(isExtension ? "Thanh toán gia hạn thành công! Thời hạn thuê đã được cập nhật." : "Thanh toán thành công! Hợp đồng thuê đất đã được kích hoạt hiệu lực.");
-      notify(isExtension ? "Thanh toán gia hạn thành công!" : "Thanh toán thành công! Hợp đồng đã có hiệu lực.");
       selectTab("gardens");
     } catch (err) {
       setError(err.message || "Lỗi khi xác nhận thanh toán");
@@ -523,9 +530,10 @@ function UserPage({ user, token, onLogout }) {
   };
   const submitSupport = async (event) => {
     event.preventDefault();
+    const formElement = event.currentTarget;
     setError("");
     setSupportSubmitting(true);
-    const form = new FormData(event.currentTarget);
+    const form = new FormData(formElement);
     const rental = rentals.find(
       (item) => String(item.ma_hop_dong) === String(selectedCareRental),
     );
@@ -545,9 +553,8 @@ function UserPage({ user, token, onLogout }) {
       setServiceRequests(await getUserServiceRequests(user.id, token));
       setSupportSent(true);
       setSelectedCareRental("");
-      event.currentTarget.reset();
+      formElement.reset();
       showNotice("Đã gửi yêu cầu chăm sóc tới đội ngũ PlotFarm.");
-      notify("Gửi yêu cầu thành công! Farmer phụ trách sẽ tiếp nhận sớm.");
     } catch (requestError) {
       setError(requestError.message);
       notify(requestError.message || "Không thể gửi yêu cầu chăm sóc", "error");
@@ -622,7 +629,8 @@ function UserPage({ user, token, onLogout }) {
         </p>
 
         <div style={{ display: "flex", justifyContent: "center", margin: "10px 0 16px" }}>
-          <img
+          <SafeImage
+            fallbackText="Không tải được mã QR. Vui lòng đóng và mở lại thông tin thanh toán."
             src={activePaymentModal.qr_code_url || activePaymentModal.payment_info?.qr_code_url}
             alt="VietQR Code"
             style={{
@@ -673,6 +681,7 @@ function UserPage({ user, token, onLogout }) {
           Môi trường demo: nút xác nhận bên dưới mô phỏng phản hồi từ ngân hàng. Bản production cần nhận callback thanh toán để tự động đối soát.
         </p>
 
+        {error && <p className="dashboard-error" role="alert">{error}</p>}
         <div className="booking-actions" style={{ marginTop: "10px", display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "space-between" }}>
           {!activePaymentModal.extension_payment_id && <button
             type="button"
@@ -749,7 +758,7 @@ function UserPage({ user, token, onLogout }) {
         <div
           style={{
             height: "220px",
-            backgroundImage: `linear-gradient(rgba(23,53,37,.15), rgba(23,53,37,.35)), url("${resolveImageUrl(rentalDetail.hinh_anh_o_dat || PLOT_PLACEHOLDER_IMAGE)}")`,
+            backgroundImage: `linear-gradient(rgba(23,53,37,.15), rgba(23,53,37,.35)), ${plotBackground(rentalDetail.hinh_anh_o_dat)}`,
             backgroundSize: "cover",
             backgroundPosition: "center",
           }}
@@ -1040,7 +1049,7 @@ function UserPage({ user, token, onLogout }) {
                     }}
                   >
                     {selectedCropObj.hinh_anh_cay && (
-                      <img
+                      <SafeImage
                         src={resolveImageUrl(selectedCropObj.hinh_anh_cay)}
                         alt={selectedCropObj.ten_cay_trong}
                         style={{ width: "50px", height: "50px", objectFit: "cover", borderRadius: "6px" }}
@@ -1243,6 +1252,7 @@ function UserPage({ user, token, onLogout }) {
             </button>
           </div>
           {loading && <p className="loading-state">Đang tải khu vườn...</p>}
+          {error && <p className="dashboard-error" role="alert">{error}</p>}
           {!loading && rentals.length === 0 && (
             <p className="empty-state">
               Bạn chưa có hợp đồng nào. Hãy chọn một ô đất cho mùa vụ đầu tiên.
@@ -1255,7 +1265,7 @@ function UserPage({ user, token, onLogout }) {
                   className="my-plot-image"
                   style={
                     {
-                      backgroundImage: `url("${resolveImageUrl(rental.hinh_anh_o_dat || PLOT_PLACEHOLDER_IMAGE)}")`,
+                      backgroundImage: plotBackground(rental.hinh_anh_o_dat),
                     }
                   }
                 >
@@ -1472,7 +1482,7 @@ function UserPage({ user, token, onLogout }) {
                       )}
                     </div>
                     {images[0] && (
-                      <img
+                      <SafeImage
                         className="image-previewable"
                         role="button"
                         tabIndex={0}
@@ -1597,7 +1607,7 @@ function UserPage({ user, token, onLogout }) {
                     </div>
                   )}
                   {request.hinh_anh_nghiem_thu && (
-                    <img
+                    <SafeImage
                       className="service-reply-image image-previewable"
                       role="button"
                       tabIndex={0}
@@ -1754,6 +1764,10 @@ function UserPage({ user, token, onLogout }) {
           user={user}
           roleLabel="Khách hàng PlotFarm"
           onProfile={() => setActiveTab("profile")}
+          onNotificationNavigate={(link) => {
+            const tab = new URLSearchParams((link || "").split("?")[1] || "").get("tab");
+            if (tab) selectTab(tab);
+          }}
           onLogout={onLogout}
         />
       </header>
@@ -1987,9 +2001,7 @@ function UserPage({ user, token, onLogout }) {
                   <div
                     className="plot-card-art"
                     style={{
-                      backgroundImage: `url("${resolveImageUrl(
-                        plot.image || plot.image_url || plot.hinh_anh_o_dat || PLOT_PLACEHOLDER_IMAGE,
-                      )}")`,
+                      backgroundImage: plotBackground(plot.image || plot.image_url || plot.hinh_anh_o_dat),
                     }}
                   >
                     <span>TRỐNG</span>

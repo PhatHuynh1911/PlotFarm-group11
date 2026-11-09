@@ -1,0 +1,30 @@
+/* Navigation remains scrollable without widening the page for any role. */
+#root > .dashboard-page > .dashboard-header { grid-template-columns: auto minmax(0, 1fr) auto; gap: 20px; }
+#root > .dashboard-page > .dashboard-header .workspace-nav { min-width: 0; max-width: 100%; justify-self: stretch; }
+.workspace-nav button { flex: 0 0 auto; }
+.dashboard-shell, .profile-form-panel, .profile-identity { min-width: 0; }
+.profile-form-actions { flex-wrap: wrap; }
+.profile-form-actions p, .toast, .dashboard-error, .user-email { overflow-wrap: anywhere; }
+.toast { line-height: 1.5; }
+.image-load-error { padding: 16px; border: 1px solid #e7c895; border-radius: 8px; background: #fff8e8; color: #775010; }
+.booking-modal, .auth-modal { max-height: calc(100svh - 40px); overflow-y: auto; overscroll-behavior: contain; }
+@media (max-width: 900px) {
+  #root > .dashboard-page > .dashboard-header { height: auto; min-height: 72px; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; padding: 12px 16px 0; }
+  #root > .dashboard-page > .dashboard-header > .brand { grid-column: 1; grid-row: 1; }
+  #root > .dashboard-page > .dashboard-header > .account-menu,
+  #root > .dashboard-page > .dashboard-header > .dashboard-account { grid-column: 2; grid-row: 1; justify-self: end; }
+  #root > .dashboard-page > .dashboard-header .workspace-nav { grid-column: 1 / -1; grid-row: 2; width: 100%; padding-bottom: 8px; margin: 0; gap: 18px; overflow-x: auto; }
+  .workspace-nav button { min-height: 44px; }
+  .account-dropdown { max-width: calc(100vw - 50px); max-height: calc(100svh - 90px); overflow-y: auto; }
+  .my-plot-card { grid-template-columns: minmax(80px, .6fr) minmax(0, 1fr); }
+  .harvest-list { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  input, select, textarea { font-size: 16px !important; }
+  .dashboard-shell { padding-left: 16px; padding-right: 16px; }
+  .profile-form-panel, .profile-identity { padding: 22px; }
+  .my-plot-card { grid-template-columns: 1fr; }
+  .my-plot-image { min-height: 130px; }
+  .journal-history-heading { align-items: stretch; flex-direction: column; }
+  .journal-history-heading select { width: 100%; min-width: 0; }
+}

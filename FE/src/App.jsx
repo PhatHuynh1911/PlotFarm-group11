@@ -12,6 +12,8 @@ import UserPage from './components/UserPage.jsx'
 import FarmerPage from './components/FarmerPage.jsx'
 import { ToastProvider } from './components/ToastProvider.jsx'
 import { getLandingStats, getPlots } from './api.js'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
+import './responsive.css'
 
 const dashboardPath = (role) => ({ quan_tri: '/admin', nong_dan: '/farmer', khach_hang: '/dashboard' }[role] || '/')
 
@@ -90,6 +92,7 @@ function HomePage({ authMode, setAuthMode, onAuthenticated }) {
 
 function App() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [auth, setAuth] = useState(readStoredAuth)
   const [authMode, setAuthMode] = useState(null)
 
@@ -106,14 +109,14 @@ function App() {
     navigate('/', { replace: true })
   }
 
-  return <ToastProvider><Routes>
+  return <ToastProvider><ErrorBoundary resetKey={location.pathname + location.search}><Routes>
     <Route path="/" element={<HomePage authMode={authMode} setAuthMode={setAuthMode} onAuthenticated={handleAuth} />} />
     <Route path="/admin" element={<ProtectedRoute auth={auth} allowedRoles={['quan_tri']}><AdminPage user={auth?.user} token={auth?.token} onLogout={logout} /></ProtectedRoute>} />
     <Route path="/farmer" element={<ProtectedRoute auth={auth} allowedRoles={['nong_dan']}><FarmerPage user={auth?.user} onLogout={logout} /></ProtectedRoute>} />
     <Route path="/dashboard" element={<ProtectedRoute auth={auth} allowedRoles={['khach_hang']}><UserPage user={auth?.user} token={auth?.token} onLogout={logout} /></ProtectedRoute>} />
     <Route path="/403" element={<StatusPage code="403" auth={auth} />} />
     <Route path="*" element={<StatusPage code="404" auth={auth} />} />
-  </Routes></ToastProvider>
+  </Routes></ErrorBoundary></ToastProvider>
 }
 
 export default App

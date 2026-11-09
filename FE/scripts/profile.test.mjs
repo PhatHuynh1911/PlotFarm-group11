@@ -13,7 +13,7 @@ const { createElement, act } = await import('react')
 const { createRoot } = await import('react-dom/client')
 let server, ProfilePanel, root
 before(async () => {
-  server = await createServer({ server: { middlewareMode: true }, appType: 'custom' })
+  server = await createServer({ server: { middlewareMode: true, hmr: false, ws: false, watch: null }, appType: 'custom' })
   ProfilePanel = (await server.ssrLoadModule('/src/components/ProfilePanel.jsx')).default
 })
 after(async () => { await server?.close(); dom.window.close() })

@@ -26,6 +26,7 @@ import {
 } from "../api.js";
 import ImageLightbox from "./ImageLightbox.jsx";
 import FarmWeatherWidget from "./FarmWeatherWidget.jsx";
+import SafeImage from "./SafeImage.jsx";
 
 const requestLabels = {
   cho_tiep_nhan: "Chờ tiếp nhận",
@@ -35,6 +36,8 @@ const requestLabels = {
   tu_choi: "Từ chối",
 };
 const cultivationLabels = {
+  cho_chon_cay_moi: "Chờ khách chọn vụ mới",
+  da_thu_hoach: "Đã thu hoạch",
   cho_gieo_trong: "Đã thanh toán · Chờ gieo trồng",
   dang_canh_tac: "Đang canh tác",
   san_sang_thu_hoach: "Sẵn sàng thu hoạch",
@@ -887,7 +890,7 @@ function FarmerPage({ user, onLogout }) {
                   onChange={handlePhoto}
                 />
                 {journalForm.photo && (
-                  <img
+                  <SafeImage
                     src={resolveImageUrl(journalForm.photo)}
                     alt="Ảnh xem trước nhật ký"
                   />
@@ -944,7 +947,7 @@ function FarmerPage({ user, onLogout }) {
                       </button>
                     </div>
                     {entry.photo && (
-                      <img
+                      <SafeImage
                         className="image-previewable"
                         role="button"
                         tabIndex={0}
@@ -1003,7 +1006,7 @@ function FarmerPage({ user, onLogout }) {
                       </p>
                     )}
                     {request.photo && (
-                      <img
+                      <SafeImage
                         className="request-proof"
                         src={resolveImageUrl(request.photo)}
                         alt="Ảnh phản hồi yêu cầu"
