@@ -6,7 +6,7 @@
 - Ảnh có xem trước, bỏ khỏi form và xem lớn trong lịch sử User, danh sách Farmer và màn yêu cầu Admin.
 - API upload yêu cầu đăng nhập; kiểm tra MIME, phần mở rộng, chữ ký tệp và quyền sở hữu ảnh khi gửi yêu cầu.
 - Migration `migrations/20261110_support_images.sql` chỉ thêm cột, không xóa dữ liệu. BE cũng tự bổ sung cột khi khởi động.
-- Đã pass 119 kiểm tra API với SQL Server thật và 38 test React, gồm upload thất bại, giới hạn ảnh và gửi form kèm ảnh.
+- Đã pass 119 kiểm tra API với SQL Server thật và 39 test React, gồm upload thất bại, giới hạn ảnh, gửi form kèm ảnh và rời tab trong khi đang tải ảnh.
 - Chạy `node scripts/demo-smoke.cjs --with-db --ui` để tạo ba tài khoản và một ô đất QA cho kiểm tra thủ công. Nhập `done` vào terminal đó để dọn dữ liệu và ảnh của lần kiểm tra.
 
 ## Kết quả ngày 09/11/2026
@@ -58,3 +58,5 @@ Cần mở Chrome ở kích thước 360, 390, 768 và 1440px để xác nhận:
 - Tắt BE rồi tải trang: thông báo lỗi và điều hướng vẫn hiển thị.
 
 Tại thời điểm chạy test, browser connector báo `The browser access host is unavailable`; chưa xác nhận trực quan checklist này.
+
+Ngày 10/11, thử lại native Chrome: cửa sổ đang thu nhỏ, API trả `window is minimized`; gọi mở lại ứng dụng vẫn không khôi phục được. Cần mở cửa sổ Chrome tại frontend đang chạy để tiếp tục kiểm tra trực quan.

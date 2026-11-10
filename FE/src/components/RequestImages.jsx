@@ -23,7 +23,10 @@ export function RequestImagePicker({ value, onChange, onBusyChange, token, disab
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const mounted = useRef(true)
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false; onBusyChange(false) }
+  }, [onBusyChange])
   const choose = async (event) => {
     const files = Array.from(event.target.files || [])
     event.target.value = ''

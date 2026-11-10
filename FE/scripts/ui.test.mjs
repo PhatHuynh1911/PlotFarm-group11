@@ -216,3 +216,26 @@ test('attachment gallery tolerates legacy requests without valid attachment JSON
   await render(h(RequestImages, { images: '{invalid' }))
   assert.equal(document.querySelector('.request-images'), null)
 })
+
+test('leaving the picker during upload clears the parent busy state', async () => {
+  let finish
+  globalThis.fetch = () => new Promise((resolve) => { finish = resolve })
+  function Workspace() {
+    const [show, setShow] = useState(true)
+    const [busy, setBusy] = useState(false)
+    const [value, setValue] = useState([])
+    return h('div', null,
+      h('button', { id: 'leave-picker', onClick: () => setShow(false) }, 'Leave'),
+      show && h(RequestImagePicker, { value, onChange: setValue, onBusyChange: setBusy, token: 'qa' }),
+      h('button', { id: 'parent-submit', disabled: busy }, 'Submit'))
+  }
+  await render(h(Workspace))
+  const input = document.querySelector('input[type="file"]')
+  Object.defineProperty(input, 'files', { value: [new window.File(['png'], 'qa.png', { type: 'image/png' })], configurable: true })
+  await act(() => input.dispatchEvent(new window.Event('change', { bubbles: true })))
+  assert.equal(document.querySelector('#parent-submit').disabled, true)
+  await act(() => document.querySelector('#leave-picker').click())
+  assert.equal(document.querySelector('#parent-submit').disabled, false)
+  await act(async () => finish({ ok: true, json: async () => ({ data: { url: '/uploads/qa.png' } }) }))
+  assert.equal(document.querySelector('.request-image-button'), null)
+})
