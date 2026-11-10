@@ -312,6 +312,12 @@ const connectDB = async () => {
                 ON dbo.YeuCauDatLaiMatKhau(ma_nguoi_dung, ngay_het_han DESC);
             END
         `);
+        await activePool.request().query(`
+            IF COL_LENGTH('dbo.KhieuNai', 'hinh_anh_dinh_kem') IS NULL
+                ALTER TABLE dbo.KhieuNai ADD hinh_anh_dinh_kem NVARCHAR(MAX) NULL;
+            IF COL_LENGTH('dbo.YeuCauDichVu', 'hinh_anh_dinh_kem') IS NULL
+                ALTER TABLE dbo.YeuCauDichVu ADD hinh_anh_dinh_kem NVARCHAR(MAX) NULL;
+        `);
         console.log(`✅ Kết nối SQL Server thành công: [${process.env.DB_NAME || 'PlotFarmDB'}] tại ${serverVal}`);
     } catch (error) {
         console.error('❌ Kết nối SQL Server thất bại:', error.message || error);

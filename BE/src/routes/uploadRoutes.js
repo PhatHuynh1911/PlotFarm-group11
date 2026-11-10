@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const upload = require('../middleware/uploadMiddleware');
 const { uploadImage } = require('../controllers/uploadController');
+const { authenticate } = require('../middleware/authMiddleware');
+const { uploadSupportImage } = require('../middleware/supportUpload');
+
+router.post('/support', authenticate, uploadSupportImage, uploadImage);
 
 // Upload ảnh/video đơn
 router.post('/', (req, res, next) => {

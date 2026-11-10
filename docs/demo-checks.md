@@ -1,5 +1,14 @@
 # Kiểm tra trước demo PlotFarm
 
+## Cập nhật ngày 10/11/2026
+
+- Đã bổ sung ảnh cho yêu cầu chăm sóc và khiếu nại: tối đa 3 ảnh, mỗi ảnh 5 MB, JPG/PNG/WEBP/GIF.
+- Ảnh có xem trước, bỏ khỏi form và xem lớn trong lịch sử User, danh sách Farmer và màn yêu cầu Admin.
+- API upload yêu cầu đăng nhập; kiểm tra MIME, phần mở rộng, chữ ký tệp và quyền sở hữu ảnh khi gửi yêu cầu.
+- Migration `migrations/20261110_support_images.sql` chỉ thêm cột, không xóa dữ liệu. BE cũng tự bổ sung cột khi khởi động.
+- Đã pass 119 kiểm tra API với SQL Server thật và 38 test React, gồm upload thất bại, giới hạn ảnh và gửi form kèm ảnh.
+- Chạy `node scripts/demo-smoke.cjs --with-db --ui` để tạo ba tài khoản và một ô đất QA cho kiểm tra thủ công. Nhập `done` vào terminal đó để dọn dữ liệu và ảnh của lần kiểm tra.
+
 ## Kết quả ngày 09/11/2026
 
 - 91 kiểm tra HTTP API với SQL Server thật đã pass. Script tạo tài khoản và ô đất QA riêng, rồi xóa đúng dữ liệu của lần chạy trong `finally`.

@@ -2,12 +2,13 @@
 // Never uses or changes the existing demo accounts or plots.
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const fs = require('node:fs/promises');
 require('dotenv').config({ path: path.join(__dirname, '../.env'), quiet: true });
 const bcrypt = require('bcryptjs');
 const { sql, getPool, connectDB } = require('../src/config/db');
 
 if (!process.argv.includes('--with-db')) {
-  console.error('Usage: node scripts/demo-smoke.cjs --with-db [--password-only]');
+  console.error('Usage: node scripts/demo-smoke.cjs --with-db [--password-only | --ui]');
   process.exit(1);
 }
 const base = 'http://127.0.0.1:5000/api';
@@ -16,6 +17,7 @@ const password = 'PlotFarm-QA-123!';
 const nextPassword = 'PlotFarm-QA-456!';
 const users = [];
 const plots = [];
+const uploadedImages = [];
 let pool;
 let checks = 0;
 async function api(route, user, body, method = body === undefined ? 'GET' : 'POST', expected = 200) {
@@ -70,6 +72,55 @@ async function createPlot(suffix) {
   plots.push(id);
   return id;
 }
+
+async function uploadPhoto(user, { bytes, type = 'image/png', name = 'qa.png', expected = 201 } = {}) {
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aZ1sAAAAASUVORK5CYII=', 'base64');
+  const form = new FormData();
+  form.append('image', new Blob([bytes || png], { type }), name);
+  const response = await fetch(`${base}/upload/support`, { method: 'POST', headers: user ? { Authorization: `Bearer ${user.token}` } : {}, body: form });
+  const result = await response.json();
+  assert.equal(response.status, expected, JSON.stringify(result));
+  checks++;
+  if (expected === 201) uploadedImages.push(result.data.url);
+  return result.data?.url;
+}
+
+async function supportChecks(customer, farmer, admin, outsider, rentalId, plotId) {
+  await uploadPhoto(null, { expected: 401 });
+  await uploadPhoto(customer, { bytes: Buffer.from('<svg/>'), name: 'bad.svg', type: 'image/svg+xml', expected: 400 });
+  await uploadPhoto(customer, { bytes: Buffer.from('not an image'), expected: 400 });
+  await uploadPhoto(customer, { bytes: Buffer.alloc(5 * 1024 * 1024 + 1), expected: 400 });
+  const image = await uploadPhoto(customer);
+  const downloaded = await fetch('http://127.0.0.1:5000' + image);
+  assert.equal(downloaded.status, 200);
+  assert.match(downloaded.headers.get('content-type'), /^image\//);
+  const serviceType = (await api('/services/types')).data[0];
+  assert.ok(serviceType);
+  const service = { ma_hop_dong: rentalId, ma_loai_dich_vu: serviceType.ma_loai_dich_vu,
+    ngay_yeu_cau_thuc_hien: '2027-01-01', ghi_chu_cua_khach: tag, hinh_anh_dinh_kem: [image] };
+  const complaint = { ma_hop_dong: rentalId, ma_o_dat: plotId, tieu_de: tag, mo_ta_chi_tiet: 'Disposable QA complaint', hinh_anh_dinh_kem: [image] };
+  await api('/services', outsider, service, 'POST', 400);
+  await api('/complaints', outsider, complaint, 'POST', 400);
+  for (const images of [[image, image, image, image], ['https://example.invalid/photo.jpg'], ['/uploads/../../.env'], [`/uploads/support-${customer.id}-00000000-0000-0000-0000-000000000000.png`], 'not-an-array']) {
+    await api('/services', customer, { ...service, hinh_anh_dinh_kem: images }, 'POST', 400);
+    await api('/complaints', customer, { ...complaint, hinh_anh_dinh_kem: images }, 'POST', 400);
+  }
+  const createdService = await api('/services', customer, service, 'POST', 201);
+  const createdComplaint = await api('/complaints', customer, complaint, 'POST', 201);
+  assert.deepEqual(JSON.parse(createdService.data.hinh_anh_dinh_kem), [image]);
+  assert.deepEqual(JSON.parse(createdComplaint.data.hinh_anh_dinh_kem), [image]);
+  const serviceId = createdService.data.ma_yeu_cau;
+  const complaintId = createdComplaint.data.ma_khieu_nai;
+  assert.deepEqual(JSON.parse((await api('/services/all', farmer)).data.find((row) => row.ma_yeu_cau === serviceId).hinh_anh_dinh_kem), [image]);
+  assert.deepEqual(JSON.parse((await api(`/services/user/${customer.id}`, customer)).data.find((row) => row.ma_yeu_cau === serviceId).hinh_anh_dinh_kem), [image]);
+  assert.deepEqual(JSON.parse((await api(`/complaints/user/${customer.id}`, customer)).data.find((row) => row.ma_khieu_nai === complaintId).hinh_anh_dinh_kem), [image]);
+  assert.deepEqual(JSON.parse((await api('/admin/requests/services', admin)).data.find((row) => row.id === serviceId).attachments), [image]);
+  assert.deepEqual(JSON.parse((await api('/admin/requests/complaints', admin)).data.find((row) => row.id === complaintId && row.source === 'complaint').attachments), [image]);
+  assert.ok((await api('/admin/requests', admin)).data.some((row) => row.attachments === JSON.stringify([image])));
+  await api('/services', customer, { ...service, hinh_anh_dinh_kem: undefined }, 'POST', 201);
+  await api('/complaints', customer, { ...complaint, hinh_anh_dinh_kem: undefined }, 'POST', 201);
+  console.log('PASS support attachments: upload validation, ownership, persistence, User/Farmer/Admin views, optional images');
+}
 async function flowChecks(customer, farmer, admin) {
   await api('/admin/dashboard', customer, undefined, 'GET', 403);
   await api('/admin/dashboard', farmer, undefined, 'GET', 403);
@@ -98,6 +149,7 @@ async function flowChecks(customer, farmer, admin) {
   const assignment = assignments.data.find((item) => item.ma_hop_dong === id);
   assert.ok(assignment);
   await api(`/rentals/assignments/${assignment.ma_phan_cong}/respond`, farmer, { status: 'da_chap_nhan' }, 'PATCH');
+  await supportChecks(customer, farmer, admin, outsider, id, plot);
   await api('/journals', farmer, { ma_hop_dong: id, tieu_de: tag, noi_dung: 'Disposable QA journal' }, 'POST', 201);
   assert.ok((await api(`/journals/rental/${id}`, customer)).data.length > 0);
   await api(`/rentals/${id}/ready-to-harvest`, farmer, {});
@@ -196,6 +248,8 @@ async function cleanup() {
       DELETE FROM GiaoNhanThuHoach WHERE ma_hop_dong IN (${contracts});
       DELETE FROM ThuHoach WHERE ma_hop_dong IN (${contracts});
       DELETE FROM NhatKyCanhTac WHERE ma_hop_dong IN (${contracts});
+      DELETE FROM KhieuNai WHERE ma_hop_dong IN (${contracts});
+      DELETE FROM YeuCauDichVu WHERE ma_hop_dong IN (${contracts});
       DELETE FROM PhanCongNongDan WHERE ma_hop_dong IN (${contracts});
       DELETE FROM HopDongThue WHERE ma_o_dat IN (${plotIds});
       DELETE FROM ODat WHERE ma_o_dat IN (${plotIds});
@@ -203,6 +257,18 @@ async function cleanup() {
     `);
     await transaction.commit();
     console.log(`Cleaned disposable fixtures: ${tag}`);
+    // Also clean photos uploaded through the browser by this run's disposable users.
+    const files = await fs.readdir(path.join(__dirname, '../uploads'));
+    for (const user of users) {
+      for (const filename of files.filter((name) => name.startsWith(`support-${user.id}-`))) {
+        const url = `/uploads/${filename}`;
+        if (!uploadedImages.includes(url)) uploadedImages.push(url);
+      }
+    }
+    for (const image of uploadedImages) {
+      assert.ok(/^\/uploads\/support-\d+-[a-f0-9-]+\.(jpg|png|webp|gif)$/.test(image));
+      await fs.unlink(path.join(__dirname, '../uploads', path.basename(image)));
+    }
   } catch (error) {
     await transaction.rollback();
     throw error;
@@ -214,10 +280,20 @@ async function cleanup() {
     const customer = await createUser('khach_hang');
     const farmer = await createUser('nong_dan');
     const admin = await createUser('quan_tri');
-    for (const user of users) await passwordChecks(user);
-    await api('/auth/change-password', null, { currentPassword: password, newPassword: nextPassword }, 'PATCH', 401);
-    if (!process.argv.includes('--password-only')) await flowChecks(customer, farmer, admin);
-    console.log(`PASS ${checks} API checks`);
+    if (process.argv.includes('--ui')) {
+      const plot = await createPlot('A');
+      const photo = await uploadPhoto(customer);
+      console.log(JSON.stringify({ tag, plot, photo: path.join(__dirname, '..', photo),
+        password, accounts: users.map(({ email, role }) => ({ email, role })) }, null, 2));
+      const readline = require('node:readline').createInterface({ input: process.stdin, output: process.stdout });
+      await new Promise((resolve) => readline.question('Enter done after UI checks to clean fixtures: ', resolve));
+      readline.close();
+    } else {
+      for (const user of users) await passwordChecks(user);
+      await api('/auth/change-password', null, { currentPassword: password, newPassword: nextPassword }, 'PATCH', 401);
+      if (!process.argv.includes('--password-only')) await flowChecks(customer, farmer, admin);
+      console.log(`PASS ${checks} API checks`);
+    }
   } catch (error) {
     console.error(error);
     process.exitCode = 1;

@@ -381,6 +381,7 @@ const requests = async (req, res) => {
             pool.request().query(`
                 SELECT y.ma_yeu_cau AS id, y.so_phieu_yeu_cau AS code, y.ngay_yeu_cau_thuc_hien AS scheduledAt,
                        y.ngay_gui_yeu_cau AS createdAt, y.trang_thai_xu_ly AS status, y.ghi_chu_cua_khach AS note,
+                       y.hinh_anh_dinh_kem AS attachments,
                        u.ho_va_ten AS customer, u.so_dien_thoai AS phone, u.email,
                        d.ten_dich_vu AS service, o.so_hieu_o AS plot,
                        COALESCE(y.loai_yeu_cau, 'cham_soc') AS category, 'service' AS type, 'service' AS source
@@ -401,6 +402,7 @@ const requests = async (req, res) => {
             pool.request().query(`
                 SELECT k.ma_khieu_nai AS id, CONCAT('KN-', k.ma_khieu_nai) AS code, k.ngay_gui AS scheduledAt,
                        k.ngay_gui AS createdAt, k.trang_thai_khieu_nai AS status, k.mo_ta_chi_tiet AS note,
+                       k.hinh_anh_dinh_kem AS attachments,
                        u.ho_va_ten AS customer, u.so_dien_thoai AS phone, u.email,
                        k.tieu_de AS service,
                        COALESCE(o.so_hieu_o, N'Ô đất đang xem xét') AS plot,
@@ -424,6 +426,7 @@ const serviceRequests = async (req, res) => {
         const result = await pool.request().query(`
             SELECT y.ma_yeu_cau AS id, y.so_phieu_yeu_cau AS code, y.ngay_yeu_cau_thuc_hien AS scheduledAt,
                    y.ngay_gui_yeu_cau AS createdAt, y.trang_thai_xu_ly AS status, y.ghi_chu_cua_khach AS note,
+                   y.hinh_anh_dinh_kem AS attachments,
                    u.ho_va_ten AS customer, u.so_dien_thoai AS phone, u.email,
                    d.ten_dich_vu AS service, o.so_hieu_o AS plot, o.ten_o_dat AS plotName,
                    h.so_hop_dong AS contractCode,
@@ -449,6 +452,7 @@ const complaintRequests = async (req, res) => {
                 SELECT k.ma_khieu_nai AS id, CONCAT('KN-', k.ma_khieu_nai) AS code, k.ngay_gui AS scheduledAt,
                        k.ngay_gui AS createdAt, k.trang_thai_khieu_nai AS status, k.mo_ta_chi_tiet AS note,
                        k.phan_hoi_admin AS adminResponse,
+                       k.hinh_anh_dinh_kem AS attachments,
                        u.ho_va_ten AS customer, u.so_dien_thoai AS phone, u.email,
                        k.tieu_de AS service,
                        COALESCE(o.so_hieu_o, N'Ô đất đang xem xét') AS plot, o.ten_o_dat AS plotName,
@@ -463,6 +467,7 @@ const complaintRequests = async (req, res) => {
                 SELECT y.ma_yeu_cau AS id, y.so_phieu_yeu_cau AS code, y.ngay_yeu_cau_thuc_hien AS scheduledAt,
                        y.ngay_gui_yeu_cau AS createdAt, y.trang_thai_xu_ly AS status, y.ghi_chu_cua_khach AS note,
                        y.phan_hoi_cua_nha_vuon AS adminResponse,
+                       y.hinh_anh_dinh_kem AS attachments,
                        u.ho_va_ten AS customer, u.so_dien_thoai AS phone, u.email,
                        COALESCE(d.ten_dich_vu, N'Khiếu nại dịch vụ') AS service, 
                        o.so_hieu_o AS plot, o.ten_o_dat AS plotName,

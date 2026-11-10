@@ -183,6 +183,22 @@ export async function uploadJournalMedia(file, token) {
   return result.data.url
 }
 
+export async function uploadSupportImage(file, token) {
+  const form = new FormData()
+  form.append('image', file)
+  let response
+  try {
+    response = await fetch(`${API_URL}/upload/support`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token || getStoredToken() || ''}` }, body: form,
+    })
+  } catch {
+    throw new Error('Không thể kết nối máy chủ để tải ảnh. Vui lòng thử lại.')
+  }
+  const result = await response.json().catch(() => null)
+  if (!response.ok || !result?.data?.url) throw new Error(result?.message || 'Không thể tải ảnh lên.')
+  return result.data.url
+}
+
 export async function createJournal(payload, token) {
   return apiRequest('/journals', { method: 'POST', body: JSON.stringify(payload), token })
 }

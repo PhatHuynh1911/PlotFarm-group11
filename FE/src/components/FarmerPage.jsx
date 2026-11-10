@@ -27,6 +27,7 @@ import {
 import ImageLightbox from "./ImageLightbox.jsx";
 import FarmWeatherWidget from "./FarmWeatherWidget.jsx";
 import SafeImage from "./SafeImage.jsx";
+import { RequestImages } from "./RequestImages.jsx";
 
 const requestLabels = {
   cho_tiep_nhan: "Chờ tiếp nhận",
@@ -54,6 +55,7 @@ const mapServiceRequests = (serviceRequests) =>
     time: request.ngay_gui_yeu_cau,
     reply: request.phan_hoi_cua_nha_vuon || "",
     photo: request.hinh_anh_nghiem_thu || "",
+    attachments: request.hinh_anh_dinh_kem,
   }));
 
 function FarmerPage({ user, onLogout }) {
@@ -999,6 +1001,7 @@ function FarmerPage({ user, onLogout }) {
                       </span>
                     </div>
                     <p>{request.text}</p>
+                    <RequestImages images={request.attachments} />
                     <small>{formatDate(request.time)}</small>
                     {request.reply && (
                       <p className="request-reply">

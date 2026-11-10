@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { getComplaintTagByTitle } from "../data/complaintCategories.js";
 import { changeCurrentPassword, updateCurrentUser } from "../api.js";
 import ProfilePanel from "./ProfilePanel.jsx";
+import { RequestImages } from "./RequestImages.jsx";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const tabs = [
@@ -1123,6 +1124,7 @@ function Requests({ groups, onUpdate }) {
               </span>
               {item.email && <span>{item.email}</span>}
               <p>{item.note || "Không có ghi chú"}</p>
+              <RequestImages images={item.attachments} />
             </div>
             <select
               value={item.status}

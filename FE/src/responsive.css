@@ -1,4 +1,11 @@
 /* Navigation remains scrollable without widening the page for any role. */
+.request-image-picker { grid-column: 1 / -1; min-width: 0; }
+.request-image-picker label { display: grid; gap: 8px; color: #31543b; }
+.request-image-picker small { color: #627468; font-size: 12px; }
+.request-images { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+.request-images > .request-image-button { flex: 0 0 90px; width: 90px; height: 76px; padding: 0; overflow: hidden; border: 1px solid #c8d5c6; border-radius: 6px; background: #eef4ea; }
+.request-image-button img { width: 100%; height: 100%; object-fit: cover; }
+.request-image-picker .text-button { min-height: 36px; margin-right: 14px; }
 #root > .dashboard-page > .dashboard-header { grid-template-columns: auto minmax(0, 1fr) auto; gap: 20px; }
 #root > .dashboard-page > .dashboard-header .workspace-nav { min-width: 0; max-width: 100%; justify-self: stretch; }
 .workspace-nav button { flex: 0 0 auto; }
