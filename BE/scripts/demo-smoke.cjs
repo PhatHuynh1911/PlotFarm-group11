@@ -97,8 +97,8 @@ async function supportChecks(customer, farmer, admin, outsider, rentalId, plotId
   const serviceType = (await api('/services/types')).data[0];
   assert.ok(serviceType);
   const service = { ma_hop_dong: rentalId, ma_loai_dich_vu: serviceType.ma_loai_dich_vu,
-    ngay_yeu_cau_thuc_hien: '2027-01-01', ghi_chu_cua_khach: tag, hinh_anh_dinh_kem: [image] };
-  const complaint = { ma_hop_dong: rentalId, ma_o_dat: plotId, tieu_de: tag, mo_ta_chi_tiet: 'Disposable QA complaint', hinh_anh_dinh_kem: [image] };
+    ngay_yeu_cau_thuc_hien: '2027-01-01', ghi_chu_cua_khach: `${tag} · Kiểm tra User gửi yêu cầu, Farmer tiếp nhận và phản hồi.`, hinh_anh_dinh_kem: [image] };
+  const complaint = { ma_hop_dong: rentalId, ma_o_dat: plotId, tieu_de: `${tag} · Khiếu nại chất lượng`, mo_ta_chi_tiet: 'Cây trồng cần được kiểm tra, chăm sóc và phản hồi rõ ràng.', hinh_anh_dinh_kem: [image] };
   await api('/services', outsider, service, 'POST', 400);
   await api('/complaints', outsider, complaint, 'POST', 400);
   for (const images of [[image, image, image, image], ['https://example.invalid/photo.jpg'], ['/uploads/../../.env'], [`/uploads/support-${customer.id}-00000000-0000-0000-0000-000000000000.png`], 'not-an-array']) {
@@ -109,8 +109,19 @@ async function supportChecks(customer, farmer, admin, outsider, rentalId, plotId
   const createdComplaint = await api('/complaints', customer, complaint, 'POST', 201);
   assert.deepEqual(JSON.parse(createdService.data.hinh_anh_dinh_kem), [image]);
   assert.deepEqual(JSON.parse(createdComplaint.data.hinh_anh_dinh_kem), [image]);
+  assert.equal(createdService.data.ghi_chu_cua_khach, service.ghi_chu_cua_khach);
+  assert.equal(createdComplaint.data.tieu_de, complaint.tieu_de);
+  assert.equal(createdComplaint.data.mo_ta_chi_tiet, complaint.mo_ta_chi_tiet);
   const serviceId = createdService.data.ma_yeu_cau;
   const complaintId = createdComplaint.data.ma_khieu_nai;
+  const reply = 'Farmer đã tiếp nhận và xử lý yêu cầu. Cây phát triển tốt, đất đủ độ ẩm.';
+  await api(`/services/${serviceId}/status`, farmer, { status: 'hoan_thanh', phan_hoi_cua_nha_vuon: reply }, 'PATCH');
+  const customerService = (await api(`/services/user/${customer.id}`, customer)).data.find((row) => row.ma_yeu_cau === serviceId);
+  assert.equal(customerService.ghi_chu_cua_khach, service.ghi_chu_cua_khach);
+  assert.equal(customerService.phan_hoi_cua_nha_vuon, reply);
+  const adminService = (await api('/admin/requests/services', admin)).data.find((row) => row.id === serviceId);
+  assert.equal(adminService.note, service.ghi_chu_cua_khach);
+  console.log('PASS Vietnamese Unicode round-trip: service note, farmer response, complaint, admin view');
   assert.deepEqual(JSON.parse((await api('/services/all', farmer)).data.find((row) => row.ma_yeu_cau === serviceId).hinh_anh_dinh_kem), [image]);
   assert.deepEqual(JSON.parse((await api(`/services/user/${customer.id}`, customer)).data.find((row) => row.ma_yeu_cau === serviceId).hinh_anh_dinh_kem), [image]);
   assert.deepEqual(JSON.parse((await api(`/complaints/user/${customer.id}`, customer)).data.find((row) => row.ma_khieu_nai === complaintId).hinh_anh_dinh_kem), [image]);

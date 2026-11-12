@@ -1,5 +1,12 @@
 # Kiểm tra trước demo PlotFarm
 
+## Sửa dữ liệu tiếng Việt ngày 12/11/2026
+
+- Yêu cầu chăm sóc số 2 chứa ký tự `?` và U+FFFD ngay trong database; các cột là `NVARCHAR`, không phải lỗi font CSS.
+- Migration `20261112_repair_service_demo_unicode.sql` sửa riêng ghi chú và phản hồi demo đó, chỉ khi nội dung cũ khớp chính xác. Chạy file bằng UTF-8 trên database cần sửa; chạy lại không thay đổi dữ liệu đã đúng.
+- Kiểm thử tích hợp kiểm tra dấu tiếng Việt sau khi gửi/lưu/đọc ghi chú, phản hồi Farmer, khiếu nại và màn Admin.
+- Khi test API bằng PowerShell, gửi body bằng `[System.Text.Encoding]::UTF8.GetBytes($jsonBody)` với `Content-Type: application/json; charset=utf-8`. Không dùng nội dung đã bị thay dấu thành `?` hoặc U+FFFD trong terminal.
+
 ## Cập nhật ngày 10/11/2026
 
 - Đã bổ sung ảnh cho yêu cầu chăm sóc và khiếu nại: tối đa 3 ảnh, mỗi ảnh 5 MB, JPG/PNG/WEBP/GIF.
