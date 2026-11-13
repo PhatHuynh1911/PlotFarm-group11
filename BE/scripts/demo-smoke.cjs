@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs/promises');
+const { randomBytes } = require('node:crypto');
 require('dotenv').config({ path: path.join(__dirname, '../.env'), quiet: true });
 const bcrypt = require('bcryptjs');
 const { sql, getPool, connectDB } = require('../src/config/db');
@@ -13,8 +14,8 @@ if (!process.argv.includes('--with-db')) {
 }
 const base = 'http://127.0.0.1:5000/api';
 const tag = `QA${Date.now()}`;
-const password = 'PlotFarm-QA-123!';
-const nextPassword = 'PlotFarm-QA-456!';
+const password = `PF-QA-${randomBytes(12).toString('base64url')}!`;
+const nextPassword = `PF-QA-${randomBytes(12).toString('base64url')}!`;
 const users = [];
 const plots = [];
 const uploadedImages = [];
@@ -204,6 +205,7 @@ async function flowChecks(customer, farmer, admin) {
   assert.equal(afterRestart.recordset[0].trang_thai, 'cho_tiep_nhan');
   assert.equal(afterRestart.recordset[0].trang_thai_vu_mua, 'dang_canh_tac');
   await api(`/rentals/assignments/${nextAssignment.ma_phan_cong}/respond`, farmer, { status: 'da_chap_nhan' }, 'PATCH');
+  assert.ok((await api('/rentals/active', farmer)).data.some((rental) => rental.ma_hop_dong === id), 'New-season plot remains visible to its farmer after last season was delivered');
   await api(`/rentals/${id}/ready-to-harvest`, farmer, {});
   const nextDelivery = (await api('/rentals/harvest-deliveries/user', customer)).data.find((item) => item.ma_hop_dong === id);
   assert.equal(nextDelivery.trang_thai, 'cho_khach_chon');

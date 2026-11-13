@@ -314,7 +314,9 @@ const getActiveRentals = async (req, res) => {
             JOIN NguoiDung u ON u.ma_nguoi_dung = h.ma_nguoi_dung
             LEFT JOIN CayTrong c ON c.ma_cay_trong = h.ma_cay_trong
             LEFT JOIN GiaoNhanThuHoach g ON g.ma_hop_dong = h.ma_hop_dong
-            WHERE h.trang_thai_hop_dong = 'hieu_luc' AND (g.trang_thai IS NULL OR g.trang_thai <> 'da_ban_giao_van_chuyen') ${farmerFilter}
+            WHERE h.trang_thai_hop_dong = 'hieu_luc'
+              AND (g.trang_thai IS NULL OR g.trang_thai <> 'da_ban_giao_van_chuyen'
+                   OR h.trang_thai_canh_tac IN ('cho_gieo_trong', 'dang_canh_tac')) ${farmerFilter}
             ORDER BY o.so_hieu_o ASC
         `);
 

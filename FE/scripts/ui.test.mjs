@@ -239,3 +239,42 @@ test('leaving the picker during upload clears the parent busy state', async () =
   await act(async () => finish({ ok: true, json: async () => ({ data: { url: '/uploads/qa.png' } }) }))
   assert.equal(document.querySelector('.request-image-button'), null)
 })
+
+test('plot search matches displayed plot codes and trims surrounding spaces', async () => {
+  auth('khach_hang')
+  globalThis.fetch = async (url) => ({ ok: true, json: async () => ({ success: true,
+    data: new URL(url).pathname.endsWith('/plots/available-plots')
+      ? [{ ma_o_dat: 42, so_hieu_o: 'B-05', ten_o_dat: 'QA plot', gia_thue_thang: 100000, trang_thai: 'trong' }] : [],
+  }) })
+  await render(h(MemoryRouter, { initialEntries: ['/dashboard?tab=find'] }, h(App)))
+  const input = document.querySelector('input[placeholder="Tìm theo mã, vị trí..."]')
+  assert.ok(input)
+  await act(() => {
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, '  b-05  ')
+    input.dispatchEvent(new window.Event('input', { bubbles: true }))
+  })
+  assert.equal(document.querySelectorAll('.user-plot-card').length, 1)
+  assert.match(document.querySelector('.user-plot-card').textContent, /B-05/)
+})
+
+test('accepting a farmer assignment refreshes the assigned plots without reloading the page', async () => {
+  auth('nong_dan')
+  let accepted = false
+  globalThis.fetch = async (url, options = {}) => {
+    const path = new URL(url).pathname.replace('/api', '')
+    if (path === '/rentals/assignments/7/respond' && options.method === 'PATCH') accepted = true
+    let data = []
+    if (path === '/rentals/assignments/mine') data = [{ ma_phan_cong: 7, ma_hop_dong: 42, so_hieu_o: 'QA-NEW', ten_khach_hang: 'QA', trang_thai: accepted ? 'da_chap_nhan' : 'cho_tiep_nhan' }]
+    if (path === '/rentals/active' && accepted) data = [{ ma_hop_dong: 42, so_hieu_o: 'QA-NEW', ten_khach_hang: 'QA', dien_tich_m2: 24, trang_thai_canh_tac: 'cho_gieo_trong', trang_thai_giao_nhan: 'da_ban_giao_van_chuyen' }]
+    if (path === '/weather/current') data = null
+    return { ok: true, json: async () => ({ success: true, data }) }
+  }
+  await render(h(MemoryRouter, { initialEntries: ['/farmer'] }, h(App)))
+  assert.equal(document.querySelectorAll('.farmer-plot-card').length, 0)
+  const accept = [...document.querySelectorAll('button')].find((button) => button.textContent === 'Chấp nhận phân công')
+  assert.ok(accept)
+  await act(async () => { accept.click(); await new Promise((resolve) => setTimeout(resolve, 20)) })
+  assert.ok(accepted)
+  assert.equal(document.querySelectorAll('.farmer-plot-card').length, 1)
+  assert.match(document.querySelector('.farmer-plot-card').textContent, /QA-NEW/)
+})

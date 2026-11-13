@@ -1,5 +1,9 @@
 # Kiểm tra trước demo PlotFarm
 
+## Kết quả mới nhất ngày 13/11/2026
+
+Xem [bàn giao](handover.md) để biết các bước đã kiểm tra thực tế và phần còn cần xác nhận. Đã chạy Chrome ở 360/390/768px; các ghi chú browser bị chặn bên dưới là lịch sử ngày 09–10/11. Kết quả mới: 123 kiểm tra API, 41 test React đạt, build thành công; lint còn 14 cảnh báo có sẵn.
+
 ## Sửa dữ liệu tiếng Việt ngày 12/11/2026
 
 - Yêu cầu chăm sóc số 2 chứa ký tự `?` và U+FFFD ngay trong database; các cột là `NVARCHAR`, không phải lỗi font CSS.

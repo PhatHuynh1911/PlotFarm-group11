@@ -33,7 +33,7 @@ PlotFarm là giải pháp công nghệ mang lại trải nghiệm làm nông ngh
 
 ### Yêu cầu
 
-- Node.js 18 trở lên
+- Node.js 20.19+ hoặc 22.12+ (theo yêu cầu của Vite)
 - SQL Server và database `PlotFarmDB`
 
 ### Backend
@@ -66,6 +66,8 @@ VITE_API_URL=http://localhost:5000/api
 ```
 
 ## Tài khoản và luồng demo
+
+Xem [hướng dẫn bàn giao và kết quả kiểm thử](docs/handover.md) trước buổi demo.
 
 - Admin: `admin.test@plotfarm.vn` / `Admin123!`
 - User/Farmer: dùng các tài khoản test đã seed trong database hoặc đăng ký mới từ màn hình đăng nhập.

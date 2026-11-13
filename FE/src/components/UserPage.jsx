@@ -318,10 +318,10 @@ function UserPage({ user, token, onLogout }) {
   const filteredPlots = useMemo(
     () =>
       availablePlots.filter((plot) => {
-        const search = filters.search.toLowerCase();
+        const search = filters.search.trim().toLowerCase();
         return (
           (!search ||
-            `${plot.id} ${plot.location} ${plot.soil}`
+            `${plot.id} ${plot.code || ''} ${plot.name || ''} ${plot.location} ${plot.soil}`
               .toLowerCase()
               .includes(search)) &&
           (filters.soil === "Tất cả loại đất" || plot.soil === filters.soil) &&
