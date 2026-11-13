@@ -1,5 +1,6 @@
 const { sql, getPool } = require('../config/db');
 const { createNotification } = require('./notificationController');
+const { validateAttachments } = require('../middleware/supportUpload');
 
 // Lấy danh mục các loại dịch vụ chăm sóc
 const getServiceTypes = async (req, res) => {
@@ -25,6 +26,9 @@ const createServiceRequest = async (req, res) => {
     try {
         const { ma_hop_dong, ma_loai_dich_vu, ngay_yeu_cau_thuc_hien, ghi_chu_cua_khach } = req.body;
         const ma_khach_hang = Number(req.user.sub);
+        let images;
+        try { images = await validateAttachments(req.body.hinh_anh_dinh_kem, ma_khach_hang); }
+        catch (error) { return res.status(400).json({ success: false, message: error.message }); }
 
         if (!ma_hop_dong || !ma_khach_hang || !ma_loai_dich_vu) {
             return res.status(400).json({ success: false, message: 'Thiếu thông tin hợp đồng, khách hàng hoặc loại dịch vụ' });
@@ -57,10 +61,11 @@ const createServiceRequest = async (req, res) => {
             .input('ngay_thuc_hien', sql.Date, ngayThucHien)
             .input('ghi_chu', sql.NVarChar(sql.MAX), ghi_chu_cua_khach || '')
             .input('farmerId', sql.Int, contract.ma_nong_dan)
+            .input('images', sql.NVarChar(sql.MAX), images.length ? JSON.stringify(images) : null)
             .query(`
-                INSERT INTO YeuCauDichVu (so_phieu_yeu_cau, ma_hop_dong, ma_khach_hang, ma_loai_dich_vu, ma_nong_dan_phu_trach, ngay_yeu_cau_thuc_hien, ghi_chu_cua_khach, trang_thai_xu_ly)
+                INSERT INTO YeuCauDichVu (so_phieu_yeu_cau, ma_hop_dong, ma_khach_hang, ma_loai_dich_vu, ma_nong_dan_phu_trach, ngay_yeu_cau_thuc_hien, ghi_chu_cua_khach, hinh_anh_dinh_kem, trang_thai_xu_ly)
                 OUTPUT INSERTED.*
-                VALUES (@so_phieu, @ma_hop_dong, @ma_khach_hang, @ma_loai_dich_vu, @farmerId, @ngay_thuc_hien, @ghi_chu, 'cho_tiep_nhan')
+                VALUES (@so_phieu, @ma_hop_dong, @ma_khach_hang, @ma_loai_dich_vu, @farmerId, @ngay_thuc_hien, @ghi_chu, @images, 'cho_tiep_nhan')
             `);
 
         createNotification(

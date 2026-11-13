@@ -1,5 +1,25 @@
 # Kiểm tra trước demo PlotFarm
 
+## Kết quả mới nhất ngày 13/11/2026
+
+Xem [bàn giao](handover.md) để biết các bước đã kiểm tra thực tế và phần còn cần xác nhận. Đã chạy Chrome ở 360/390/768px; các ghi chú browser bị chặn bên dưới là lịch sử ngày 09–10/11. Kết quả mới: 123 kiểm tra API, 41 test React đạt, build thành công; lint còn 14 cảnh báo có sẵn.
+
+## Sửa dữ liệu tiếng Việt ngày 12/11/2026
+
+- Yêu cầu chăm sóc số 2 chứa ký tự `?` và U+FFFD ngay trong database; các cột là `NVARCHAR`, không phải lỗi font CSS.
+- Migration `20261112_repair_service_demo_unicode.sql` sửa riêng ghi chú và phản hồi demo đó, chỉ khi nội dung cũ khớp chính xác. Chạy file bằng UTF-8 trên database cần sửa; chạy lại không thay đổi dữ liệu đã đúng.
+- Kiểm thử tích hợp kiểm tra dấu tiếng Việt sau khi gửi/lưu/đọc ghi chú, phản hồi Farmer, khiếu nại và màn Admin.
+- Khi test API bằng PowerShell, gửi body bằng `[System.Text.Encoding]::UTF8.GetBytes($jsonBody)` với `Content-Type: application/json; charset=utf-8`. Không dùng nội dung đã bị thay dấu thành `?` hoặc U+FFFD trong terminal.
+
+## Cập nhật ngày 10/11/2026
+
+- Đã bổ sung ảnh cho yêu cầu chăm sóc và khiếu nại: tối đa 3 ảnh, mỗi ảnh 5 MB, JPG/PNG/WEBP/GIF.
+- Ảnh có xem trước, bỏ khỏi form và xem lớn trong lịch sử User, danh sách Farmer và màn yêu cầu Admin.
+- API upload yêu cầu đăng nhập; kiểm tra MIME, phần mở rộng, chữ ký tệp và quyền sở hữu ảnh khi gửi yêu cầu.
+- Migration `migrations/20261110_support_images.sql` chỉ thêm cột, không xóa dữ liệu. BE cũng tự bổ sung cột khi khởi động.
+- Đã pass 119 kiểm tra API với SQL Server thật và 39 test React, gồm upload thất bại, giới hạn ảnh, gửi form kèm ảnh và rời tab trong khi đang tải ảnh.
+- Chạy `node scripts/demo-smoke.cjs --with-db --ui` để tạo ba tài khoản và một ô đất QA cho kiểm tra thủ công. Nhập `done` vào terminal đó để dọn dữ liệu và ảnh của lần kiểm tra.
+
 ## Kết quả ngày 09/11/2026
 
 - 91 kiểm tra HTTP API với SQL Server thật đã pass. Script tạo tài khoản và ô đất QA riêng, rồi xóa đúng dữ liệu của lần chạy trong `finally`.
@@ -49,3 +69,5 @@ Cần mở Chrome ở kích thước 360, 390, 768 và 1440px để xác nhận:
 - Tắt BE rồi tải trang: thông báo lỗi và điều hướng vẫn hiển thị.
 
 Tại thời điểm chạy test, browser connector báo `The browser access host is unavailable`; chưa xác nhận trực quan checklist này.
+
+Ngày 10/11, thử lại native Chrome: cửa sổ đang thu nhỏ, API trả `window is minimized`; gọi mở lại ứng dụng vẫn không khôi phục được. Cần mở cửa sổ Chrome tại frontend đang chạy để tiếp tục kiểm tra trực quan.

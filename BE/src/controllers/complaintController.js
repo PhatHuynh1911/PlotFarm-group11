@@ -1,9 +1,13 @@
 const { sql, getPool } = require('../config/db');
+const { validateAttachments } = require('../middleware/supportUpload');
 
 const createComplaint = async (req, res) => {
     try {
         const { ma_hop_dong, ma_o_dat, tieu_de, mo_ta_chi_tiet } = req.body;
         const ma_khach_hang = Number(req.user.sub);
+        let images;
+        try { images = await validateAttachments(req.body.hinh_anh_dinh_kem, ma_khach_hang); }
+        catch (error) { return res.status(400).json({ success: false, message: error.message }); }
 
         if (!ma_hop_dong || !tieu_de || !mo_ta_chi_tiet) {
             return res.status(400).json({
@@ -42,10 +46,11 @@ const createComplaint = async (req, res) => {
             .input('ma_o_dat', sql.Int, ma_o_dat ? Number(ma_o_dat) : null)
             .input('tieu_de', sql.NVarChar(200), String(tieu_de).trim())
             .input('mo_ta', sql.NVarChar(sql.MAX), String(mo_ta_chi_tiet).trim())
+            .input('images', sql.NVarChar(sql.MAX), images.length ? JSON.stringify(images) : null)
             .query(`
-                INSERT INTO KhieuNai (ma_hop_dong, ma_khach_hang, ma_o_dat, tieu_de, mo_ta_chi_tiet, trang_thai_khieu_nai)
+                INSERT INTO KhieuNai (ma_hop_dong, ma_khach_hang, ma_o_dat, tieu_de, mo_ta_chi_tiet, hinh_anh_dinh_kem, trang_thai_khieu_nai)
                 OUTPUT INSERTED.*
-                VALUES (@ma_hop_dong, @ma_khach_hang, @ma_o_dat, @tieu_de, @mo_ta, 'dang_tiep_nhan')
+                VALUES (@ma_hop_dong, @ma_khach_hang, @ma_o_dat, @tieu_de, @mo_ta, @images, 'dang_tiep_nhan')
             `);
 
         res.status(201).json({

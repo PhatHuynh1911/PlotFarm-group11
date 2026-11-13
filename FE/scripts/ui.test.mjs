@@ -10,7 +10,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true
 const { createElement: h, act, useState } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const { MemoryRouter } = await import('react-router-dom')
-let server, App, SafeImage, ErrorBoundary, api, ToastProvider, notify, root
+let server, App, SafeImage, ErrorBoundary, api, ToastProvider, notify, root, RequestImages, RequestImagePicker
 const originalFetch = globalThis.fetch
 const unavailable = async () => ({ ok: false, json: async () => ({ success: false, message: 'API unavailable QA' }) })
 before(async () => {
@@ -20,6 +20,7 @@ before(async () => {
   ErrorBoundary = (await server.ssrLoadModule('/src/components/ErrorBoundary.jsx')).default
   api = await server.ssrLoadModule('/src/api.js')
   ;({ ToastProvider, notify } = await server.ssrLoadModule('/src/components/ToastProvider.jsx'))
+  ;({ RequestImages, RequestImagePicker } = await server.ssrLoadModule('/src/components/RequestImages.jsx'))
 })
 afterEach(async () => {
   if (root) await act(() => root.unmount())
@@ -138,13 +139,14 @@ test('toast displays success and failure text', async () => {
 
 test('support success does not become an error after the async form submission', async () => {
   auth('khach_hang')
-  let posts = 0
+  let posts = 0, postedImages
   globalThis.fetch = async (url, options = {}) => {
     const path = new URL(url).pathname.replace('/api', '')
     let data = []
     if (path === '/rentals/user/123') data = [{ ma_hop_dong: 42, so_hieu_o: 'QA-42', ten_o_dat: 'QA', trang_thai_hop_dong: 'hieu_luc', trang_thai_canh_tac: 'dang_canh_tac', trang_thai_phan_cong: 'da_chap_nhan' }]
     if (path === '/services/types') data = [{ ma_loai_dich_vu: 1, ten_dich_vu: 'Tưới nước' }]
-    if (path === '/services' && options.method === 'POST') posts++
+    if (path === '/upload/support') return { ok: true, json: async () => ({ success: true, data: { url: '/uploads/qa-image.png' } }) }
+    if (path === '/services' && options.method === 'POST') { posts++; postedImages = JSON.parse(options.body).hinh_anh_dinh_kem }
     return { ok: true, json: async () => ({ success: true, data }) }
   }
   await render(h(MemoryRouter, { initialEntries: ['/dashboard?tab=support'] }, h(App)))
@@ -153,9 +155,126 @@ test('support success does not become an error after the async form submission',
   form.elements.serviceType.value = '1'
   form.elements.schedule.value = '2027-01-01'
   form.elements.note.value = 'QA support'
+  const input = form.querySelector('input[type="file"]')
+  Object.defineProperty(input, 'files', { value: [new window.File(['png'], 'qa.png', { type: 'image/png' })], configurable: true })
+  await act(async () => input.dispatchEvent(new window.Event('change', { bubbles: true })))
   await act(async () => form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true })))
   assert.equal(posts, 1)
+  assert.deepEqual(postedImages, ['/uploads/qa-image.png'])
   assert.match(document.body.textContent, /Yêu cầu đã được gửi thành công/)
   assert.equal(document.querySelector('.dashboard-error'), null)
   assert.equal(document.querySelectorAll('.toast-success').length, 1)
+})
+
+function PickerHarness() {
+  const [value, onChange] = useState([])
+  const [busy, onBusyChange] = useState(false)
+  return h('form', null, h(RequestImagePicker, { value, onChange, onBusyChange, token: 'qa-token' }), h('button', { type: 'submit', disabled: busy }, 'Submit QA'))
+}
+async function selectFiles(files) {
+  const input = document.querySelector('input[type="file"]')
+  Object.defineProperty(input, 'files', { value: files, configurable: true })
+  await act(async () => input.dispatchEvent(new window.Event('change', { bubbles: true })))
+}
+test('image picker rejects invalid type, size and count before uploading', async () => {
+  let calls = 0
+  globalThis.fetch = async () => { calls++; throw new Error('unexpected upload') }
+  await render(h(PickerHarness))
+  await selectFiles([new window.File(['<svg/>'], 'bad.svg', { type: 'image/svg+xml' })])
+  assert.match(document.querySelector('[role="alert"]').textContent, /Chỉ chấp nhận ảnh/)
+  await selectFiles([new window.File([new Uint8Array(5 * 1024 * 1024 + 1)], 'large.png', { type: 'image/png' })])
+  assert.match(document.querySelector('[role="alert"]').textContent, /5 MB/)
+  await selectFiles(Array.from({ length: 4 }, () => new window.File(['png'], 'qa.png', { type: 'image/png' })))
+  assert.match(document.querySelector('[role="alert"]').textContent, /tối đa 3 ảnh/)
+  assert.equal(calls, 0)
+})
+test('upload failure is visible and re-enables the submit button', async () => {
+  globalThis.fetch = async () => ({ ok: false, json: async () => ({ message: 'QA upload rejected' }) })
+  await render(h(PickerHarness))
+  await selectFiles([new window.File(['png'], 'qa.png', { type: 'image/png' })])
+  assert.match(document.querySelector('[role="alert"]').textContent, /QA upload rejected/)
+  assert.equal(document.querySelector('button[type="submit"]').disabled, false)
+  assert.equal(document.querySelector('.request-image-button'), null)
+})
+test('upload pending blocks submission; a successful photo can be previewed and removed', async () => {
+  let finish
+  globalThis.fetch = () => new Promise((resolve) => { finish = resolve })
+  await render(h(PickerHarness))
+  const input = document.querySelector('input[type="file"]')
+  Object.defineProperty(input, 'files', { value: [new window.File(['png'], 'qa.png', { type: 'image/png' })], configurable: true })
+  await act(() => input.dispatchEvent(new window.Event('change', { bubbles: true })))
+  assert.equal(document.querySelector('button[type="submit"]').disabled, true)
+  await act(async () => finish({ ok: true, json: async () => ({ data: { url: '/uploads/qa.png' } }) }))
+  assert.equal(document.querySelector('button[type="submit"]').disabled, false)
+  await act(() => document.querySelector('.request-image-button').click())
+  assert.ok(document.querySelector('.image-lightbox'))
+  await act(() => document.querySelector('.image-lightbox-close').click())
+  await act(() => document.querySelector('.request-image-picker .text-button').click())
+  assert.equal(document.querySelector('.request-image-button'), null)
+})
+test('attachment gallery tolerates legacy requests without valid attachment JSON', async () => {
+  await render(h(RequestImages, { images: '{invalid' }))
+  assert.equal(document.querySelector('.request-images'), null)
+})
+
+test('leaving the picker during upload clears the parent busy state', async () => {
+  let finish
+  globalThis.fetch = () => new Promise((resolve) => { finish = resolve })
+  function Workspace() {
+    const [show, setShow] = useState(true)
+    const [busy, setBusy] = useState(false)
+    const [value, setValue] = useState([])
+    return h('div', null,
+      h('button', { id: 'leave-picker', onClick: () => setShow(false) }, 'Leave'),
+      show && h(RequestImagePicker, { value, onChange: setValue, onBusyChange: setBusy, token: 'qa' }),
+      h('button', { id: 'parent-submit', disabled: busy }, 'Submit'))
+  }
+  await render(h(Workspace))
+  const input = document.querySelector('input[type="file"]')
+  Object.defineProperty(input, 'files', { value: [new window.File(['png'], 'qa.png', { type: 'image/png' })], configurable: true })
+  await act(() => input.dispatchEvent(new window.Event('change', { bubbles: true })))
+  assert.equal(document.querySelector('#parent-submit').disabled, true)
+  await act(() => document.querySelector('#leave-picker').click())
+  assert.equal(document.querySelector('#parent-submit').disabled, false)
+  await act(async () => finish({ ok: true, json: async () => ({ data: { url: '/uploads/qa.png' } }) }))
+  assert.equal(document.querySelector('.request-image-button'), null)
+})
+
+test('plot search matches displayed plot codes and trims surrounding spaces', async () => {
+  auth('khach_hang')
+  globalThis.fetch = async (url) => ({ ok: true, json: async () => ({ success: true,
+    data: new URL(url).pathname.endsWith('/plots/available-plots')
+      ? [{ ma_o_dat: 42, so_hieu_o: 'B-05', ten_o_dat: 'QA plot', gia_thue_thang: 100000, trang_thai: 'trong' }] : [],
+  }) })
+  await render(h(MemoryRouter, { initialEntries: ['/dashboard?tab=find'] }, h(App)))
+  const input = document.querySelector('input[placeholder="Tìm theo mã, vị trí..."]')
+  assert.ok(input)
+  await act(() => {
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, '  b-05  ')
+    input.dispatchEvent(new window.Event('input', { bubbles: true }))
+  })
+  assert.equal(document.querySelectorAll('.user-plot-card').length, 1)
+  assert.match(document.querySelector('.user-plot-card').textContent, /B-05/)
+})
+
+test('accepting a farmer assignment refreshes the assigned plots without reloading the page', async () => {
+  auth('nong_dan')
+  let accepted = false
+  globalThis.fetch = async (url, options = {}) => {
+    const path = new URL(url).pathname.replace('/api', '')
+    if (path === '/rentals/assignments/7/respond' && options.method === 'PATCH') accepted = true
+    let data = []
+    if (path === '/rentals/assignments/mine') data = [{ ma_phan_cong: 7, ma_hop_dong: 42, so_hieu_o: 'QA-NEW', ten_khach_hang: 'QA', trang_thai: accepted ? 'da_chap_nhan' : 'cho_tiep_nhan' }]
+    if (path === '/rentals/active' && accepted) data = [{ ma_hop_dong: 42, so_hieu_o: 'QA-NEW', ten_khach_hang: 'QA', dien_tich_m2: 24, trang_thai_canh_tac: 'cho_gieo_trong', trang_thai_giao_nhan: 'da_ban_giao_van_chuyen' }]
+    if (path === '/weather/current') data = null
+    return { ok: true, json: async () => ({ success: true, data }) }
+  }
+  await render(h(MemoryRouter, { initialEntries: ['/farmer'] }, h(App)))
+  assert.equal(document.querySelectorAll('.farmer-plot-card').length, 0)
+  const accept = [...document.querySelectorAll('button')].find((button) => button.textContent === 'Chấp nhận phân công')
+  assert.ok(accept)
+  await act(async () => { accept.click(); await new Promise((resolve) => setTimeout(resolve, 20)) })
+  assert.ok(accepted)
+  assert.equal(document.querySelectorAll('.farmer-plot-card').length, 1)
+  assert.match(document.querySelector('.farmer-plot-card').textContent, /QA-NEW/)
 })

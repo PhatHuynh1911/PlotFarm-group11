@@ -32,6 +32,7 @@ import { vietnamProvinces } from "../data/vietnamAddress.js";
 import ImageLightbox from "./ImageLightbox.jsx";
 import FarmWeatherWidget from "./FarmWeatherWidget.jsx";
 import SafeImage from "./SafeImage.jsx";
+import { RequestImages, RequestImagePicker } from "./RequestImages.jsx";
 import { plotBackground } from "../api.js";
 
 const formatMoney = (value) =>
@@ -171,6 +172,11 @@ function UserPage({ user, token, onLogout }) {
   const [notice, setNotice] = useState("");
   const [supportSent, setSupportSent] = useState(false);
   const [supportSubmitting, setSupportSubmitting] = useState(false);
+  const [supportImages, setSupportImages] = useState([]);
+  const [supportUploading, setSupportUploading] = useState(false);
+  const [complaintImages, setComplaintImages] = useState([]);
+  const [complaintUploading, setComplaintUploading] = useState(false);
+  const [complaintSubmitting, setComplaintSubmitting] = useState(false);
   const [harvestDeliveries, setHarvestDeliveries] = useState([]);
   const [selectedCareRental, setSelectedCareRental] = useState("");
   const [selectedHarvestRental, setSelectedHarvestRental] = useState("");
@@ -312,10 +318,10 @@ function UserPage({ user, token, onLogout }) {
   const filteredPlots = useMemo(
     () =>
       availablePlots.filter((plot) => {
-        const search = filters.search.toLowerCase();
+        const search = filters.search.trim().toLowerCase();
         return (
           (!search ||
-            `${plot.id} ${plot.location} ${plot.soil}`
+            `${plot.id} ${plot.code || ''} ${plot.name || ''} ${plot.location} ${plot.soil}`
               .toLowerCase()
               .includes(search)) &&
           (filters.soil === "Tất cả loại đất" || plot.soil === filters.soil) &&
@@ -530,6 +536,7 @@ function UserPage({ user, token, onLogout }) {
   };
   const submitSupport = async (event) => {
     event.preventDefault();
+    if (supportUploading || supportSubmitting) return;
     const formElement = event.currentTarget;
     setError("");
     setSupportSubmitting(true);
@@ -547,11 +554,13 @@ function UserPage({ user, token, onLogout }) {
           ma_loai_dich_vu: Number(form.get("serviceType")),
           ngay_yeu_cau_thuc_hien: form.get("schedule"),
           ghi_chu_cua_khach: form.get("note"),
+          hinh_anh_dinh_kem: supportImages,
         },
         token,
       );
       setServiceRequests(await getUserServiceRequests(user.id, token));
       setSupportSent(true);
+      setSupportImages([]);
       setSelectedCareRental("");
       formElement.reset();
       showNotice("Đã gửi yêu cầu chăm sóc tới đội ngũ PlotFarm.");
@@ -573,6 +582,8 @@ function UserPage({ user, token, onLogout }) {
 
   const handleComplaintSubmit = async (event) => {
     event.preventDefault();
+    if (complaintUploading || complaintSubmitting) return;
+    setComplaintSubmitting(true);
     setError("");
     try {
       if (!complaintForm.ma_hop_dong || !complaintForm.tieu_de || !complaintForm.mo_ta_chi_tiet) {
@@ -584,9 +595,11 @@ function UserPage({ user, token, onLogout }) {
         ma_o_dat: complaintForm.ma_o_dat ? Number(complaintForm.ma_o_dat) : null,
         tieu_de: complaintForm.tieu_de,
         mo_ta_chi_tiet: complaintForm.mo_ta_chi_tiet,
+        hinh_anh_dinh_kem: complaintImages,
       }, token);
 
       setComplaints(await getUserComplaints(user.id, token));
+      setComplaintImages([]);
       setComplaintForm({
         ma_hop_dong: "",
         ma_o_dat: "",
@@ -598,6 +611,7 @@ function UserPage({ user, token, onLogout }) {
     } catch (requestError) {
       setError(requestError.message);
     }
+    finally { setComplaintSubmitting(false); }
   };
 
   const paymentModal = activePaymentModal && (
@@ -1553,7 +1567,8 @@ function UserPage({ user, token, onLogout }) {
                 required
                 placeholder="Mô tả tình trạng hoặc ghi chú cho nông dân"
               />
-              <button className="primary-button" type="submit" disabled={supportSubmitting}>
+              <RequestImagePicker value={supportImages} onChange={setSupportImages} onBusyChange={setSupportUploading} token={token} disabled={supportSubmitting} label="Ảnh tình trạng ô đất" />
+              <button className="primary-button" type="submit" disabled={supportSubmitting || supportUploading}>
                 {supportSubmitting ? "Đang gửi..." : "Gửi yêu cầu"} <span>→</span>
               </button>
             </form>
@@ -1600,6 +1615,7 @@ function UserPage({ user, token, onLogout }) {
                     </span>
                   </div>
                   {request.ghi_chu_cua_khach && <p>{request.ghi_chu_cua_khach}</p>}
+                  <RequestImages images={request.hinh_anh_dinh_kem} />
                   {request.phan_hoi_cua_nha_vuon && (
                     <div className="farmer-reply">
                       <b>Phản hồi từ nông dân</b>
@@ -1695,8 +1711,9 @@ function UserPage({ user, token, onLogout }) {
               rows="5"
               required
             />
-            <button className="primary-button" type="submit">
-              Gửi khiếu nại <span>→</span>
+            <RequestImagePicker value={complaintImages} onChange={setComplaintImages} onBusyChange={setComplaintUploading} token={token} disabled={complaintSubmitting} label="Ảnh minh chứng khiếu nại" />
+            <button className="primary-button" type="submit" disabled={complaintSubmitting || complaintUploading}>
+              {complaintSubmitting ? 'Đang gửi...' : 'Gửi khiếu nại'} <span>→</span>
             </button>
           </form>
 
@@ -1726,6 +1743,7 @@ function UserPage({ user, token, onLogout }) {
                     </span>
                   </div>
                   <p>{item.mo_ta_chi_tiet}</p>
+                  <RequestImages images={item.hinh_anh_dinh_kem} />
                   {item.phan_hoi_admin && (
                     <div className="farmer-reply">
                       <b>Phản hồi Admin</b>

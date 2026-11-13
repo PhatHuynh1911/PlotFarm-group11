@@ -929,6 +929,18 @@ const swaggerSpec = {
                 }
             }
         },
+        '/api/upload/support': {
+            post: {
+                tags: ['Support attachments'],
+                summary: 'Upload one support photo (JPG/PNG/WEBP/GIF, max 5 MB)',
+                security: [{ bearerAuth: [] }],
+                requestBody: { required: true, content: { 'multipart/form-data': { schema: {
+                    type: 'object', required: ['image'], properties: { image: { type: 'string', format: 'binary' } }
+                } } } },
+                responses: { 201: { description: 'Photo URL; pass up to 3 URLs as hinh_anh_dinh_kem when creating a complaint/service request' },
+                    400: { description: 'Invalid image or size' }, 401: { description: 'Login required' } }
+            }
+        },
         '/api/harvest/rental/{rentalId}': {
             get: {
                 tags: ['10. Harvest'],

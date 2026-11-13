@@ -27,6 +27,7 @@ import {
 import ImageLightbox from "./ImageLightbox.jsx";
 import FarmWeatherWidget from "./FarmWeatherWidget.jsx";
 import SafeImage from "./SafeImage.jsx";
+import { RequestImages } from "./RequestImages.jsx";
 
 const requestLabels = {
   cho_tiep_nhan: "Chờ tiếp nhận",
@@ -54,6 +55,7 @@ const mapServiceRequests = (serviceRequests) =>
     time: request.ngay_gui_yeu_cau,
     reply: request.phan_hoi_cua_nha_vuon || "",
     photo: request.hinh_anh_nghiem_thu || "",
+    attachments: request.hinh_anh_dinh_kem,
   }));
 
 function FarmerPage({ user, onLogout }) {
@@ -67,6 +69,7 @@ function FarmerPage({ user, onLogout }) {
   const [refreshingRequests, setRefreshingRequests] = useState(false);
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [dataVersion, setDataVersion] = useState(0);
   const [error, setError] = useState("");
   const [journal, setJournal] = useState([]);
   const [journalPlotFilter, setJournalPlotFilter] = useState("all");
@@ -109,11 +112,13 @@ function FarmerPage({ user, onLogout }) {
       getFarmerHarvestDeliveries(token),
     ])
       .then(async ([rentals, serviceRequests, nextAssignments, deliveries]) => {
+        setError("");
         setAssignments(nextAssignments);
         setHarvestDeliveries(deliveries);
         const mappedPlots = rentals
           .filter(
-            (rental) => rental.trang_thai_giao_nhan !== "da_ban_giao_van_chuyen",
+            (rental) => rental.trang_thai_giao_nhan !== "da_ban_giao_van_chuyen"
+              || ['cho_gieo_trong', 'dang_canh_tac'].includes(rental.trang_thai_canh_tac),
           )
           .map((rental) => ({
             id: rental.so_hieu_o,
@@ -182,7 +187,7 @@ function FarmerPage({ user, onLogout }) {
       })
       .catch((requestError) => setError(requestError.message))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, dataVersion]);
 
   const refreshRequests = async (showToast = false) => {
     setRefreshingRequests(true);
@@ -211,6 +216,7 @@ function FarmerPage({ user, onLogout }) {
         : items.map((item) => item.ma_phan_cong === assignment.ma_phan_cong ? { ...item, trang_thai: status } : item),
       );
       if (status === "da_chap_nhan") {
+        setDataVersion((version) => version + 1);
         notify("Đã tiếp nhận phân công chăm sóc ô đất thành công!");
       } else {
         notify("Đã từ chối phân công và gửi lý do cho Quản trị viên.");
@@ -368,6 +374,7 @@ function FarmerPage({ user, onLogout }) {
   };
 
   const confirmPlanting = async (plot) => {
+    setError("");
     try {
       await updateCultivationStatus(plot.rentalId, "dang_canh_tac", token);
       setPlots((items) =>
@@ -999,6 +1006,7 @@ function FarmerPage({ user, onLogout }) {
                       </span>
                     </div>
                     <p>{request.text}</p>
+                    <RequestImages images={request.attachments} />
                     <small>{formatDate(request.time)}</small>
                     {request.reply && (
                       <p className="request-reply">

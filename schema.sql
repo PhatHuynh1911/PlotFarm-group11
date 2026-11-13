@@ -238,6 +238,7 @@ CREATE TABLE dbo.YeuCauDichVu (
     ngay_yeu_cau_thuc_hien DATE NOT NULL DEFAULT CAST(SYSDATETIME() AS DATE),
     buoi_thuc_hien VARCHAR(20) NOT NULL DEFAULT 'sang', -- 'sang', 'chieu'
     ghi_chu_cua_khach NVARCHAR(500) NULL,
+    hinh_anh_dinh_kem NVARCHAR(MAX) NULL,
     loai_yeu_cau VARCHAR(30) NOT NULL DEFAULT 'cham_soc', -- 'cham_soc', 'khieu_nai', 'khac'
     chi_phi DECIMAL(14, 2) NOT NULL DEFAULT 0.00,
     trang_thai_thanh_toan VARCHAR(20) NOT NULL DEFAULT 'mien_phi_kem_theo',
@@ -310,6 +311,7 @@ CREATE TABLE dbo.KhieuNai (
     ma_o_dat INT NULL FOREIGN KEY REFERENCES dbo.ODat(ma_o_dat),
     tieu_de NVARCHAR(200) NOT NULL,
     mo_ta_chi_tiet NVARCHAR(1000) NOT NULL,
+    hinh_anh_dinh_kem NVARCHAR(MAX) NULL,
     trang_thai_khieu_nai VARCHAR(30) NOT NULL DEFAULT 'dang_tiep_nhan', -- 'dang_tiep_nhan', 'da_giai_quyet', 'tu_choi'
     phan_hoi_admin NVARCHAR(1000) NULL,
     ma_admin_xu_ly INT NULL FOREIGN KEY REFERENCES dbo.NguoiDung(ma_nguoi_dung),
