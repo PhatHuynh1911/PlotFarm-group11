@@ -9,7 +9,7 @@ const bcrypt = require('bcryptjs');
 const { sql, getPool, connectDB } = require('../src/config/db');
 
 if (!process.argv.includes('--with-db')) {
-  console.error('Usage: node scripts/demo-smoke.cjs --with-db [--password-only | --ui]');
+  console.error('Usage: node scripts/demo-smoke.cjs --with-db [--password-only | --ui [--ui-harvest]]');
   process.exit(1);
 }
 const base = 'http://127.0.0.1:5000/api';
@@ -296,6 +296,18 @@ async function cleanup() {
     if (process.argv.includes('--ui')) {
       const plot = await createPlot('A');
       const photo = await uploadPhoto(customer);
+      if (process.argv.includes('--ui-harvest')) {
+        const crop = (await api('/crops')).data[0];
+        const rental = (await api('/rentals', customer, {
+          so_hop_dong: `${tag}-UI`, ma_o_dat: plot, ma_cay_trong: crop.ma_cay_trong, thoi_han_thang: 12,
+        }, 'POST', 201)).data;
+        await api(`/rentals/${rental.ma_hop_dong}/confirm-payment`, customer, {});
+        await api('/admin/assignments', admin, { ma_hop_dong: rental.ma_hop_dong, ma_nong_dan: farmer.id, ghi_chu: tag }, 'POST', 201);
+        const assignment = (await api('/rentals/assignments/mine', farmer)).data.find((item) => item.ma_hop_dong === rental.ma_hop_dong);
+        await api(`/rentals/assignments/${assignment.ma_phan_cong}/respond`, farmer, { status: 'da_chap_nhan' }, 'PATCH');
+        await api(`/rentals/${rental.ma_hop_dong}/ready-to-harvest`, farmer, {});
+        console.log(`UI harvest fixture ready: rental ${rental.ma_hop_dong}`);
+      }
       console.log(JSON.stringify({ tag, plot, photo: path.join(__dirname, '..', photo),
         password, accounts: users.map(({ email, role }) => ({ email, role })) }, null, 2));
       const readline = require('node:readline').createInterface({ input: process.stdin, output: process.stdout });

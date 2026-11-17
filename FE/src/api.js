@@ -20,7 +20,7 @@ export async function apiRequest(path, options = {}) {
   try {
     response = await fetch(`${API_URL}${path}`, {
       ...requestOptions,
-      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(requestOptions.headers || {}) },
+      headers: { ...(requestOptions.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(requestOptions.headers || {}) },
     })
   } catch {
     throw new Error('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối và thử lại.')

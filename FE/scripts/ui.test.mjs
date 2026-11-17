@@ -70,6 +70,29 @@ test('signed-out protected route goes to home', async () => {
   assert.ok(document.querySelector('#plots'))
   assert.equal(document.querySelector('.admin-workspace'), null)
 })
+
+test('Admin network failure shows Vietnamese guidance and preserves navigation', async () => {
+  auth('quan_tri')
+  globalThis.fetch = async () => { throw new TypeError('Failed to fetch') }
+  await render(h(MemoryRouter, { initialEntries: ['/admin?tab=rentals'] }, h(App)))
+  assert.ok(document.querySelector('.workspace-nav'))
+  assert.match(document.body.textContent, /Không thể kết nối đến máy chủ/)
+  assert.doesNotMatch(document.body.textContent, /Failed to fetch/)
+})
+
+test('multipart API requests let the browser supply the content type boundary', async () => {
+  let options
+  globalThis.fetch = async (_url, requestOptions) => {
+    options = requestOptions
+    return { ok: true, json: async () => ({ success: true }) }
+  }
+  const body = new FormData()
+  body.append('name', 'QA')
+  await api.apiRequest('/admin/plots', { method: 'POST', body, token: 'qa' })
+  assert.equal(options.body, body)
+  assert.equal(options.headers['Content-Type'], undefined)
+  assert.equal(options.headers.Authorization, 'Bearer qa')
+})
 test('malformed session cannot crash the app', async () => {
   sessionStorage.setItem('plotfarm_auth', '{broken')
   await route('/farmer')
@@ -255,6 +278,27 @@ test('plot search matches displayed plot codes and trims surrounding spaces', as
   })
   assert.equal(document.querySelectorAll('.user-plot-card').length, 1)
   assert.match(document.querySelector('.user-plot-card').textContent, /B-05/)
+})
+
+test('harvest receipt submission replaces the ready prompt with the waiting status', async () => {
+  auth('khach_hang')
+  globalThis.fetch = async (url) => {
+    const path = new URL(url).pathname.replace('/api', '')
+    const data = path === '/rentals/harvest-deliveries/user'
+      ? [{ ma_hop_dong: 42, so_hieu_o: 'QA-HARVEST', trang_thai: 'cho_khach_chon' }]
+      : path.startsWith('/rentals/user/')
+        ? [{ ma_hop_dong: 42, trang_thai_canh_tac: 'san_sang_thu_hoach' }] : []
+    return { ok: true, json: async () => ({ success: true, data }) }
+  }
+  await render(h(MemoryRouter, { initialEntries: ['/dashboard?tab=harvest'] }, h(App)))
+  assert.match(document.body.textContent, /Vui lòng chọn hình thức nhận nông sản/)
+  await act(async () => {
+    document.querySelector('.form-panel form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }))
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  })
+  assert.match(document.body.textContent, /Đang chờ Farmer thu hoạch, đóng gói và bàn giao/)
+  assert.doesNotMatch(document.body.textContent, /Vui lòng chọn hình thức nhận nông sản/)
+  assert.doesNotMatch(document.body.textContent, /Chưa có ô đất nào sẵn sàng thu hoạch/)
 })
 
 test('accepting a farmer assignment refreshes the assigned plots without reloading the page', async () => {
