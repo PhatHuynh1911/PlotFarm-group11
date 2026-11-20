@@ -311,9 +311,9 @@ function FarmerPage({ user, onLogout }) {
         danh_sach_hinh_anh: journalForm.photo || null,
         video_ghi_hinh: journalForm.video || null,
       };
-      if (editingJournal)
-        await updateJournal(editingJournal.id, journalPayload, token);
-      else await createJournal(journalPayload, token);
+      const saved = editingJournal
+        ? await updateJournal(editingJournal.id, journalPayload, token)
+        : await createJournal(journalPayload, token);
       setJournal((items) =>
         editingJournal
           ? items.map((item) =>
@@ -324,7 +324,7 @@ function FarmerPage({ user, onLogout }) {
           : [
               {
                 ...journalForm,
-                id: Date.now(),
+                id: saved.data.ma_nhat_ky,
                 plot: targetPlot.id,
                 date: "Vừa cập nhật",
               },

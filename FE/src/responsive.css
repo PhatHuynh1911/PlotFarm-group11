@@ -35,3 +35,8 @@
   .journal-history-heading { align-items: stretch; flex-direction: column; }
   .journal-history-heading select { width: 100%; min-width: 0; }
 }
+.my-plot-image {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}

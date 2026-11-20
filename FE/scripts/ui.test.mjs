@@ -322,3 +322,33 @@ test('accepting a farmer assignment refreshes the assigned plots without reloadi
   assert.equal(document.querySelectorAll('.farmer-plot-card').length, 1)
   assert.match(document.querySelector('.farmer-plot-card').textContent, /QA-NEW/)
 })
+
+test('a newly saved farmer journal can be edited immediately using its database ID', async () => {
+  auth('nong_dan')
+  const writes = []
+  globalThis.fetch = async (url, options = {}) => {
+    const path = new URL(url).pathname.replace('/api', '')
+    if (options.method) writes.push([options.method, path])
+    const data = path === '/rentals/active'
+      ? [{ ma_hop_dong: 42, so_hieu_o: 'QA-JOURNAL', trang_thai_canh_tac: 'dang_canh_tac' }]
+      : path === '/journals' && options.method === 'POST' ? { ma_nhat_ky: 777 } : []
+    return { ok: true, json: async () => ({ success: true, data }) }
+  }
+  await render(h(MemoryRouter, { initialEntries: ['/farmer?tab=journal'] }, h(App)))
+  const note = document.querySelector('.farmer-form textarea')
+  assert.ok(note)
+  await act(() => {
+    Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set.call(note, 'Cây phát triển tốt')
+    note.dispatchEvent(new window.Event('input', { bubbles: true }))
+  })
+  const submit = async () => act(async () => {
+    document.querySelector('.farmer-form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }))
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  })
+  await submit()
+  const edit = [...document.querySelectorAll('button')].find((button) => button.textContent === 'Chỉnh sửa')
+  assert.ok(edit)
+  await act(() => edit.click())
+  await submit()
+  assert.deepEqual(writes, [['POST', '/journals'], ['PATCH', '/journals/777']])
+})
