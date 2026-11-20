@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { getComplaintTagByTitle } from "../data/complaintCategories.js";
-import { changeCurrentPassword, updateCurrentUser } from "../api.js";
+import { apiRequest, changeCurrentPassword, updateCurrentUser } from "../api.js";
 import ProfilePanel from "./ProfilePanel.jsx";
 import { RequestImages } from "./RequestImages.jsx";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const tabs = [
   ["overview", "Tổng quan"],
   ["users", "Người dùng"],
@@ -119,20 +118,10 @@ function AdminPage({ user, token, onLogout }) {
         "farmers",
         "assignments",
       ];
-      const responses = await Promise.all(
-        endpoints.map((endpoint) =>
-          fetch(`${API_URL}/admin/${endpoint}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-        ),
-      );
       const results = await Promise.all(
-        responses.map(async (response) => {
-          const result = await response.json();
-          if (!response.ok)
-            throw new Error(result.message || "Không thể tải dữ liệu quản trị");
-          return result.data;
-        }),
+        endpoints.map((endpoint) =>
+          apiRequest(`/admin/${endpoint}`, { token }).then((result) => result.data),
+        ),
       );
       setData({
         stats: results[0],
@@ -159,16 +148,11 @@ function AdminPage({ user, token, onLogout }) {
 
   const update = async (path, method, body) => {
     const isFormData = body instanceof FormData;
-    const response = await fetch(`${API_URL}/admin/${path}`, {
+    const result = await apiRequest(`/admin/${path}`, {
       method,
-      headers: {
-        ...(isFormData ? {} : { "Content-Type": "application/json" }),
-        Authorization: `Bearer ${token}`,
-      },
+      token,
       body: isFormData ? body : JSON.stringify(body),
     });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.message || "Thao tác thất bại");
     setNotice(result.message);
     await load();
   };

@@ -1,5 +1,29 @@
 # Bàn giao demo PlotFarm — 13/11/2026
 
+## Cập nhật ngày 20/11/2026
+
+- Chạy lại 123 kiểm tra API với SQL Server thật: đạt. Sau sửa lỗi, 45 test React đạt; build production thành công; lint không lỗi, còn 14 cảnh báo có sẵn.
+- Chrome 1440 × 844: gia hạn một tháng, xem QR và xác nhận thanh toán mô phỏng thành công; thời hạn tăng từ 365 lên 395 ngày. Chọn cây vụ mới thành công, hợp đồng chuyển về chờ canh tác.
+- Hủy đơn QA chưa thanh toán qua hộp xác nhận: thành công, UI báo đã hủy và ô đất đã được giải phóng. Chỉ dùng dữ liệu QA tạo trong phiên.
+- Kiểm tra form hỗ trợ/chọn ảnh và nhật ký User ở 1440px. Hộp chọn ảnh Windows vẫn không có định danh điều khiển hợp lệ; người dùng chọn Cancel và yêu cầu bỏ qua chọn ảnh. Upload vẫn đạt qua API và React, chưa đánh dấu kiểm tra chọn tệp Windows thành công.
+- Sửa ảnh dự phòng thẻ ô đất bị lặp nhiều hàng: ảnh hiện phủ khung một lần, đã xác nhận bằng Chrome.
+- Sửa mã nhật ký mới: dùng `ma_nhat_ky` từ API thay cho `Date.now()`, giúp chỉnh sửa/xóa ngay sau tạo gọi đúng bản ghi. Test hồi quy xác nhận tạo rồi sửa gọi đúng `/journals/777`.
+- Có thể tạo dữ liệu cho các bước UI còn lại bằng `node scripts/demo-smoke.cjs --with-db --ui --ui-harvest --ui-review`: ô A chờ thu hoạch, B chưa thanh toán để hủy, C đã bàn giao để chọn vụ mới/gia hạn. Mật khẩu QA ngẫu nhiên; nhập `done` để dọn.
+- PR #49 được kiểm tra: đang mở dạng draft, chưa merge, không có xung đột tại thời điểm kiểm tra. Chưa xác nhận từng tab/trạng thái của cả ba role ở 1440px.
+
+## Cập nhật ngày 17/11/2026
+
+- Chạy lại 123 kiểm tra API với SQL Server thật: đạt; dữ liệu QA đã được script dọn.
+- Sau sửa lỗi: 44 test React đạt, build production thành công; lint không lỗi, còn 14 cảnh báo có sẵn.
+- Chrome ở viewport 1440 × 844: đã xem trang nhận thu hoạch User, dashboard/thu hoạch Farmer, tổng quan/bảng hợp đồng Admin. Chưa kiểm tra từng tab của cả ba vai trò ở kích thước này.
+- User chọn nhận tại nông trại → Farmer bấm bàn giao: thành công trên UI, nút chuyển sang “Đã bàn giao”, số ô đang canh tác và chờ thu hoạch về 0.
+- Sửa thông báo User sau khi chọn cách nhận: hiện chờ Farmer đóng gói/bàn giao; không còn nhắc chọn cách nhận lần nữa. Khi đã bàn giao, hiện thông tin đã bàn giao.
+- Tắt BE và tải lại Admin: trang/menu vẫn hiển thị. Phát hiện lỗi mạng tiếng Anh; đã chuyển Admin sang bộ xử lý API chung để hiện tiếng Việt, xử lý phản hồi JSON lỗi và giữ đúng header multipart. Khởi động lại BE, tải lại trang thành công.
+- Bổ sung tùy chọn `--ui --ui-harvest` cho script QA: tạo hợp đồng demo đã thanh toán/phân công/sẵn sàng thu hoạch để thử nhận hàng và bàn giao; nhập `done` vẫn dọn toàn bộ dữ liệu QA.
+- Upload ảnh tiếp tục đạt qua API và React; hộp chọn tệp Windows chưa được xác nhận thủ công. Hủy/gia hạn/vụ mới đạt qua API, chưa kiểm tra lại đầy đủ bằng thao tác UI.
+
+Các kết quả ở phần bên dưới ghi nhận phiên 13/11, không thay thế cho phạm vi kiểm tra ngày 17/11 nêu trên.
+
 ## Khởi động
 
 1. Cài Node.js 20.19+ hoặc 22.12+, SQL Server và database `PlotFarmDB`.

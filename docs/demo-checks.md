@@ -1,5 +1,13 @@
 # Kiểm tra trước demo PlotFarm
 
+## Kết quả ngày 20/11/2026
+
+123 kiểm tra API, 45 test React và build đạt. Đã hoàn tất hủy đơn, gia hạn/thanh toán mô phỏng, chọn vụ mới trên Chrome 1440px bằng dữ liệu QA. Sửa ảnh dự phòng bị lặp và mã nhật ký tạm làm lỗi chỉnh sửa ngay sau tạo. Hộp chọn tệp Windows được người dùng Cancel, bỏ qua bước chọn ảnh. Phạm vi chi tiết và mục chưa xác nhận nằm trong [bàn giao](handover.md).
+
+## Kết quả ngày 17/11/2026
+
+123 kiểm tra API và 44 test React đạt; build thành công, lint còn 14 cảnh báo có sẵn. Đã kiểm tra User chọn nhận hàng → Farmer bàn giao trên Chrome, xem các màn chính ở 1440px và kiểm tra Admin khi BE tắt/khởi động lại. Sửa thông báo chờ nhận thu hoạch và lỗi mạng Admin. Xem [bàn giao](handover.md) để biết phạm vi và các thao tác UI còn chưa xác nhận.
+
 ## Kết quả mới nhất ngày 13/11/2026
 
 Xem [bàn giao](handover.md) để biết các bước đã kiểm tra thực tế và phần còn cần xác nhận. Đã chạy Chrome ở 360/390/768px; các ghi chú browser bị chặn bên dưới là lịch sử ngày 09–10/11. Kết quả mới: 123 kiểm tra API, 41 test React đạt, build thành công; lint còn 14 cảnh báo có sẵn.
