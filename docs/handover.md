@@ -1,5 +1,25 @@
 # Bàn giao demo PlotFarm — 13/11/2026
 
+## Cập nhật ngày 23/11/2026
+
+Đã xem các tab sau trong Chrome ở viewport 1440 × 844, gồm cuộn trang/thanh điều hướng để truy cập nội dung. Đây là kiểm tra bố cục với dữ liệu đang có, không phải kiểm tra mọi tổ hợp thao tác/trạng thái của từng bảng.
+
+| Vai trò | Tab đã mở và xem |
+| --- | --- |
+| User | Khu vườn, tìm/lọc đất, nhật ký có dữ liệu, camera, hỗ trợ/lịch sử chăm sóc và khiếu nại có ảnh, thu hoạch, giao dịch, hồ sơ |
+| Farmer | Ô đất, form/lịch sử nhật ký, yêu cầu có ảnh, camera, thu hoạch chờ khách phản hồi, hồ sơ |
+| Admin | Tổng quan, người dùng, ô đất, phân công, đơn thuê, chăm sóc/khiếu nại/tư vấn, thanh toán/gia hạn, hồ sơ; mở/đóng xem lớn ảnh khiếu nại |
+
+- 123 kiểm tra API với SQL Server thật và 50 test React đạt. Test bổ sung xác nhận trạng thái đang tải rồi mất mạng vẫn giữ menu và thông báo tiếng Việt cho cả ba vai trò. Đây là kiểm tra trạng thái trong jsdom; không ghi nhận mọi trạng thái lỗi là đã xem trực quan trong Chrome.
+- Build production đạt; lint không lỗi, còn 14 cảnh báo có sẵn. Các tài khoản seed Admin/Farmer/User ở mục dưới đã được kiểm tra đăng nhập lại đúng role hôm nay.
+- Sửa chữ tối trên nền xanh của phần ảnh khiếu nại và tiêu đề giao dịch bị chìm trên nền sáng. Lịch sử giao dịch chuyển sang bố cục khối, đã xem lại trên Chrome.
+- Sửa ảnh nhật ký Farmer bị mất khỏi UI sau tải lại: đọc `danh_sach_hinh_anh` bên cạnh trường cũ; test xác nhận ảnh hiển thị và được giữ khi chỉnh sửa. Chrome đã xác nhận lại phần tử ảnh trong lịch sử.
+- Camera User trước đây chỉ là khung minh họa với nhãn LIVE/mã ô/giờ cố định và nút toàn màn hình không thực hiện mở. Nay hiển thị chưa kết nối, có nút sang hỗ trợ. Liên kết camera Farmer cũng chỉ là bản nháp trong bộ nhớ màn hình, tải lại sẽ mất; đã làm rõ bằng nhãn và thông báo. Chưa tích hợp camera trực tiếp hay lưu cấu hình camera vào backend, không demo như luồng đang phát thật.
+- Ảnh hỗ trợ được kiểm tra qua upload API và viewer User/Farmer/Admin. Chọn tệp Windows vẫn chưa được xác nhận; người dùng đã chọn bỏ qua bước này ở phiên trước. Không đánh dấu upload bằng hộp thoại Windows là đạt.
+- PR #49 được kiểm tra đang mở dạng draft, chưa merge và không xung đột. Giữ draft để người review xác nhận bước chọn tệp thủ công và giới hạn camera trước khi chốt demo.
+
+Kịch bản trình bày: đăng nhập User → thuê/QR/thanh toán mô phỏng → Admin phân công → Farmer ghi nhật ký → gửi/xử lý hỗ trợ kèm ảnh → thu hoạch/nhận hàng/bàn giao → gia hạn hoặc chọn vụ mới. Dùng tài khoản QA khi thay đổi dữ liệu, nhập `done` ở terminal QA để dọn sau demo. Với camera, chỉ trình bày trạng thái chưa kết nối và hướng dẫn hỗ trợ.
+
 ## Cập nhật ngày 20/11/2026
 
 - Chạy lại 123 kiểm tra API với SQL Server thật: đạt. Sau sửa lỗi, 45 test React đạt; build production thành công; lint không lỗi, còn 14 cảnh báo có sẵn.

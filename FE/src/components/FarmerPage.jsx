@@ -45,6 +45,15 @@ const cultivationLabels = {
 };
 const formatDate = (value) =>
   value ? new Date(value).toLocaleDateString("vi-VN") : "Chưa cập nhật";
+const firstJournalImage = (entry) => {
+  const raw = entry.danh_sach_hinh_anh || entry.hinh_anh || "";
+  let images = raw;
+  if (typeof raw === "string") {
+    try { images = JSON.parse(raw); } catch { images = raw; }
+  }
+  const first = Array.isArray(images) ? images.find((item) => typeof item === "string") : images;
+  return typeof first === "string" && /^(https?:\/\/|\/|data:image\/)/i.test(first) ? first : "";
+};
 const mapServiceRequests = (serviceRequests) =>
   serviceRequests.map((request) => ({
     id: request.ma_yeu_cau,
@@ -84,10 +93,7 @@ function FarmerPage({ user, onLogout }) {
   });
   const [editingJournal, setEditingJournal] = useState(null);
   const [journalMessage, setJournalMessage] = useState("");
-  const [cameraUrls, setCameraUrls] = useState({
-    "A-03": "https://camera.plotfarm.vn/a03",
-    "C-09": "",
-  });
+  const [cameraUrls, setCameraUrls] = useState({});
   const [cameraMessage, setCameraMessage] = useState("");
   const [harvestDeliveries, setHarvestDeliveries] = useState([]);
   const [rejectingAssignment, setRejectingAssignment] = useState(null);
@@ -175,7 +181,7 @@ function FarmerPage({ user, onLogout }) {
                 water: "",
                 fertilizer: j.loai_phan_bon_da_dung || "Chưa bón",
                 note: j.noi_dung || j.ghi_chu_chi_tiet,
-                photo: j.hinh_anh,
+                photo: firstJournalImage(j),
                 video: j.video_ghi_hinh,
               }));
             } catch {
@@ -395,7 +401,7 @@ function FarmerPage({ user, onLogout }) {
   };
 
   const saveCamera = (plotId) => {
-    setCameraMessage(`Đã lưu liên kết camera cho ô ${plotId}.`);
+    setCameraMessage(`Liên kết ô ${plotId} chỉ được giữ tạm trên màn hình này, chưa kết nối camera cho khách hàng. Tải lại trang sẽ xóa bản nháp.`);
     setTimeout(() => setCameraMessage(""), 2500);
   };
 
@@ -1107,10 +1113,10 @@ function FarmerPage({ user, onLogout }) {
             <div className="panel-heading">
               <div>
                 <p className="eyebrow">THIẾT BỊ ĐƯỢC PHÂN QUYỀN</p>
-                <h2>Liên kết camera ô đất</h2>
+                <h2>Liên kết camera ô đất (bản nháp)</h2>
               </div>
               <span className="result-count">
-                Chỉ dùng link stream được cấp quyền
+                Chỉ giữ tạm; tải lại trang sẽ mất liên kết
               </span>
             </div>
             <div className="camera-settings">
@@ -1139,7 +1145,7 @@ function FarmerPage({ user, onLogout }) {
                     className="outline-button"
                     onClick={() => saveCamera(plot.id)}
                   >
-                    Lưu liên kết
+                    Ghi nhớ tạm
                   </button>
                 </div>
               ))}

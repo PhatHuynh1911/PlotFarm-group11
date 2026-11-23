@@ -20,7 +20,7 @@ PlotFarm là giải pháp công nghệ mang lại trải nghiệm làm nông ngh
 
 -Nhật ký canh tác: Cập nhật thông tin chi tiết về tình trạng cây trồng và các giai đoạn phát triển.
 
--Camera trực tuyến (Live Stream): Theo dõi hình ảnh thực tế của ô đất 24/7.
+-Camera: Màn hình chờ kết nối; hiện chưa tích hợp luồng phát trực tiếp. Liên kết Farmer nhập chỉ là bản nháp tạm trên màn hình.
 
 -Yêu cầu dịch vụ: Gửi yêu cầu hỗ trợ tưới nước, bón phân, phòng trừ sâu bệnh hoặc chăm sóc định kỳ cho nhà vườn.
 

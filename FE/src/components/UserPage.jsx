@@ -2106,25 +2106,18 @@ function UserPage({ user, token, onLogout }) {
         {activeTab === "live" && (
           <section className="dashboard-panel content-panel live-panel">
             <div>
-              <p className="eyebrow">LIVE STREAM · A-01</p>
+              <p className="eyebrow">CAMERA TRỰC TIẾP</p>
               <h2>Quan sát khu vườn theo thời gian thực</h2>
-              <p>Camera đang hoạt động, cập nhật hình ảnh mỗi 30 giây.</p>
+              <p>Chưa có luồng camera được kết nối. Bạn có thể gửi yêu cầu hỗ trợ tới nông trại hoặc xem ảnh trong nhật ký canh tác.</p>
               <button
                 className="primary-button"
-                onClick={() =>
-                  showNotice(
-                    "Camera đã sẵn sàng. Chức năng toàn màn hình đang được mở.",
-                  )
-                }
+                onClick={() => selectTab("support")}
               >
-                Mở toàn màn hình <span>↗</span>
+                Gửi yêu cầu hỗ trợ <span>→</span>
               </button>
             </div>
-            <div className="camera-frame">
-              <span className="camera-live">
-                <i /> LIVE
-              </span>
-              <span>CAM-A01 · 10:42:18</span>
+            <div className="camera-frame" role="status" aria-label="Camera chưa kết nối">
+              <span>Camera chưa kết nối</span>
             </div>
           </section>
         )}

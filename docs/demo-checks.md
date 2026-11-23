@@ -1,5 +1,9 @@
 # Kiểm tra trước demo PlotFarm
 
+## Kết quả ngày 23/11/2026
+
+Đã mở các tab của cả ba vai trò trong Chrome 1440 × 844; phạm vi từng tab nằm trong [bàn giao](handover.md). 123 kiểm tra API, 50 test React và build đạt; lint còn 14 cảnh báo cũ. Test loading/mất mạng cho cả ba role đạt. Sửa màu chữ khiếu nại/giao dịch, ảnh nhật ký Farmer sau tải lại và trạng thái camera minh họa gây hiểu nhầm. Chọn tệp Windows chưa được xác nhận; PR #49 tiếp tục draft, không merge.
+
 ## Kết quả ngày 20/11/2026
 
 123 kiểm tra API, 45 test React và build đạt. Đã hoàn tất hủy đơn, gia hạn/thanh toán mô phỏng, chọn vụ mới trên Chrome 1440px bằng dữ liệu QA. Sửa ảnh dự phòng bị lặp và mã nhật ký tạm làm lỗi chỉnh sửa ngay sau tạo. Hộp chọn tệp Windows được người dùng Cancel, bỏ qua bước chọn ảnh. Phạm vi chi tiết và mục chưa xác nhận nằm trong [bàn giao](handover.md).

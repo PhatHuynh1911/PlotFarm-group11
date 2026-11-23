@@ -40,3 +40,9 @@
   background-position: center;
   background-repeat: no-repeat;
 }
+.complaint-panel .request-image-picker label { color: #fff; }
+.complaint-panel .request-image-picker small,
+.complaint-panel .support-intro > p:not(.eyebrow) { color: #dce9dc; }
+.complaint-panel .request-image-picker .text-button { color: #f3d39d; }
+.payment-history-panel { display: block; background: #fff; color: #173525; border: 1px solid #dfe4dd; }
+.payment-history-panel h2 { color: #173525; }
