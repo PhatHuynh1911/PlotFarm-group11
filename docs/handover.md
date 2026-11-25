@@ -1,5 +1,11 @@
 # Bàn giao demo PlotFarm — 13/11/2026
 
+## Cập nhật ngày 25/11/2026
+
+- Mục 4: bản nháp camera Farmer có xem trước, kiểm tra URL HTTP/HTTPS, báo lỗi tải video, mất mạng và quá thời gian chờ 15 giây. Có nút thử lại; khi mạng trở lại sẽ kết nối lại phần xem trước.
+- 55 test React đạt, gồm 5 test mới cho URL sai, lỗi media/thử lại, timeout, offline/online và sửa liên kết trên màn Farmer. Build production đạt; lint còn 14 cảnh báo có sẵn.
+- Kiểm tra mới dùng sự kiện media trong jsdom, chưa xác nhận bằng camera thật. Chưa lưu cấu hình vào database hoặc nối camera sang màn User. Không chạy lại kiểm tra API trong lần sửa frontend này.
+
 ## Cập nhật ngày 23/11/2026
 
 Đã xem các tab sau trong Chrome ở viewport 1440 × 844, gồm cuộn trang/thanh điều hướng để truy cập nội dung. Đây là kiểm tra bố cục với dữ liệu đang có, không phải kiểm tra mọi tổ hợp thao tác/trạng thái của từng bảng.

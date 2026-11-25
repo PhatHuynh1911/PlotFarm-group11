@@ -10,13 +10,14 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true
 const { createElement: h, act, useState } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const { MemoryRouter } = await import('react-router-dom')
-let server, App, SafeImage, ErrorBoundary, api, ToastProvider, notify, root, RequestImages, RequestImagePicker
+let server, App, SafeImage, ErrorBoundary, api, ToastProvider, notify, root, RequestImages, RequestImagePicker, CameraPreview
 const originalFetch = globalThis.fetch
 const unavailable = async () => ({ ok: false, json: async () => ({ success: false, message: 'API unavailable QA' }) })
 before(async () => {
   server = await createServer({ server: { middlewareMode: true, hmr: false, ws: false, watch: null }, appType: 'custom' })
   App = (await server.ssrLoadModule('/src/App.jsx')).default
   SafeImage = (await server.ssrLoadModule('/src/components/SafeImage.jsx')).default
+  CameraPreview = (await server.ssrLoadModule('/src/components/CameraPreview.jsx')).default
   ErrorBoundary = (await server.ssrLoadModule('/src/components/ErrorBoundary.jsx')).default
   api = await server.ssrLoadModule('/src/api.js')
   ;({ ToastProvider, notify } = await server.ssrLoadModule('/src/components/ToastProvider.jsx'))
@@ -29,6 +30,80 @@ afterEach(async () => {
   globalThis.fetch = originalFetch
 })
 after(async () => { await server?.close(); dom.window.close() })
+
+test('invalid or credential-bearing camera links do not create a video request', async () => {
+  await render(h(CameraPreview, { url: '' }))
+  for (const url of ['', 'not a URL', 'javascript:alert(1)', 'ftp://camera.example/live', 'https://user:secret@camera.example/live']) {
+    await act(() => root.render(h(CameraPreview, { url })))
+    assert.equal(document.querySelector('video'), null)
+    assert.match(document.querySelector('[role="alert"]').textContent, /liên kết camera HTTP hoặc HTTPS hợp lệ/)
+  }
+})
+
+test('camera media failure removes the broken player and retry starts a fresh connection', async () => {
+  await render(h(CameraPreview, { url: 'https://camera.example/live.mp4' }))
+  const first = document.querySelector('video')
+  await act(() => first.dispatchEvent(new window.Event('error')))
+  assert.equal(document.querySelector('video'), null)
+  assert.match(document.querySelector('[role="alert"]').textContent, /Không thể tải camera/)
+  await act(() => document.querySelector('button').click())
+  const second = document.querySelector('video')
+  assert.ok(second)
+  assert.notEqual(second, first)
+  await act(() => second.dispatchEvent(new window.Event('loadeddata')))
+  assert.match(document.querySelector('[role="status"]').textContent, /Đã tải được dữ liệu video/)
+})
+
+test('camera connection and buffering timeouts show recovery actions', async () => {
+  await render(h(CameraPreview, { url: 'https://camera.example/live.mp4', timeoutMs: 60 }))
+  await act(() => document.querySelector('video').dispatchEvent(new window.Event('loadeddata')))
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 80)) })
+  assert.ok(document.querySelector('video'), 'loaded video must not retain the initial deadline')
+  await act(() => document.querySelector('video').dispatchEvent(new window.Event('waiting')))
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 80)) })
+  assert.match(document.querySelector('[role="alert"]').textContent, /Camera phản hồi quá lâu/)
+  assert.equal(document.querySelector('video'), null)
+  await act(() => document.querySelector('button').click())
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 80)) })
+  assert.match(document.querySelector('[role="alert"]').textContent, /Camera phản hồi quá lâu/)
+})
+
+test('camera reconnects after offline and a corrected URL clears the previous error', async () => {
+  await render(h(CameraPreview, { url: 'https://camera.example/old.mp4' }))
+  await act(() => window.dispatchEvent(new window.Event('offline')))
+  assert.equal(document.querySelector('video'), null)
+  assert.match(document.body.textContent, /Thiết bị đang mất mạng/)
+  await act(() => window.dispatchEvent(new window.Event('online')))
+  assert.ok(document.querySelector('video'))
+  await act(() => document.querySelector('video').dispatchEvent(new window.Event('error')))
+  await act(() => root.render(h(CameraPreview, { url: 'https://camera.example/corrected.mp4' })))
+  assert.equal(document.querySelector('[role="alert"]'), null)
+  assert.ok(document.querySelector('video').src.endsWith('/corrected.mp4'))
+  assert.match(document.body.textContent, /Đang kết nối camera/)
+})
+
+test('Farmer checks only the submitted draft camera link and can correct an invalid link', async () => {
+  auth('nong_dan')
+  globalThis.fetch = async (url) => ({ ok: true, json: async () => ({ success: true,
+    data: new URL(url).pathname.endsWith('/rentals/active')
+      ? [{ ma_hop_dong: 42, so_hieu_o: 'QA-CAMERA', trang_thai_canh_tac: 'dang_canh_tac' }] : [],
+  }) })
+  await render(h(MemoryRouter, { initialEntries: ['/farmer?tab=cameras'] }, h(App)))
+  const input = document.querySelector('input[aria-label="Liên kết camera ô QA-CAMERA"]')
+  const check = [...document.querySelectorAll('button')].find((button) => button.textContent === 'Kiểm tra liên kết')
+  const change = async (value) => act(() => {
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, value)
+    input.dispatchEvent(new window.Event('input', { bubbles: true }))
+  })
+  await change('bad link')
+  await act(() => check.click())
+  assert.match(document.querySelector('.camera-preview').textContent, /liên kết camera HTTP hoặc HTTPS hợp lệ/)
+  await change('https://camera.example/live.mp4')
+  assert.equal(document.querySelector('video'), null, 'typing alone must not connect')
+  await act(() => check.click())
+  assert.ok(document.querySelector('video').src.endsWith('/live.mp4'))
+  assert.match(document.body.textContent, /chưa lưu liên kết hoặc kết nối camera cho khách hàng/)
+})
 function auth(role) {
   const user = { id: 123, name: 'QA Test', email: 'qa@example.invalid', role }
   const payload = Buffer.from(JSON.stringify({ sub: user.id, role, exp: Math.floor(Date.now() / 1000) + 3600 })).toString('base64url')

@@ -28,6 +28,7 @@ import ImageLightbox from "./ImageLightbox.jsx";
 import FarmWeatherWidget from "./FarmWeatherWidget.jsx";
 import SafeImage from "./SafeImage.jsx";
 import { RequestImages } from "./RequestImages.jsx";
+import CameraPreview from "./CameraPreview.jsx";
 
 const requestLabels = {
   cho_tiep_nhan: "Chờ tiếp nhận",
@@ -94,7 +95,7 @@ function FarmerPage({ user, onLogout }) {
   const [editingJournal, setEditingJournal] = useState(null);
   const [journalMessage, setJournalMessage] = useState("");
   const [cameraUrls, setCameraUrls] = useState({});
-  const [cameraMessage, setCameraMessage] = useState("");
+  const [cameraChecks, setCameraChecks] = useState({});
   const [harvestDeliveries, setHarvestDeliveries] = useState([]);
   const [rejectingAssignment, setRejectingAssignment] = useState(null);
   const [rejectionReasonType, setRejectionReasonType] = useState("busy");
@@ -401,8 +402,9 @@ function FarmerPage({ user, onLogout }) {
   };
 
   const saveCamera = (plotId) => {
-    setCameraMessage(`Liên kết ô ${plotId} chỉ được giữ tạm trên màn hình này, chưa kết nối camera cho khách hàng. Tải lại trang sẽ xóa bản nháp.`);
-    setTimeout(() => setCameraMessage(""), 2500);
+    setCameraChecks((current) => ({ ...current, [plotId]: {
+      url: cameraUrls[plotId] || "", attempt: (current[plotId]?.attempt || 0) + 1,
+    } }));
   };
 
   const handleReadyToHarvest = async (plot) => {
@@ -1145,12 +1147,13 @@ function FarmerPage({ user, onLogout }) {
                     className="outline-button"
                     onClick={() => saveCamera(plot.id)}
                   >
-                    Ghi nhớ tạm
+                    Kiểm tra liên kết
                   </button>
+                  {cameraChecks[plot.id] && <CameraPreview key={`${plot.id}:${cameraChecks[plot.id].attempt}`} url={cameraChecks[plot.id].url} />}
                 </div>
               ))}
             </div>
-            {cameraMessage && <p className="form-success">{cameraMessage}</p>}
+            <p className="camera-help">Kiểm tra chỉ dùng để xem trước trên màn hình này, chưa lưu liên kết hoặc kết nối camera cho khách hàng. Tải lại trang sẽ xóa bản nháp.</p>
           </section>
         )}
 

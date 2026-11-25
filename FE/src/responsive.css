@@ -46,3 +46,8 @@
 .complaint-panel .request-image-picker .text-button { color: #f3d39d; }
 .payment-history-panel { display: block; background: #fff; color: #173525; border: 1px solid #dfe4dd; }
 .payment-history-panel h2 { color: #173525; }
+.camera-setting > .camera-preview { grid-column: 1 / -1; min-width: 0; }
+.camera-preview { padding: 14px; border: 1px solid #cbd9cf; border-radius: 8px; background: #f5f8f3; color: #173525; overflow-wrap: anywhere; }
+.camera-preview video { display: block; width: 100%; max-height: 360px; background: #173525; }
+.camera-preview [role="alert"], .camera-preview[role="alert"] { color: #933b26; }
+.camera-help { color: #526658; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }

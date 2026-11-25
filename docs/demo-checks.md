@@ -1,5 +1,9 @@
 # Kiểm tra trước demo PlotFarm
 
+## Kết quả ngày 25/11/2026
+
+Mục 4 camera: 55 test React và build đạt; lint còn 14 cảnh báo cũ. Đã kiểm tra tự động URL sai, lỗi media, thử lại, chờ quá lâu, mất mạng/có mạng lại và sửa liên kết nháp Farmer. Chưa kiểm tra camera thật; liên kết vẫn chỉ là bản nháp trên màn Farmer, chưa lưu database hoặc kết nối cho User. Chi tiết trong [bàn giao](handover.md).
+
 ## Kết quả ngày 23/11/2026
 
 Đã mở các tab của cả ba vai trò trong Chrome 1440 × 844; phạm vi từng tab nằm trong [bàn giao](handover.md). 123 kiểm tra API, 50 test React và build đạt; lint còn 14 cảnh báo cũ. Test loading/mất mạng cho cả ba role đạt. Sửa màu chữ khiếu nại/giao dịch, ảnh nhật ký Farmer sau tải lại và trạng thái camera minh họa gây hiểu nhầm. Chọn tệp Windows chưa được xác nhận; PR #49 tiếp tục draft, không merge.
