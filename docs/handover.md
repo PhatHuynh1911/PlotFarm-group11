@@ -1,5 +1,55 @@
 # Bàn giao demo PlotFarm — 13/11/2026
 
+## Cập nhật ngày 25/11/2026
+
+- Mục 4: bản nháp camera Farmer có xem trước, kiểm tra URL HTTP/HTTPS, báo lỗi tải video, mất mạng và quá thời gian chờ 15 giây. Có nút thử lại; khi mạng trở lại sẽ kết nối lại phần xem trước.
+- 55 test React đạt, gồm 5 test mới cho URL sai, lỗi media/thử lại, timeout, offline/online và sửa liên kết trên màn Farmer. Build production đạt; lint còn 14 cảnh báo có sẵn.
+- Kiểm tra mới dùng sự kiện media trong jsdom, chưa xác nhận bằng camera thật. Chưa lưu cấu hình vào database hoặc nối camera sang màn User. Không chạy lại kiểm tra API trong lần sửa frontend này.
+
+## Cập nhật ngày 23/11/2026
+
+Đã xem các tab sau trong Chrome ở viewport 1440 × 844, gồm cuộn trang/thanh điều hướng để truy cập nội dung. Đây là kiểm tra bố cục với dữ liệu đang có, không phải kiểm tra mọi tổ hợp thao tác/trạng thái của từng bảng.
+
+| Vai trò | Tab đã mở và xem |
+| --- | --- |
+| User | Khu vườn, tìm/lọc đất, nhật ký có dữ liệu, camera, hỗ trợ/lịch sử chăm sóc và khiếu nại có ảnh, thu hoạch, giao dịch, hồ sơ |
+| Farmer | Ô đất, form/lịch sử nhật ký, yêu cầu có ảnh, camera, thu hoạch chờ khách phản hồi, hồ sơ |
+| Admin | Tổng quan, người dùng, ô đất, phân công, đơn thuê, chăm sóc/khiếu nại/tư vấn, thanh toán/gia hạn, hồ sơ; mở/đóng xem lớn ảnh khiếu nại |
+
+- 123 kiểm tra API với SQL Server thật và 50 test React đạt. Test bổ sung xác nhận trạng thái đang tải rồi mất mạng vẫn giữ menu và thông báo tiếng Việt cho cả ba vai trò. Đây là kiểm tra trạng thái trong jsdom; không ghi nhận mọi trạng thái lỗi là đã xem trực quan trong Chrome.
+- Build production đạt; lint không lỗi, còn 14 cảnh báo có sẵn. Các tài khoản seed Admin/Farmer/User ở mục dưới đã được kiểm tra đăng nhập lại đúng role hôm nay.
+- Sửa chữ tối trên nền xanh của phần ảnh khiếu nại và tiêu đề giao dịch bị chìm trên nền sáng. Lịch sử giao dịch chuyển sang bố cục khối, đã xem lại trên Chrome.
+- Sửa ảnh nhật ký Farmer bị mất khỏi UI sau tải lại: đọc `danh_sach_hinh_anh` bên cạnh trường cũ; test xác nhận ảnh hiển thị và được giữ khi chỉnh sửa. Chrome đã xác nhận lại phần tử ảnh trong lịch sử.
+- Camera User trước đây chỉ là khung minh họa với nhãn LIVE/mã ô/giờ cố định và nút toàn màn hình không thực hiện mở. Nay hiển thị chưa kết nối, có nút sang hỗ trợ. Liên kết camera Farmer cũng chỉ là bản nháp trong bộ nhớ màn hình, tải lại sẽ mất; đã làm rõ bằng nhãn và thông báo. Chưa tích hợp camera trực tiếp hay lưu cấu hình camera vào backend, không demo như luồng đang phát thật.
+- Ảnh hỗ trợ được kiểm tra qua upload API và viewer User/Farmer/Admin. Chọn tệp Windows vẫn chưa được xác nhận; người dùng đã chọn bỏ qua bước này ở phiên trước. Không đánh dấu upload bằng hộp thoại Windows là đạt.
+- PR #49 được kiểm tra đang mở dạng draft, chưa merge và không xung đột. Giữ draft để người review xác nhận bước chọn tệp thủ công và giới hạn camera trước khi chốt demo.
+
+Kịch bản trình bày: đăng nhập User → thuê/QR/thanh toán mô phỏng → Admin phân công → Farmer ghi nhật ký → gửi/xử lý hỗ trợ kèm ảnh → thu hoạch/nhận hàng/bàn giao → gia hạn hoặc chọn vụ mới. Dùng tài khoản QA khi thay đổi dữ liệu, nhập `done` ở terminal QA để dọn sau demo. Với camera, chỉ trình bày trạng thái chưa kết nối và hướng dẫn hỗ trợ.
+
+## Cập nhật ngày 20/11/2026
+
+- Chạy lại 123 kiểm tra API với SQL Server thật: đạt. Sau sửa lỗi, 45 test React đạt; build production thành công; lint không lỗi, còn 14 cảnh báo có sẵn.
+- Chrome 1440 × 844: gia hạn một tháng, xem QR và xác nhận thanh toán mô phỏng thành công; thời hạn tăng từ 365 lên 395 ngày. Chọn cây vụ mới thành công, hợp đồng chuyển về chờ canh tác.
+- Hủy đơn QA chưa thanh toán qua hộp xác nhận: thành công, UI báo đã hủy và ô đất đã được giải phóng. Chỉ dùng dữ liệu QA tạo trong phiên.
+- Kiểm tra form hỗ trợ/chọn ảnh và nhật ký User ở 1440px. Hộp chọn ảnh Windows vẫn không có định danh điều khiển hợp lệ; người dùng chọn Cancel và yêu cầu bỏ qua chọn ảnh. Upload vẫn đạt qua API và React, chưa đánh dấu kiểm tra chọn tệp Windows thành công.
+- Sửa ảnh dự phòng thẻ ô đất bị lặp nhiều hàng: ảnh hiện phủ khung một lần, đã xác nhận bằng Chrome.
+- Sửa mã nhật ký mới: dùng `ma_nhat_ky` từ API thay cho `Date.now()`, giúp chỉnh sửa/xóa ngay sau tạo gọi đúng bản ghi. Test hồi quy xác nhận tạo rồi sửa gọi đúng `/journals/777`.
+- Có thể tạo dữ liệu cho các bước UI còn lại bằng `node scripts/demo-smoke.cjs --with-db --ui --ui-harvest --ui-review`: ô A chờ thu hoạch, B chưa thanh toán để hủy, C đã bàn giao để chọn vụ mới/gia hạn. Mật khẩu QA ngẫu nhiên; nhập `done` để dọn.
+- PR #49 được kiểm tra: đang mở dạng draft, chưa merge, không có xung đột tại thời điểm kiểm tra. Chưa xác nhận từng tab/trạng thái của cả ba role ở 1440px.
+
+## Cập nhật ngày 17/11/2026
+
+- Chạy lại 123 kiểm tra API với SQL Server thật: đạt; dữ liệu QA đã được script dọn.
+- Sau sửa lỗi: 44 test React đạt, build production thành công; lint không lỗi, còn 14 cảnh báo có sẵn.
+- Chrome ở viewport 1440 × 844: đã xem trang nhận thu hoạch User, dashboard/thu hoạch Farmer, tổng quan/bảng hợp đồng Admin. Chưa kiểm tra từng tab của cả ba vai trò ở kích thước này.
+- User chọn nhận tại nông trại → Farmer bấm bàn giao: thành công trên UI, nút chuyển sang “Đã bàn giao”, số ô đang canh tác và chờ thu hoạch về 0.
+- Sửa thông báo User sau khi chọn cách nhận: hiện chờ Farmer đóng gói/bàn giao; không còn nhắc chọn cách nhận lần nữa. Khi đã bàn giao, hiện thông tin đã bàn giao.
+- Tắt BE và tải lại Admin: trang/menu vẫn hiển thị. Phát hiện lỗi mạng tiếng Anh; đã chuyển Admin sang bộ xử lý API chung để hiện tiếng Việt, xử lý phản hồi JSON lỗi và giữ đúng header multipart. Khởi động lại BE, tải lại trang thành công.
+- Bổ sung tùy chọn `--ui --ui-harvest` cho script QA: tạo hợp đồng demo đã thanh toán/phân công/sẵn sàng thu hoạch để thử nhận hàng và bàn giao; nhập `done` vẫn dọn toàn bộ dữ liệu QA.
+- Upload ảnh tiếp tục đạt qua API và React; hộp chọn tệp Windows chưa được xác nhận thủ công. Hủy/gia hạn/vụ mới đạt qua API, chưa kiểm tra lại đầy đủ bằng thao tác UI.
+
+Các kết quả ở phần bên dưới ghi nhận phiên 13/11, không thay thế cho phạm vi kiểm tra ngày 17/11 nêu trên.
+
 ## Khởi động
 
 1. Cài Node.js 20.19+ hoặc 22.12+, SQL Server và database `PlotFarmDB`.

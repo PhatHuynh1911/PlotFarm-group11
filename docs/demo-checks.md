@@ -1,5 +1,21 @@
 # Kiểm tra trước demo PlotFarm
 
+## Kết quả ngày 25/11/2026
+
+Mục 4 camera: 55 test React và build đạt; lint còn 14 cảnh báo cũ. Đã kiểm tra tự động URL sai, lỗi media, thử lại, chờ quá lâu, mất mạng/có mạng lại và sửa liên kết nháp Farmer. Chưa kiểm tra camera thật; liên kết vẫn chỉ là bản nháp trên màn Farmer, chưa lưu database hoặc kết nối cho User. Chi tiết trong [bàn giao](handover.md).
+
+## Kết quả ngày 23/11/2026
+
+Đã mở các tab của cả ba vai trò trong Chrome 1440 × 844; phạm vi từng tab nằm trong [bàn giao](handover.md). 123 kiểm tra API, 50 test React và build đạt; lint còn 14 cảnh báo cũ. Test loading/mất mạng cho cả ba role đạt. Sửa màu chữ khiếu nại/giao dịch, ảnh nhật ký Farmer sau tải lại và trạng thái camera minh họa gây hiểu nhầm. Chọn tệp Windows chưa được xác nhận; PR #49 tiếp tục draft, không merge.
+
+## Kết quả ngày 20/11/2026
+
+123 kiểm tra API, 45 test React và build đạt. Đã hoàn tất hủy đơn, gia hạn/thanh toán mô phỏng, chọn vụ mới trên Chrome 1440px bằng dữ liệu QA. Sửa ảnh dự phòng bị lặp và mã nhật ký tạm làm lỗi chỉnh sửa ngay sau tạo. Hộp chọn tệp Windows được người dùng Cancel, bỏ qua bước chọn ảnh. Phạm vi chi tiết và mục chưa xác nhận nằm trong [bàn giao](handover.md).
+
+## Kết quả ngày 17/11/2026
+
+123 kiểm tra API và 44 test React đạt; build thành công, lint còn 14 cảnh báo có sẵn. Đã kiểm tra User chọn nhận hàng → Farmer bàn giao trên Chrome, xem các màn chính ở 1440px và kiểm tra Admin khi BE tắt/khởi động lại. Sửa thông báo chờ nhận thu hoạch và lỗi mạng Admin. Xem [bàn giao](handover.md) để biết phạm vi và các thao tác UI còn chưa xác nhận.
+
 ## Kết quả mới nhất ngày 13/11/2026
 
 Xem [bàn giao](handover.md) để biết các bước đã kiểm tra thực tế và phần còn cần xác nhận. Đã chạy Chrome ở 360/390/768px; các ghi chú browser bị chặn bên dưới là lịch sử ngày 09–10/11. Kết quả mới: 123 kiểm tra API, 41 test React đạt, build thành công; lint còn 14 cảnh báo có sẵn.

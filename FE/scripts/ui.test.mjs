@@ -10,13 +10,14 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true
 const { createElement: h, act, useState } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const { MemoryRouter } = await import('react-router-dom')
-let server, App, SafeImage, ErrorBoundary, api, ToastProvider, notify, root, RequestImages, RequestImagePicker
+let server, App, SafeImage, ErrorBoundary, api, ToastProvider, notify, root, RequestImages, RequestImagePicker, CameraPreview
 const originalFetch = globalThis.fetch
 const unavailable = async () => ({ ok: false, json: async () => ({ success: false, message: 'API unavailable QA' }) })
 before(async () => {
   server = await createServer({ server: { middlewareMode: true, hmr: false, ws: false, watch: null }, appType: 'custom' })
   App = (await server.ssrLoadModule('/src/App.jsx')).default
   SafeImage = (await server.ssrLoadModule('/src/components/SafeImage.jsx')).default
+  CameraPreview = (await server.ssrLoadModule('/src/components/CameraPreview.jsx')).default
   ErrorBoundary = (await server.ssrLoadModule('/src/components/ErrorBoundary.jsx')).default
   api = await server.ssrLoadModule('/src/api.js')
   ;({ ToastProvider, notify } = await server.ssrLoadModule('/src/components/ToastProvider.jsx'))
@@ -29,6 +30,80 @@ afterEach(async () => {
   globalThis.fetch = originalFetch
 })
 after(async () => { await server?.close(); dom.window.close() })
+
+test('invalid or credential-bearing camera links do not create a video request', async () => {
+  await render(h(CameraPreview, { url: '' }))
+  for (const url of ['', 'not a URL', 'javascript:alert(1)', 'ftp://camera.example/live', 'https://user:secret@camera.example/live']) {
+    await act(() => root.render(h(CameraPreview, { url })))
+    assert.equal(document.querySelector('video'), null)
+    assert.match(document.querySelector('[role="alert"]').textContent, /liên kết camera HTTP hoặc HTTPS hợp lệ/)
+  }
+})
+
+test('camera media failure removes the broken player and retry starts a fresh connection', async () => {
+  await render(h(CameraPreview, { url: 'https://camera.example/live.mp4' }))
+  const first = document.querySelector('video')
+  await act(() => first.dispatchEvent(new window.Event('error')))
+  assert.equal(document.querySelector('video'), null)
+  assert.match(document.querySelector('[role="alert"]').textContent, /Không thể tải camera/)
+  await act(() => document.querySelector('button').click())
+  const second = document.querySelector('video')
+  assert.ok(second)
+  assert.notEqual(second, first)
+  await act(() => second.dispatchEvent(new window.Event('loadeddata')))
+  assert.match(document.querySelector('[role="status"]').textContent, /Đã tải được dữ liệu video/)
+})
+
+test('camera connection and buffering timeouts show recovery actions', async () => {
+  await render(h(CameraPreview, { url: 'https://camera.example/live.mp4', timeoutMs: 60 }))
+  await act(() => document.querySelector('video').dispatchEvent(new window.Event('loadeddata')))
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 80)) })
+  assert.ok(document.querySelector('video'), 'loaded video must not retain the initial deadline')
+  await act(() => document.querySelector('video').dispatchEvent(new window.Event('waiting')))
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 80)) })
+  assert.match(document.querySelector('[role="alert"]').textContent, /Camera phản hồi quá lâu/)
+  assert.equal(document.querySelector('video'), null)
+  await act(() => document.querySelector('button').click())
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 80)) })
+  assert.match(document.querySelector('[role="alert"]').textContent, /Camera phản hồi quá lâu/)
+})
+
+test('camera reconnects after offline and a corrected URL clears the previous error', async () => {
+  await render(h(CameraPreview, { url: 'https://camera.example/old.mp4' }))
+  await act(() => window.dispatchEvent(new window.Event('offline')))
+  assert.equal(document.querySelector('video'), null)
+  assert.match(document.body.textContent, /Thiết bị đang mất mạng/)
+  await act(() => window.dispatchEvent(new window.Event('online')))
+  assert.ok(document.querySelector('video'))
+  await act(() => document.querySelector('video').dispatchEvent(new window.Event('error')))
+  await act(() => root.render(h(CameraPreview, { url: 'https://camera.example/corrected.mp4' })))
+  assert.equal(document.querySelector('[role="alert"]'), null)
+  assert.ok(document.querySelector('video').src.endsWith('/corrected.mp4'))
+  assert.match(document.body.textContent, /Đang kết nối camera/)
+})
+
+test('Farmer checks only the submitted draft camera link and can correct an invalid link', async () => {
+  auth('nong_dan')
+  globalThis.fetch = async (url) => ({ ok: true, json: async () => ({ success: true,
+    data: new URL(url).pathname.endsWith('/rentals/active')
+      ? [{ ma_hop_dong: 42, so_hieu_o: 'QA-CAMERA', trang_thai_canh_tac: 'dang_canh_tac' }] : [],
+  }) })
+  await render(h(MemoryRouter, { initialEntries: ['/farmer?tab=cameras'] }, h(App)))
+  const input = document.querySelector('input[aria-label="Liên kết camera ô QA-CAMERA"]')
+  const check = [...document.querySelectorAll('button')].find((button) => button.textContent === 'Kiểm tra liên kết')
+  const change = async (value) => act(() => {
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, value)
+    input.dispatchEvent(new window.Event('input', { bubbles: true }))
+  })
+  await change('bad link')
+  await act(() => check.click())
+  assert.match(document.querySelector('.camera-preview').textContent, /liên kết camera HTTP hoặc HTTPS hợp lệ/)
+  await change('https://camera.example/live.mp4')
+  assert.equal(document.querySelector('video'), null, 'typing alone must not connect')
+  await act(() => check.click())
+  assert.ok(document.querySelector('video').src.endsWith('/live.mp4'))
+  assert.match(document.body.textContent, /chưa lưu liên kết hoặc kết nối camera cho khách hàng/)
+})
 function auth(role) {
   const user = { id: 123, name: 'QA Test', email: 'qa@example.invalid', role }
   const payload = Buffer.from(JSON.stringify({ sub: user.id, role, exp: Math.floor(Date.now() / 1000) + 3600 })).toString('base64url')
@@ -48,6 +123,25 @@ async function route(path, role) {
 }
 const paths = { khach_hang: '/dashboard', nong_dan: '/farmer', quan_tri: '/admin' }
 for (const role of Object.keys(paths)) {
+  test(`${role}: loading and interrupted network keep navigation and readable recovery text`, async () => {
+    auth(role)
+    const pending = []
+    globalThis.fetch = () => new Promise((_resolve, reject) => pending.push(reject))
+    await render(h(MemoryRouter, { initialEntries: [paths[role]] }, h(App)))
+    assert.ok(document.querySelector('.workspace-nav'))
+    assert.match(document.body.textContent, /Đang tải/)
+    const originalError = console.error
+    console.error = () => {}
+    try {
+      await act(async () => {
+        pending.forEach((reject) => reject(new TypeError('Network interrupted QA')))
+        await new Promise((resolve) => setTimeout(resolve, 20))
+      })
+    } finally { console.error = originalError }
+    assert.ok(document.querySelector('.workspace-nav'))
+    assert.match(document.body.textContent, /Không thể kết nối đến máy chủ/)
+    assert.doesNotMatch(document.body.textContent, /Không thể hiển thị nội dung/)
+  })
   for (const target of Object.keys(paths)) {
     test(`route guard: ${role} -> ${paths[target]}`, async () => {
       await route(paths[target] + '?tab=profile', role)
@@ -69,6 +163,42 @@ test('signed-out protected route goes to home', async () => {
   await route('/admin')
   assert.ok(document.querySelector('#plots'))
   assert.equal(document.querySelector('.admin-workspace'), null)
+})
+
+test('unconnected User camera has an honest status and opens support instead of a fake fullscreen action', async () => {
+  auth('khach_hang')
+  globalThis.fetch = async () => ({ ok: true, json: async () => ({ success: true, data: [] }) })
+  await render(h(MemoryRouter, { initialEntries: ['/dashboard?tab=live'] }, h(App)))
+  assert.match(document.querySelector('.camera-frame').textContent, /Camera chưa kết nối/)
+  assert.equal(document.querySelector('.camera-live'), null)
+  const support = [...document.querySelectorAll('button')].find((button) => /Gửi yêu cầu hỗ trợ/.test(button.textContent))
+  assert.ok(support)
+  await act(() => support.click())
+  assert.match(document.body.textContent, /Gửi yêu cầu và theo dõi xử lý/)
+  assert.equal(document.querySelector('.camera-frame'), null)
+})
+
+test('Admin network failure shows Vietnamese guidance and preserves navigation', async () => {
+  auth('quan_tri')
+  globalThis.fetch = async () => { throw new TypeError('Failed to fetch') }
+  await render(h(MemoryRouter, { initialEntries: ['/admin?tab=rentals'] }, h(App)))
+  assert.ok(document.querySelector('.workspace-nav'))
+  assert.match(document.body.textContent, /Không thể kết nối đến máy chủ/)
+  assert.doesNotMatch(document.body.textContent, /Failed to fetch/)
+})
+
+test('multipart API requests let the browser supply the content type boundary', async () => {
+  let options
+  globalThis.fetch = async (_url, requestOptions) => {
+    options = requestOptions
+    return { ok: true, json: async () => ({ success: true }) }
+  }
+  const body = new FormData()
+  body.append('name', 'QA')
+  await api.apiRequest('/admin/plots', { method: 'POST', body, token: 'qa' })
+  assert.equal(options.body, body)
+  assert.equal(options.headers['Content-Type'], undefined)
+  assert.equal(options.headers.Authorization, 'Bearer qa')
 })
 test('malformed session cannot crash the app', async () => {
   sessionStorage.setItem('plotfarm_auth', '{broken')
@@ -257,6 +387,27 @@ test('plot search matches displayed plot codes and trims surrounding spaces', as
   assert.match(document.querySelector('.user-plot-card').textContent, /B-05/)
 })
 
+test('harvest receipt submission replaces the ready prompt with the waiting status', async () => {
+  auth('khach_hang')
+  globalThis.fetch = async (url) => {
+    const path = new URL(url).pathname.replace('/api', '')
+    const data = path === '/rentals/harvest-deliveries/user'
+      ? [{ ma_hop_dong: 42, so_hieu_o: 'QA-HARVEST', trang_thai: 'cho_khach_chon' }]
+      : path.startsWith('/rentals/user/')
+        ? [{ ma_hop_dong: 42, trang_thai_canh_tac: 'san_sang_thu_hoach' }] : []
+    return { ok: true, json: async () => ({ success: true, data }) }
+  }
+  await render(h(MemoryRouter, { initialEntries: ['/dashboard?tab=harvest'] }, h(App)))
+  assert.match(document.body.textContent, /Vui lòng chọn hình thức nhận nông sản/)
+  await act(async () => {
+    document.querySelector('.form-panel form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }))
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  })
+  assert.match(document.body.textContent, /Đang chờ Farmer thu hoạch, đóng gói và bàn giao/)
+  assert.doesNotMatch(document.body.textContent, /Vui lòng chọn hình thức nhận nông sản/)
+  assert.doesNotMatch(document.body.textContent, /Chưa có ô đất nào sẵn sàng thu hoạch/)
+})
+
 test('accepting a farmer assignment refreshes the assigned plots without reloading the page', async () => {
   auth('nong_dan')
   let accepted = false
@@ -277,4 +428,60 @@ test('accepting a farmer assignment refreshes the assigned plots without reloadi
   assert.ok(accepted)
   assert.equal(document.querySelectorAll('.farmer-plot-card').length, 1)
   assert.match(document.querySelector('.farmer-plot-card').textContent, /QA-NEW/)
+})
+
+test('a newly saved farmer journal can be edited immediately using its database ID', async () => {
+  auth('nong_dan')
+  const writes = []
+  globalThis.fetch = async (url, options = {}) => {
+    const path = new URL(url).pathname.replace('/api', '')
+    if (options.method) writes.push([options.method, path])
+    const data = path === '/rentals/active'
+      ? [{ ma_hop_dong: 42, so_hieu_o: 'QA-JOURNAL', trang_thai_canh_tac: 'dang_canh_tac' }]
+      : path === '/journals' && options.method === 'POST' ? { ma_nhat_ky: 777 } : []
+    return { ok: true, json: async () => ({ success: true, data }) }
+  }
+  await render(h(MemoryRouter, { initialEntries: ['/farmer?tab=journal'] }, h(App)))
+  const note = document.querySelector('.farmer-form textarea')
+  assert.ok(note)
+  await act(() => {
+    Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set.call(note, 'Cây phát triển tốt')
+    note.dispatchEvent(new window.Event('input', { bubbles: true }))
+  })
+  const submit = async () => act(async () => {
+    document.querySelector('.farmer-form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }))
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  })
+  await submit()
+  const edit = [...document.querySelectorAll('button')].find((button) => button.textContent === 'Chỉnh sửa')
+  assert.ok(edit)
+  await act(() => edit.click())
+  await submit()
+  assert.deepEqual(writes, [['POST', '/journals'], ['PATCH', '/journals/777']])
+})
+
+test('a reloaded Farmer journal displays its saved image and preserves it when editing', async () => {
+  auth('nong_dan')
+  let edited
+  const photo = '/uploads/qa-journal.png'
+  globalThis.fetch = async (url, options = {}) => {
+    const path = new URL(url).pathname.replace('/api', '')
+    if (options.method === 'PATCH') edited = JSON.parse(options.body)
+    const data = path === '/rentals/active'
+      ? [{ ma_hop_dong: 42, so_hieu_o: 'QA-JOURNAL', trang_thai_canh_tac: 'dang_canh_tac' }]
+      : path === '/journals/rental/42'
+        ? [{ ma_nhat_ky: 777, ghi_chu_chi_tiet: 'Cây phát triển tốt', danh_sach_hinh_anh: JSON.stringify([photo]) }] : []
+    return { ok: true, json: async () => ({ success: true, data }) }
+  }
+  await render(h(MemoryRouter, { initialEntries: ['/farmer?tab=journal'] }, h(App)))
+  const image = document.querySelector('img[alt="Ảnh cây trồng trong nhật ký"]')
+  assert.ok(image)
+  assert.ok(image.src.endsWith(photo))
+  const edit = [...document.querySelectorAll('button')].find((button) => button.textContent === 'Chỉnh sửa')
+  await act(() => edit.click())
+  await act(async () => {
+    document.querySelector('.farmer-form').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }))
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  })
+  assert.equal(edited.danh_sach_hinh_anh, photo)
 })

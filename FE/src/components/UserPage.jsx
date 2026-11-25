@@ -2106,25 +2106,18 @@ function UserPage({ user, token, onLogout }) {
         {activeTab === "live" && (
           <section className="dashboard-panel content-panel live-panel">
             <div>
-              <p className="eyebrow">LIVE STREAM · A-01</p>
+              <p className="eyebrow">CAMERA TRỰC TIẾP</p>
               <h2>Quan sát khu vườn theo thời gian thực</h2>
-              <p>Camera đang hoạt động, cập nhật hình ảnh mỗi 30 giây.</p>
+              <p>Chưa có luồng camera được kết nối. Bạn có thể gửi yêu cầu hỗ trợ tới nông trại hoặc xem ảnh trong nhật ký canh tác.</p>
               <button
                 className="primary-button"
-                onClick={() =>
-                  showNotice(
-                    "Camera đã sẵn sàng. Chức năng toàn màn hình đang được mở.",
-                  )
-                }
+                onClick={() => selectTab("support")}
               >
-                Mở toàn màn hình <span>↗</span>
+                Gửi yêu cầu hỗ trợ <span>→</span>
               </button>
             </div>
-            <div className="camera-frame">
-              <span className="camera-live">
-                <i /> LIVE
-              </span>
-              <span>CAM-A01 · 10:42:18</span>
+            <div className="camera-frame" role="status" aria-label="Camera chưa kết nối">
+              <span>Camera chưa kết nối</span>
             </div>
           </section>
         )}
@@ -2225,9 +2218,8 @@ function UserPage({ user, token, onLogout }) {
               <p>Đăng ký địa chỉ và cách vận chuyển trước ngày thu hoạch.</p>
             </div>
             {selectedHarvestRental &&
-              rentals.find(
-                (r) => String(r.ma_hop_dong) === String(selectedHarvestRental),
-              )?.trang_thai_canh_tac === "san_sang_thu_hoach" && (
+              harvestDeliveries.some((item) => String(item.ma_hop_dong) === String(selectedHarvestRental)
+                && item.trang_thai === "cho_khach_chon") && (
                 <div
                   style={{
                     background: "#e8f5e9",
@@ -2243,7 +2235,11 @@ function UserPage({ user, token, onLogout }) {
                 </div>
               )}
             {harvestDeliveries.filter((item) => item.trang_thai === "cho_khach_chon").length === 0 ? (
-              <p className="empty-state">Chưa có ô đất nào sẵn sàng thu hoạch. Khi Farmer cập nhật, form chọn hình thức nhận hàng sẽ tự mở khóa tại đây.</p>
+              <p className="empty-state">{harvestDeliveries.some((item) => item.trang_thai === "cho_thu_hoach_dong_goi")
+                ? "Đã gửi cách nhận hàng. Đang chờ Farmer thu hoạch, đóng gói và bàn giao."
+                : harvestDeliveries.some((item) => item.trang_thai === "da_ban_giao_van_chuyen")
+                  ? "Nông sản đã được Farmer xác nhận bàn giao. Chưa có mùa vụ mới chờ chọn cách nhận hàng."
+                  : "Chưa có ô đất nào sẵn sàng thu hoạch. Khi Farmer cập nhật, form chọn hình thức nhận hàng sẽ tự mở khóa tại đây."}</p>
             ) : (
               <form onSubmit={async (event) => {
                 event.preventDefault();
@@ -2262,6 +2258,7 @@ function UserPage({ user, token, onLogout }) {
                     ghi_chu_khach: harvestForm.note,
                   }, token);
                   setHarvestDeliveries((items) => items.map((item) => item.ma_hop_dong === selected.ma_hop_dong ? { ...item, trang_thai: "cho_thu_hoach_dong_goi" } : item));
+                  setSelectedHarvestRental(String(harvestDeliveries.find((item) => item.ma_hop_dong !== selected.ma_hop_dong && item.trang_thai === "cho_khach_chon")?.ma_hop_dong || ""));
                   notify("Đã gửi yêu cầu đóng gói và giao hàng tới Farmer.");
                 } catch (harvestError) {
                   notify(harvestError.message, "error");
